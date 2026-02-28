@@ -6,6 +6,12 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { creditAccount, creditTransaction } from "./credit.schema";
+import { customer } from "./customer.schema";
+import { category, inventoryMovement, product } from "./inventory.schema";
+import { cashMovement, shift } from "./pos.schema";
+import { payment, sale } from "./sales.schema";
+
 
 export const user = sqliteTable("user", {
   id: text("id").primaryKey(),
@@ -148,7 +154,13 @@ export const userRelations = relations(user, ({ many }) => ({
   accounts: many(account),
   members: many(member),
   invitations: many(invitation),
+  // Nuevas relaciones POS
+  inventoryMovements: many(inventoryMovement),
+  shifts: many(shift),
+  sales: many(sale),
 }));
+
+
 
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, {
@@ -167,7 +179,19 @@ export const accountRelations = relations(account, ({ one }) => ({
 export const organizationRelations = relations(organization, ({ many }) => ({
   members: many(member),
   invitations: many(invitation),
+  // Nuevas relaciones POS
+  customers: many(customer),
+  categories: many(category),
+  products: many(product),
+  inventoryMovements: many(inventoryMovement),
+  shifts: many(shift),
+  cashMovements: many(cashMovement),
+  sales: many(sale),
+  payments: many(payment),
+  creditAccounts: many(creditAccount),
+  creditTransactions: many(creditTransaction),
 }));
+
 
 export const memberRelations = relations(member, ({ one }) => ({
   organization: one(organization, {

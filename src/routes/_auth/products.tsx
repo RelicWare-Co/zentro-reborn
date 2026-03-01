@@ -31,7 +31,10 @@ import { DeleteProductDialog } from "@/features/products/components/delete-produ
 import { ProductFormSheet } from "@/features/products/components/product-form-sheet";
 import { getProductsColumns } from "@/features/products/components/products-table-columns";
 import type { Product } from "@/features/products/hooks/use-products";
-import { useProductsMutations, useProductsQueries } from "@/features/products/hooks/use-products";
+import {
+	useProductsMutations,
+	useProductsQueries,
+} from "@/features/products/hooks/use-products";
 import { getProducts } from "@/features/products/products.functions";
 
 export const Route = createFileRoute("/_auth/products")({

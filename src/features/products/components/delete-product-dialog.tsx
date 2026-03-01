@@ -23,16 +23,13 @@ export function DeleteProductDialog({
 	isPending,
 }: DeleteProductDialogProps) {
 	return (
-		<AlertDialog
-			open={productId !== null}
-			onOpenChange={onOpenChange}
-		>
+		<AlertDialog open={productId !== null} onOpenChange={onOpenChange}>
 			<AlertDialogContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
 				<AlertDialogHeader>
 					<AlertDialogTitle>Are you sure?</AlertDialogTitle>
 					<AlertDialogDescription className="text-gray-400">
-						This action cannot be undone. The product will be marked as
-						deleted and removed from the active inventory.
+						This action cannot be undone. The product will be marked as deleted
+						and removed from the active inventory.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>

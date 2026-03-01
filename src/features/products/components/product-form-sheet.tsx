@@ -143,7 +143,10 @@ export function ProductFormSheet({
 									id={nameId}
 									value={productForm.name}
 									onChange={(e) =>
-										setProductForm((prev) => ({ ...prev, name: e.target.value }))
+										setProductForm((prev) => ({
+											...prev,
+											name: e.target.value,
+										}))
 									}
 									placeholder="e.g., Capuccino"
 									className="bg-black/20 border-gray-700 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20"

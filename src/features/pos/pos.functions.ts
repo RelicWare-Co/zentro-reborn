@@ -7,9 +7,24 @@ import {
 	getShiftCloseSummaryForCurrentOrganization,
 	openShiftForCurrentOrganization,
 	registerCashMovementForCurrentOrganization,
+	searchPosCustomersForCurrentOrganization,
+	searchPosProductsForCurrentOrganization,
 } from "./pos.server";
 
 const nullableString = z.string().trim().optional().nullable();
+
+const searchPosProductsInputSchema = z.object({
+	searchQuery: nullableString,
+	categoryId: nullableString,
+	limit: z.coerce.number().int().min(1).max(100).optional(),
+	cursor: z.coerce.number().int().min(0).optional(),
+});
+
+const searchPosCustomersInputSchema = z.object({
+	searchQuery: nullableString,
+	limit: z.coerce.number().int().min(1).max(100).optional(),
+	cursor: z.coerce.number().int().min(0).optional(),
+});
 
 const openShiftInputSchema = z.object({
 	startingCash: z.coerce.number().min(0),
@@ -103,6 +118,27 @@ export const getPosBootstrap = createServerFn({ method: "GET" }).handler(
 		return getPosBootstrapForCurrentOrganization();
 	},
 );
+
+export const searchPosProducts = createServerFn({ method: "GET" })
+	.inputValidator(searchPosProductsInputSchema)
+	.handler(async ({ data }) => {
+		return searchPosProductsForCurrentOrganization({
+			searchQuery: data.searchQuery ?? undefined,
+			categoryId: data.categoryId ?? undefined,
+			limit: data.limit,
+			cursor: data.cursor,
+		});
+	});
+
+export const searchPosCustomers = createServerFn({ method: "GET" })
+	.inputValidator(searchPosCustomersInputSchema)
+	.handler(async ({ data }) => {
+		return searchPosCustomersForCurrentOrganization({
+			searchQuery: data.searchQuery ?? undefined,
+			limit: data.limit,
+			cursor: data.cursor,
+		});
+	});
 
 export const openShift = createServerFn({ method: "POST" })
 	.inputValidator(openShiftInputSchema)

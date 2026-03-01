@@ -27,9 +27,7 @@ export function useProductsQueries(initialProducts?: Product[]) {
 	return { products, categories };
 }
 
-export function useProductsMutations(options?: {
-	onSuccess?: () => void;
-}) {
+export function useProductsMutations(options?: { onSuccess?: () => void }) {
 	const queryClient = useQueryClient();
 
 	const handleSuccess = async () => {

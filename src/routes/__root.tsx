@@ -4,10 +4,8 @@ import {
   createRootRouteWithContext,
   HeadContent,
   Scripts,
-  useLocation,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { AppLayout } from '../components/AppLayout'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 import TanStackQueryProvider from '../integrations/tanstack-query/root-provider'
 import appCss from '../styles/globals.css?url'
@@ -43,9 +41,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-  const location = useLocation()
-  const isAuthPage = location.pathname === '/login'
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -55,11 +50,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body className="font-sans antialiased [overflow-wrap:anywhere] selection:bg-[rgba(79,184,178,0.24)]">
         <TanStackQueryProvider>
-          {isAuthPage ? (
-            children
-          ) : (
-            <AppLayout>{children}</AppLayout>
-          )}
+          {children}
           <TanStackDevtools
             config={{
               position: 'bottom-right',

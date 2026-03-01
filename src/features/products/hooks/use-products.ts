@@ -1,0 +1,81 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	createProduct,
+	deleteProduct,
+	getCategories,
+	getProducts,
+	updateProduct,
+} from "@/features/products/products.functions";
+
+export type Product = Awaited<ReturnType<typeof getProducts>>[number];
+
+export const PRODUCT_QUERY_KEY = ["products"];
+export const CATEGORY_QUERY_KEY = ["product-categories"];
+
+export function useProductsQueries(initialProducts?: Product[]) {
+	const { data: products = initialProducts ?? [] } = useQuery({
+		queryKey: PRODUCT_QUERY_KEY,
+		queryFn: () => getProducts(),
+		initialData: initialProducts,
+	});
+
+	const { data: categories = [] } = useQuery({
+		queryKey: CATEGORY_QUERY_KEY,
+		queryFn: () => getCategories(),
+	});
+
+	return { products, categories };
+}
+
+export function useProductsMutations(options?: {
+	onSuccess?: () => void;
+}) {
+	const queryClient = useQueryClient();
+
+	const handleSuccess = async () => {
+		options?.onSuccess?.();
+		await queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEY });
+	};
+
+	const createProductMutation = useMutation({
+		mutationFn: (payload: {
+			name: string;
+			categoryId: string | null;
+			sku: string | null;
+			barcode: string | null;
+			price: number;
+			cost: number;
+			taxRate: number;
+			stock: number;
+			trackInventory: boolean;
+		}) => createProduct({ data: payload }),
+		onSuccess: handleSuccess,
+	});
+
+	const updateProductMutation = useMutation({
+		mutationFn: (payload: {
+			id: string;
+			name: string;
+			categoryId: string | null;
+			sku: string | null;
+			barcode: string | null;
+			price: number;
+			cost: number;
+			taxRate: number;
+			stock: number;
+			trackInventory: boolean;
+		}) => updateProduct({ data: payload }),
+		onSuccess: handleSuccess,
+	});
+
+	const deleteProductMutation = useMutation({
+		mutationFn: (id: string) => deleteProduct({ data: { id } }),
+		onSuccess: handleSuccess,
+	});
+
+	return {
+		createProductMutation,
+		updateProductMutation,
+		deleteProductMutation,
+	};
+}

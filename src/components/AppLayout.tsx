@@ -1,5 +1,5 @@
 import { Link, useLocation } from '@tanstack/react-router'
-import { LayoutDashboard, LogOut, Menu, Package, Settings, Store, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LayoutDashboard, LogOut, Menu, Package, Settings, Store } from 'lucide-react'
 import { useState } from 'react'
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

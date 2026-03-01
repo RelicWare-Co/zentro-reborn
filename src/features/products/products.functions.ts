@@ -1,0 +1,86 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import {
+	createProductForCurrentOrganization,
+	deleteProductForCurrentOrganization,
+	getCategoriesForCurrentOrganization,
+	getProductsForCurrentOrganization,
+	updateProductForCurrentOrganization,
+} from "./products.server";
+
+const nullableString = z.string().trim().optional().nullable();
+
+const createProductInputSchema = z.object({
+	name: z.string().trim().min(1, "El nombre es obligatorio"),
+	categoryId: nullableString,
+	sku: nullableString,
+	barcode: nullableString,
+	price: z.coerce.number().min(0),
+	cost: z.coerce.number().min(0).optional(),
+	taxRate: z.coerce.number().min(0).max(100).optional(),
+	stock: z.coerce.number().int().min(0).optional(),
+	trackInventory: z.boolean().optional(),
+});
+
+const updateProductInputSchema = z
+	.object({
+		id: z.string().trim().min(1),
+		name: z.string().trim().min(1).optional(),
+		categoryId: nullableString,
+		sku: nullableString,
+		barcode: nullableString,
+		price: z.coerce.number().min(0).optional(),
+		cost: z.coerce.number().min(0).optional(),
+		taxRate: z.coerce.number().min(0).max(100).optional(),
+		stock: z.coerce.number().int().min(0).optional(),
+		trackInventory: z.boolean().optional(),
+	})
+	.refine(
+		(input) =>
+			input.name !== undefined ||
+			input.categoryId !== undefined ||
+			input.sku !== undefined ||
+			input.barcode !== undefined ||
+			input.price !== undefined ||
+			input.cost !== undefined ||
+			input.taxRate !== undefined ||
+			input.stock !== undefined ||
+			input.trackInventory !== undefined,
+		{
+			message: "Debes enviar al menos un campo para actualizar",
+		},
+	);
+
+const deleteProductInputSchema = z.object({
+	id: z.string().trim().min(1),
+});
+
+export const getProducts = createServerFn({ method: "GET" }).handler(
+	async () => {
+		return getProductsForCurrentOrganization();
+	},
+);
+
+export const getCategories = createServerFn({ method: "GET" }).handler(
+	async () => {
+		return getCategoriesForCurrentOrganization();
+	},
+);
+
+export const createProduct = createServerFn({ method: "POST" })
+	.inputValidator(createProductInputSchema)
+	.handler(async ({ data }) => {
+		return createProductForCurrentOrganization(data);
+	});
+
+export const updateProduct = createServerFn({ method: "POST" })
+	.inputValidator(updateProductInputSchema)
+	.handler(async ({ data }) => {
+		return updateProductForCurrentOrganization(data);
+	});
+
+export const deleteProduct = createServerFn({ method: "POST" })
+	.inputValidator(deleteProductInputSchema)
+	.handler(async ({ data }) => {
+		return deleteProductForCurrentOrganization(data.id);
+	});

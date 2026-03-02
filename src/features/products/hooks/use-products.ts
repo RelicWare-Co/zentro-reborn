@@ -1,13 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+	createCategory,
 	createProduct,
+	deleteCategory,
 	deleteProduct,
 	getCategories,
 	getProducts,
+	registerInventoryMovement,
+	updateCategory,
 	updateProduct,
 } from "@/features/products/products.functions";
 
 export type Product = Awaited<ReturnType<typeof getProducts>>[number];
+export type Category = Awaited<ReturnType<typeof getCategories>>[number];
 
 export const PRODUCT_QUERY_KEY = ["products"];
 export const CATEGORY_QUERY_KEY = ["product-categories"];
@@ -46,6 +51,7 @@ export function useProductsMutations(options?: { onSuccess?: () => void }) {
 			taxRate: number;
 			stock: number;
 			trackInventory: boolean;
+			isModifier: boolean;
 		}) => createProduct({ data: payload }),
 		onSuccess: handleSuccess,
 	});
@@ -62,6 +68,7 @@ export function useProductsMutations(options?: { onSuccess?: () => void }) {
 			taxRate: number;
 			stock: number;
 			trackInventory: boolean;
+			isModifier: boolean;
 		}) => updateProduct({ data: payload }),
 		onSuccess: handleSuccess,
 	});
@@ -71,9 +78,61 @@ export function useProductsMutations(options?: { onSuccess?: () => void }) {
 		onSuccess: handleSuccess,
 	});
 
+	const createCategoryMutation = useMutation({
+		mutationFn: (payload: { name: string; description: string | null }) =>
+			createCategory({ data: payload }),
+		onSuccess: async () => {
+			options?.onSuccess?.();
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEY }),
+				queryClient.invalidateQueries({ queryKey: CATEGORY_QUERY_KEY }),
+			]);
+		},
+	});
+
+	const updateCategoryMutation = useMutation({
+		mutationFn: (payload: {
+			id: string;
+			name?: string;
+			description?: string | null;
+		}) => updateCategory({ data: payload }),
+		onSuccess: async () => {
+			options?.onSuccess?.();
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEY }),
+				queryClient.invalidateQueries({ queryKey: CATEGORY_QUERY_KEY }),
+			]);
+		},
+	});
+
+	const deleteCategoryMutation = useMutation({
+		mutationFn: (id: string) => deleteCategory({ data: { id } }),
+		onSuccess: async () => {
+			options?.onSuccess?.();
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEY }),
+				queryClient.invalidateQueries({ queryKey: CATEGORY_QUERY_KEY }),
+			]);
+		},
+	});
+
+	const registerInventoryMovementMutation = useMutation({
+		mutationFn: (payload: {
+			productId: string;
+			type: "restock" | "waste" | "adjustment";
+			quantity: number;
+			notes: string | null;
+		}) => registerInventoryMovement({ data: payload }),
+		onSuccess: handleSuccess,
+	});
+
 	return {
 		createProductMutation,
 		updateProductMutation,
 		deleteProductMutation,
+		createCategoryMutation,
+		updateCategoryMutation,
+		deleteCategoryMutation,
+		registerInventoryMovementMutation,
 	};
 }

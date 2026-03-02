@@ -80,14 +80,15 @@ describe("products.server", () => {
 					name: "Comidas",
 					description: null,
 				});
-			const { id: productId } = await server.createProductForCurrentOrganization({
-				name: "Almuerzo",
-				categoryId,
-				price: 25000,
-				cost: 12000,
-				stock: 5,
-				trackInventory: true,
-			});
+			const { id: productId } =
+				await server.createProductForCurrentOrganization({
+					name: "Almuerzo",
+					categoryId,
+					price: 25000,
+					cost: 12000,
+					stock: 5,
+					trackInventory: true,
+				});
 
 			await server.deleteProductForCurrentOrganization(productId);
 
@@ -136,13 +137,14 @@ describe("products.server", () => {
 					name: "Bebidas",
 					description: null,
 				});
-			const { id: productId } = await server.createProductForCurrentOrganization({
-				name: "Papas",
-				categoryId: sourceCategoryId,
-				price: 3000,
-				trackInventory: true,
-				stock: 5,
-			});
+			const { id: productId } =
+				await server.createProductForCurrentOrganization({
+					name: "Papas",
+					categoryId: sourceCategoryId,
+					price: 3000,
+					trackInventory: true,
+					stock: 5,
+				});
 
 			const updateResult = await server.updateProductForCurrentOrganization({
 				id: productId,
@@ -183,6 +185,95 @@ describe("products.server", () => {
 		}
 	});
 
+	test("persists modifier product flag", async () => {
+		const { ctx, server } = await setupProductsServer();
+		try {
+			const { id: productId } =
+				await server.createProductForCurrentOrganization({
+					name: "Extra Queso",
+					price: 2500,
+					isModifier: true,
+					trackInventory: false,
+				});
+
+			const [createdProduct] = await ctx.db
+				.select({ isModifier: schema.product.isModifier })
+				.from(schema.product)
+				.where(eq(schema.product.id, productId))
+				.limit(1);
+
+			expect(createdProduct?.isModifier).toBe(true);
+
+			await server.updateProductForCurrentOrganization({
+				id: productId,
+				isModifier: false,
+			});
+
+			const [updatedProduct] = await ctx.db
+				.select({ isModifier: schema.product.isModifier })
+				.from(schema.product)
+				.where(eq(schema.product.id, productId))
+				.limit(1);
+
+			expect(updatedProduct?.isModifier).toBe(false);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("registers restock and waste inventory movements", async () => {
+		const { ctx, server } = await setupProductsServer();
+		try {
+			const { id: productId } =
+				await server.createProductForCurrentOrganization({
+					name: "Pan",
+					price: 1500,
+					stock: 10,
+					trackInventory: true,
+				});
+
+			await server.registerInventoryMovementForCurrentOrganization({
+				productId,
+				type: "restock",
+				quantity: 5,
+				notes: "Compra proveedor",
+			});
+
+			await server.registerInventoryMovementForCurrentOrganization({
+				productId,
+				type: "waste",
+				quantity: 3,
+				notes: "Producto dañado",
+			});
+
+			const [productRow] = await ctx.db
+				.select({ stock: schema.product.stock })
+				.from(schema.product)
+				.where(eq(schema.product.id, productId))
+				.limit(1);
+
+			expect(productRow?.stock).toBe(12);
+
+			const movementRows = await ctx.db
+				.select({
+					type: schema.inventoryMovement.type,
+					quantity: schema.inventoryMovement.quantity,
+				})
+				.from(schema.inventoryMovement)
+				.where(eq(schema.inventoryMovement.productId, productId));
+
+			expect(movementRows).toHaveLength(2);
+			expect(movementRows).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ type: "restock", quantity: 5 }),
+					expect.objectContaining({ type: "waste", quantity: -3 }),
+				]),
+			);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
 	test("rejects update operations without fields", async () => {
 		const { ctx, server } = await setupProductsServer();
 		try {
@@ -215,7 +306,9 @@ describe("products.server", () => {
 				description: "Eliminar",
 			});
 
-			const result = await server.deleteCategoryForCurrentOrganization(category.id);
+			const result = await server.deleteCategoryForCurrentOrganization(
+				category.id,
+			);
 			expect(result.success).toBe(true);
 
 			const rows = await ctx.db

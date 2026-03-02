@@ -31,6 +31,7 @@ export const EMPTY_PRODUCT_FORM = {
 	taxRate: "0",
 	stock: "0",
 	trackInventory: true,
+	isModifier: false,
 };
 
 type Category = Awaited<ReturnType<typeof getCategories>>[number];
@@ -51,6 +52,7 @@ interface ProductFormSheetProps {
 		taxRate: number;
 		stock: number;
 		trackInventory: boolean;
+		isModifier: boolean;
 	}) => Promise<void>;
 	isPending: boolean;
 	error: string | null;
@@ -76,6 +78,7 @@ export function ProductFormSheet({
 	const taxRateId = useId();
 	const stockId = useId();
 	const trackInventoryId = useId();
+	const isModifierId = useId();
 
 	useEffect(() => {
 		if (isOpen) {
@@ -90,6 +93,7 @@ export function ProductFormSheet({
 					taxRate: (editingProduct.taxRate ?? 0).toString(),
 					stock: (editingProduct.stock ?? 0).toString(),
 					trackInventory: editingProduct.trackInventory ?? true,
+					isModifier: editingProduct.isModifier ?? false,
 				});
 			} else {
 				setProductForm(EMPTY_PRODUCT_FORM);
@@ -110,6 +114,7 @@ export function ProductFormSheet({
 			taxRate: Number(productForm.taxRate),
 			stock: Number(productForm.stock),
 			trackInventory: productForm.trackInventory,
+			isModifier: productForm.isModifier,
 		});
 	};
 
@@ -318,6 +323,30 @@ export function ProductFormSheet({
 										setProductForm((prev) => ({
 											...prev,
 											trackInventory: checked,
+										}))
+									}
+								/>
+							</div>
+
+							<div className="flex items-center justify-between p-4 bg-black/20 border border-gray-800 rounded-lg">
+								<div className="space-y-0.5">
+									<Label
+										htmlFor={isModifierId}
+										className="text-gray-200 font-medium"
+									>
+										Modifier Product
+									</Label>
+									<p className="text-xs text-gray-500">
+										Use this item as POS modifier/add-on
+									</p>
+								</div>
+								<Switch
+									id={isModifierId}
+									checked={productForm.isModifier}
+									onCheckedChange={(checked) =>
+										setProductForm((prev) => ({
+											...prev,
+											isModifier: checked,
 										}))
 									}
 								/>

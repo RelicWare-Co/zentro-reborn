@@ -20,11 +20,13 @@ const formatCurrency = (value: number) =>
 interface ProductsTableColumnsProps {
 	onEdit: (product: Product) => void;
 	onDelete: (productId: string) => void;
+	onAdjustStock: (product: Product) => void;
 }
 
 export function getProductsColumns({
 	onEdit,
 	onDelete,
+	onAdjustStock,
 }: ProductsTableColumnsProps): ColumnDef<Product>[] {
 	return [
 		{
@@ -59,9 +61,16 @@ export function getProductsColumns({
 					<div className="h-10 w-10 bg-gray-800 rounded-md overflow-hidden flex items-center justify-center shrink-0">
 						<ImageIcon className="h-5 w-5 text-gray-500" />
 					</div>
-					<span className="font-medium text-[var(--color-photon)]">
-						{row.getValue("name")}
-					</span>
+					<div className="flex flex-col gap-0.5">
+						<span className="font-medium text-[var(--color-photon)]">
+							{row.getValue("name")}
+						</span>
+						{row.original.isModifier && (
+							<span className="text-[10px] uppercase tracking-wide text-amber-400">
+								Modifier
+							</span>
+						)}
+					</div>
 				</div>
 			),
 		},
@@ -160,6 +169,14 @@ export function getProductsColumns({
 							>
 								Edit
 							</DropdownMenuItem>
+							{currentProduct.trackInventory && (
+								<DropdownMenuItem
+									className="focus:bg-white/10 focus:text-white cursor-pointer"
+									onClick={() => onAdjustStock(currentProduct)}
+								>
+									Adjust stock
+								</DropdownMenuItem>
+							)}
 							<DropdownMenuItem
 								className="text-red-400 focus:bg-red-400/10 focus:text-red-400 cursor-pointer"
 								onClick={() => onDelete(currentProduct.id)}

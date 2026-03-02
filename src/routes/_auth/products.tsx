@@ -8,10 +8,18 @@ import {
 	getSortedRowModel,
 	useReactTable,
 } from "@tanstack/react-table";
-import { Filter, Plus, Search } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { Edit3, Filter, Plus, Search, Trash2 } from "lucide-react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -27,10 +35,11 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { DeleteProductDialog } from "@/features/products/components/delete-product-dialog";
 import { ProductFormSheet } from "@/features/products/components/product-form-sheet";
 import { getProductsColumns } from "@/features/products/components/products-table-columns";
-import type { Product } from "@/features/products/hooks/use-products";
+import type { Category, Product } from "@/features/products/hooks/use-products";
 import {
 	useProductsMutations,
 	useProductsQueries,
@@ -50,6 +59,25 @@ function ProductsPage() {
 	const [isSheetOpen, setIsSheetOpen] = useState(false);
 	const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 	const [productToDelete, setProductToDelete] = useState<string | null>(null);
+	const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+	const [selectedCategoryId, setSelectedCategoryId] = useState("");
+	const [categoryName, setCategoryName] = useState("");
+	const [categoryDescription, setCategoryDescription] = useState("");
+	const [isInventoryDialogOpen, setIsInventoryDialogOpen] = useState(false);
+	const [selectedProductForInventory, setSelectedProductForInventory] =
+		useState<Product | null>(null);
+	const [inventoryMovementType, setInventoryMovementType] = useState<
+		"restock" | "waste" | "adjustment"
+	>("restock");
+	const [inventoryMovementQuantity, setInventoryMovementQuantity] =
+		useState("");
+	const [inventoryMovementNotes, setInventoryMovementNotes] = useState("");
+
+	const categoryNameId = useId();
+	const categoryDescriptionId = useId();
+	const inventoryTypeId = useId();
+	const inventoryQuantityId = useId();
+	const inventoryNotesId = useId();
 
 	const { products, categories } = useProductsQueries(loaderProducts);
 
@@ -62,6 +90,10 @@ function ProductsPage() {
 		createProductMutation,
 		updateProductMutation,
 		deleteProductMutation,
+		createCategoryMutation,
+		updateCategoryMutation,
+		deleteCategoryMutation,
+		registerInventoryMovementMutation,
 	} = useProductsMutations({
 		onSuccess: () => {
 			closeSheet();
@@ -79,6 +111,13 @@ function ProductsPage() {
 			getProductsColumns({
 				onEdit: openEditSheet,
 				onDelete: setProductToDelete,
+				onAdjustStock: (product) => {
+					setSelectedProductForInventory(product);
+					setInventoryMovementType("restock");
+					setInventoryMovementQuantity("");
+					setInventoryMovementNotes("");
+					setIsInventoryDialogOpen(true);
+				},
 			}),
 		[openEditSheet],
 	);
@@ -112,6 +151,20 @@ function ProductsPage() {
 				? updateProductMutation.error.message
 				: null;
 
+	const categoryFormError =
+		createCategoryMutation.error instanceof Error
+			? createCategoryMutation.error.message
+			: updateCategoryMutation.error instanceof Error
+				? updateCategoryMutation.error.message
+				: deleteCategoryMutation.error instanceof Error
+					? deleteCategoryMutation.error.message
+					: null;
+
+	const inventoryMovementError =
+		registerInventoryMovementMutation.error instanceof Error
+			? registerInventoryMovementMutation.error.message
+			: null;
+
 	const isPending =
 		createProductMutation.isPending || updateProductMutation.isPending;
 
@@ -126,6 +179,7 @@ function ProductsPage() {
 		taxRate: number;
 		stock: number;
 		trackInventory: boolean;
+		isModifier: boolean;
 	}) => {
 		if (payload.id) {
 			await updateProductMutation.mutateAsync({
@@ -141,6 +195,84 @@ function ProductsPage() {
 		if (productToDelete) {
 			deleteProductMutation.mutate(productToDelete);
 		}
+	};
+
+	const selectedCategory = useMemo(
+		() => categories.find((item) => item.id === selectedCategoryId) ?? null,
+		[categories, selectedCategoryId],
+	);
+
+	const openCreateCategoryDialog = () => {
+		setSelectedCategoryId("");
+		setCategoryName("");
+		setCategoryDescription("");
+		setIsCategoryDialogOpen(true);
+	};
+
+	const openEditCategoryDialog = (category: Category) => {
+		setSelectedCategoryId(category.id);
+		setCategoryName(category.name);
+		setCategoryDescription(category.description ?? "");
+		setIsCategoryDialogOpen(true);
+	};
+
+	const handleCreateCategory = async () => {
+		await createCategoryMutation.mutateAsync({
+			name: categoryName,
+			description: categoryDescription || null,
+		});
+		setSelectedCategoryId("");
+		setCategoryName("");
+		setCategoryDescription("");
+		setIsCategoryDialogOpen(false);
+	};
+
+	const handleUpdateCategory = async () => {
+		if (!selectedCategoryId) {
+			return;
+		}
+
+		await updateCategoryMutation.mutateAsync({
+			id: selectedCategoryId,
+			name: categoryName,
+			description: categoryDescription || null,
+		});
+		setIsCategoryDialogOpen(false);
+	};
+
+	const handleDeleteCategory = async () => {
+		if (!selectedCategoryId) {
+			return;
+		}
+
+		await deleteCategoryMutation.mutateAsync(selectedCategoryId);
+		setSelectedCategoryId("");
+		setCategoryName("");
+		setCategoryDescription("");
+		setIsCategoryDialogOpen(false);
+	};
+
+	const handleRegisterInventoryMovement = async () => {
+		if (!selectedProductForInventory) {
+			return;
+		}
+
+		const parsedQuantity = Number(inventoryMovementQuantity);
+		if (!Number.isFinite(parsedQuantity) || parsedQuantity === 0) {
+			return;
+		}
+
+		await registerInventoryMovementMutation.mutateAsync({
+			productId: selectedProductForInventory.id,
+			type: inventoryMovementType,
+			quantity: Math.round(parsedQuantity),
+			notes: inventoryMovementNotes.trim() || null,
+		});
+
+		setIsInventoryDialogOpen(false);
+		setSelectedProductForInventory(null);
+		setInventoryMovementQuantity("");
+		setInventoryMovementNotes("");
 	};
 
 	return (
@@ -206,6 +338,15 @@ function ProductsPage() {
 					Add Product
 				</Button>
 
+				<Button
+					variant="outline"
+					className="bg-[var(--color-carbon)] border-gray-800 text-gray-300 hover:bg-white/5 hover:text-white rounded-lg"
+					onClick={openCreateCategoryDialog}
+				>
+					<Plus className="w-4 h-4 mr-2" />
+					Add Category
+				</Button>
+
 				<ProductFormSheet
 					isOpen={isSheetOpen}
 					onOpenChange={(open) => {
@@ -221,6 +362,20 @@ function ProductsPage() {
 					isPending={isPending}
 					error={formError}
 				/>
+			</div>
+
+			<div className="flex flex-wrap gap-2">
+				{categories.map((category) => (
+					<Button
+						key={category.id}
+						variant="outline"
+						className="h-8 border-gray-800 text-gray-300 hover:text-white"
+						onClick={() => openEditCategoryDialog(category)}
+					>
+						<Edit3 className="h-3.5 w-3.5 mr-1.5" />
+						{category.name}
+					</Button>
+				))}
 			</div>
 
 			<div className="bg-[var(--color-carbon)] rounded-xl border border-gray-800 overflow-x-auto">
@@ -347,6 +502,175 @@ function ProductsPage() {
 				onConfirm={handleDeleteProduct}
 				isPending={deleteProductMutation.isPending}
 			/>
+
+			<Dialog
+				open={isCategoryDialogOpen}
+				onOpenChange={setIsCategoryDialogOpen}
+			>
+				<DialogContent className="bg-[var(--color-carbon)] border-gray-800 text-white sm:max-w-[480px]">
+					<DialogHeader>
+						<DialogTitle>
+							{selectedCategory ? "Edit Category" : "Create Category"}
+						</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-4 py-2">
+						<div className="grid gap-2">
+							<Label htmlFor={categoryNameId}>Name</Label>
+							<Input
+								id={categoryNameId}
+								value={categoryName}
+								onChange={(event) => setCategoryName(event.target.value)}
+								placeholder="Category name"
+								className="bg-black/20 border-gray-700"
+							/>
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor={categoryDescriptionId}>Description</Label>
+							<Textarea
+								id={categoryDescriptionId}
+								value={categoryDescription}
+								onChange={(event) => setCategoryDescription(event.target.value)}
+								placeholder="Optional"
+								className="min-h-[72px] bg-black/20 border-gray-700"
+							/>
+						</div>
+						{categoryFormError && (
+							<p className="text-sm text-red-400">{categoryFormError}</p>
+						)}
+					</div>
+					<DialogFooter className="gap-2 sm:justify-between">
+						{selectedCategory ? (
+							<Button
+								variant="outline"
+								onClick={handleDeleteCategory}
+								disabled={deleteCategoryMutation.isPending}
+								className="border-red-900/40 text-red-400 hover:bg-red-900/20"
+							>
+								<Trash2 className="w-4 h-4 mr-2" />
+								Delete
+							</Button>
+						) : (
+							<span />
+						)}
+						<div className="flex gap-2">
+							<Button
+								variant="ghost"
+								onClick={() => setIsCategoryDialogOpen(false)}
+							>
+								Cancel
+							</Button>
+							<Button
+								onClick={
+									selectedCategory ? handleUpdateCategory : handleCreateCategory
+								}
+								disabled={
+									!categoryName.trim() ||
+									createCategoryMutation.isPending ||
+									updateCategoryMutation.isPending
+								}
+								className="bg-[var(--color-voltage)] text-black hover:bg-[#c9e605]"
+							>
+								{selectedCategory ? "Save" : "Create"}
+							</Button>
+						</div>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog
+				open={isInventoryDialogOpen}
+				onOpenChange={(open) => {
+					setIsInventoryDialogOpen(open);
+					if (!open) {
+						setSelectedProductForInventory(null);
+					}
+				}}
+			>
+				<DialogContent className="bg-[var(--color-carbon)] border-gray-800 text-white sm:max-w-[480px]">
+					<DialogHeader>
+						<DialogTitle>
+							Adjust Stock · {selectedProductForInventory?.name}
+						</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-4 py-2">
+						<div className="grid gap-2">
+							<Label htmlFor={inventoryTypeId}>Movement type</Label>
+							<Select
+								value={inventoryMovementType}
+								onValueChange={(value) =>
+									setInventoryMovementType(
+										value as "restock" | "waste" | "adjustment",
+									)
+								}
+							>
+								<SelectTrigger
+									id={inventoryTypeId}
+									className="bg-black/20 border-gray-700 text-white"
+								>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+									<SelectItem value="restock">Restock</SelectItem>
+									<SelectItem value="waste">Waste</SelectItem>
+									<SelectItem value="adjustment">Adjustment (+/-)</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor={inventoryQuantityId}>Quantity</Label>
+							<Input
+								id={inventoryQuantityId}
+								type="number"
+								value={inventoryMovementQuantity}
+								onChange={(event) =>
+									setInventoryMovementQuantity(event.target.value)
+								}
+								placeholder={
+									inventoryMovementType === "adjustment"
+										? "Ej: 5 o -3"
+										: "Ej: 5"
+								}
+								className="bg-black/20 border-gray-700"
+							/>
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor={inventoryNotesId}>Notes</Label>
+							<Textarea
+								id={inventoryNotesId}
+								value={inventoryMovementNotes}
+								onChange={(event) =>
+									setInventoryMovementNotes(event.target.value)
+								}
+								placeholder="Optional"
+								className="min-h-[72px] bg-black/20 border-gray-700"
+							/>
+						</div>
+						{inventoryMovementError && (
+							<p className="text-sm text-red-400">{inventoryMovementError}</p>
+						)}
+					</div>
+					<DialogFooter>
+						<Button
+							variant="ghost"
+							onClick={() => setIsInventoryDialogOpen(false)}
+						>
+							Cancel
+						</Button>
+						<Button
+							onClick={handleRegisterInventoryMovement}
+							disabled={
+								!inventoryMovementQuantity.trim() ||
+								registerInventoryMovementMutation.isPending
+							}
+							className="bg-[var(--color-voltage)] text-black hover:bg-[#c9e605]"
+						>
+							{registerInventoryMovementMutation.isPending
+								? "Saving..."
+								: "Apply movement"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</main>
 	);
 }

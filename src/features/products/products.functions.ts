@@ -7,6 +7,7 @@ import {
 	deleteProductForCurrentOrganization,
 	getCategoriesForCurrentOrganization,
 	getProductsForCurrentOrganization,
+	registerInventoryMovementForCurrentOrganization,
 	updateCategoryForCurrentOrganization,
 	updateProductForCurrentOrganization,
 } from "./products.server";
@@ -23,6 +24,7 @@ const createProductInputSchema = z.object({
 	taxRate: z.coerce.number().min(0).max(100).optional(),
 	stock: z.coerce.number().int().min(0).optional(),
 	trackInventory: z.boolean().optional(),
+	isModifier: z.boolean().optional(),
 });
 
 const updateProductInputSchema = z
@@ -37,6 +39,7 @@ const updateProductInputSchema = z
 		taxRate: z.coerce.number().min(0).max(100).optional(),
 		stock: z.coerce.number().int().min(0).optional(),
 		trackInventory: z.boolean().optional(),
+		isModifier: z.boolean().optional(),
 	})
 	.refine(
 		(input) =>
@@ -48,11 +51,20 @@ const updateProductInputSchema = z
 			input.cost !== undefined ||
 			input.taxRate !== undefined ||
 			input.stock !== undefined ||
-			input.trackInventory !== undefined,
+			input.trackInventory !== undefined ||
+			input.isModifier !== undefined,
 		{
 			message: "Debes enviar al menos un campo para actualizar",
 		},
 	);
+
+const registerInventoryMovementInputSchema = z.object({
+	productId: z.string().trim().min(1),
+	type: z.enum(["restock", "waste", "adjustment"]),
+	quantity: z.coerce.number().int(),
+	notes: nullableString,
+	createdAt: z.coerce.number().int().min(0).optional(),
+});
 
 const deleteProductInputSchema = z.object({
 	id: z.string().trim().min(1),
@@ -102,6 +114,12 @@ export const updateProduct = createServerFn({ method: "POST" })
 	.inputValidator(updateProductInputSchema)
 	.handler(async ({ data }) => {
 		return updateProductForCurrentOrganization(data);
+	});
+
+export const registerInventoryMovement = createServerFn({ method: "POST" })
+	.inputValidator(registerInventoryMovementInputSchema)
+	.handler(async ({ data }) => {
+		return registerInventoryMovementForCurrentOrganization(data);
 	});
 
 export const deleteProduct = createServerFn({ method: "POST" })

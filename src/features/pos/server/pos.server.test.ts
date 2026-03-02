@@ -5,6 +5,9 @@ import {
 	createBackendTestContext,
 	mockBackendRuntime,
 } from "#/test/backend-test-utils";
+import type { createTestDatabase } from "#/test/test-db";
+
+type TestDb = ReturnType<typeof createTestDatabase>["db"];
 
 async function setupPosServers() {
 	const ctx = await createBackendTestContext("pos");
@@ -17,9 +20,7 @@ async function setupPosServers() {
 
 async function insertProduct(input: {
 	organizationId: string;
-	db: ReturnType<typeof createBackendTestContext> extends Promise<infer T>
-		? T["db"]
-		: never;
+	db: TestDb;
 	name?: string;
 	categoryId?: string | null;
 	sku?: string | null;
@@ -51,9 +52,7 @@ async function insertProduct(input: {
 }
 
 async function insertCategory(input: {
-	db: ReturnType<typeof createBackendTestContext> extends Promise<infer T>
-		? T["db"]
-		: never;
+	db: TestDb;
 	organizationId: string;
 	name: string;
 	description?: string | null;
@@ -70,9 +69,7 @@ async function insertCategory(input: {
 }
 
 async function insertCustomer(input: {
-	db: ReturnType<typeof createBackendTestContext> extends Promise<infer T>
-		? T["db"]
-		: never;
+	db: TestDb;
 	organizationId: string;
 	name: string;
 	documentNumber: string;
@@ -578,6 +575,54 @@ describe("pos server modules", () => {
 			]);
 			expect(summary.summaryByMethod[0]?.expectedAmount).toBe(1200);
 			expect(summary.totalExpected).toBe(2200);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("rejects shift close with duplicated payment methods", async () => {
+		const { ctx, shiftsServer } = await setupPosServers();
+		try {
+			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 5000,
+				terminalId: "terminal-1",
+				terminalName: "Caja 1",
+			});
+
+			await expect(
+				shiftsServer.closeShiftForCurrentOrganization({
+					shiftId: openedShift.id,
+					closures: [
+						{ paymentMethod: "cash", actualAmount: 3000 },
+						{ paymentMethod: "cash", actualAmount: 2000 },
+					],
+				}),
+			).rejects.toThrow("Método de pago duplicado en cierre: cash");
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("rejects closing a shift twice", async () => {
+		const { ctx, shiftsServer } = await setupPosServers();
+		try {
+			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 4000,
+				terminalId: "terminal-1",
+				terminalName: "Caja 1",
+			});
+
+			await shiftsServer.closeShiftForCurrentOrganization({
+				shiftId: openedShift.id,
+				closures: [{ paymentMethod: "cash", actualAmount: 4000 }],
+			});
+
+			await expect(
+				shiftsServer.closeShiftForCurrentOrganization({
+					shiftId: openedShift.id,
+					closures: [{ paymentMethod: "cash", actualAmount: 4000 }],
+				}),
+			).rejects.toThrow("El turno ya está cerrado");
 		} finally {
 			ctx.cleanup();
 		}

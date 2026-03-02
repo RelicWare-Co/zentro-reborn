@@ -22,6 +22,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { searchCreditAccounts } from "@/features/credit/credit.functions";
+import { createCustomer } from "@/features/customers/customers.functions";
 import {
 	closeShift,
 	createPosSale,
@@ -42,6 +45,9 @@ type Product = Awaited<ReturnType<typeof searchPosProducts>>["data"][number];
 type PosCustomer = Awaited<
 	ReturnType<typeof searchPosCustomers>
 >["data"][number];
+type CreditAccount = Awaited<
+	ReturnType<typeof searchCreditAccounts>
+>["data"][number];
 
 type CartItemModifier = {
 	id: string;
@@ -55,6 +61,7 @@ type CartItem = {
 	product: Product;
 	quantity: number;
 	modifiers: CartItemModifier[];
+	discountAmount: number;
 };
 
 function formatCurrency(amount: number) {
@@ -86,13 +93,21 @@ function PosPage() {
 	const [activeCategoryId, setActiveCategoryId] = useState("all");
 	const [searchQuery, setSearchQuery] = useState("");
 	const [cart, setCart] = useState<CartItem[]>([]);
-	const [discount] = useState(0);
+	const [discountInput, setDiscountInput] = useState("0");
+	const [isModifierModalOpen, setIsModifierModalOpen] = useState(false);
+	const [selectedProductForModifiers, setSelectedProductForModifiers] =
+		useState<Product | null>(null);
+	const [modifierQuantities, setModifierQuantities] = useState<
+		Record<string, number>
+	>({});
 
 	// Shift & Cash Management States
 	const [isShiftOpenModalOpen, setIsShiftOpenModalOpen] = useState(false);
 	const [isCashMovementModalOpen, setIsCashMovementModalOpen] = useState(false);
 	const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
 	const [startingCash, setStartingCash] = useState("");
+	const [openShiftNotes, setOpenShiftNotes] = useState("");
+	const [closeShiftNotes, setCloseShiftNotes] = useState("");
 	const [movementType, setMovementType] = useState("inflow");
 	const [movementAmount, setMovementAmount] = useState("");
 	const [movementDescription, setMovementDescription] = useState("");
@@ -100,6 +115,13 @@ function PosPage() {
 		{},
 	);
 	const [selectedCustomerId, setSelectedCustomerId] = useState("");
+	const [isCreateCustomerModalOpen, setIsCreateCustomerModalOpen] =
+		useState(false);
+	const [newCustomerName, setNewCustomerName] = useState("");
+	const [newCustomerPhone, setNewCustomerPhone] = useState("");
+	const [newCustomerDocumentType, setNewCustomerDocumentType] = useState("CC");
+	const [newCustomerDocumentNumber, setNewCustomerDocumentNumber] =
+		useState("");
 
 	// Checkout States
 	const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -112,7 +134,14 @@ function PosPage() {
 	const movementTypeId = useId();
 	const movementAmountId = useId();
 	const movementDescriptionId = useId();
+	const openShiftNotesId = useId();
+	const closeShiftNotesId = useId();
 	const creditSaleId = useId();
+	const discountInputId = useId();
+	const customerNameId = useId();
+	const customerPhoneId = useId();
+	const customerDocumentTypeId = useId();
+	const customerDocumentNumberId = useId();
 
 	const { data: bootstrap = bootstrapData } = useQuery({
 		queryKey: ["pos-bootstrap"],
@@ -140,6 +169,12 @@ function PosPage() {
 				}),
 		});
 	const filteredProducts = productSearchResult?.data ?? [];
+	const regularProducts = useMemo(
+		() => filteredProducts.filter((product) => !product.isModifier),
+		[filteredProducts],
+	);
+
+	const modifierProducts = bootstrap.modifierProducts ?? [];
 
 	const { data: customerSearchResult } = useQuery({
 		queryKey: ["pos-customers"],
@@ -152,6 +187,32 @@ function PosPage() {
 			}),
 	});
 	const customers: PosCustomer[] = customerSearchResult?.data ?? [];
+
+	const { data: creditAccountsSearchResult } = useQuery({
+		queryKey: ["credit-accounts-pos"],
+		queryFn: () =>
+			searchCreditAccounts({
+				data: {
+					limit: 100,
+					cursor: 0,
+				},
+			}),
+	});
+	const creditAccounts: CreditAccount[] =
+		creditAccountsSearchResult?.data ?? [];
+	const creditAccountByCustomerId = useMemo(
+		() =>
+			new Map(
+				creditAccounts.map((creditAccount) => [
+					creditAccount.customerId,
+					creditAccount,
+				]),
+			),
+		[creditAccounts],
+	);
+	const selectedCustomerCreditAccount = selectedCustomerId
+		? (creditAccountByCustomerId.get(selectedCustomerId) ?? null)
+		: null;
 
 	const { data: shiftCloseSummary, isFetching: isShiftSummaryFetching } =
 		useQuery({
@@ -183,13 +244,14 @@ function PosPage() {
 	}, [isCloseShiftModalOpen, shiftCloseSummary]);
 
 	const openShiftMutation = useMutation({
-		mutationFn: (payload: { startingCash: number }) =>
+		mutationFn: (payload: { startingCash: number; notes: string | null }) =>
 			openShift({
 				data: payload,
 			}),
 		onSuccess: async () => {
 			setIsShiftOpenModalOpen(false);
 			setStartingCash("");
+			setOpenShiftNotes("");
 			await queryClient.invalidateQueries({ queryKey: ["pos-bootstrap"] });
 		},
 	});
@@ -219,6 +281,7 @@ function PosPage() {
 		mutationFn: (payload: {
 			shiftId: string;
 			closures: Array<{ paymentMethod: string; actualAmount: number }>;
+			notes: string | null;
 		}) =>
 			closeShift({
 				data: payload,
@@ -226,6 +289,7 @@ function PosPage() {
 		onSuccess: async () => {
 			setIsCloseShiftModalOpen(false);
 			setClosureAmounts({});
+			setCloseShiftNotes("");
 			await Promise.all([
 				queryClient.invalidateQueries({ queryKey: ["pos-bootstrap"] }),
 				queryClient.invalidateQueries({
@@ -239,6 +303,7 @@ function PosPage() {
 		mutationFn: (payload: {
 			shiftId: string;
 			customerId: string | null;
+			discountAmount: number;
 			items: Array<{
 				productId: string;
 				quantity: number;
@@ -264,15 +329,38 @@ function PosPage() {
 			setIsCheckoutModalOpen(false);
 			setCart([]);
 			setIsCreditSale(false);
+			setDiscountInput("0");
 			setPayments([
 				{ id: crypto.randomUUID(), method: "cash", amount: "", reference: "" },
 			]);
 			await Promise.all([
 				queryClient.invalidateQueries({ queryKey: ["pos-products"] }),
+				queryClient.invalidateQueries({ queryKey: ["credit-accounts-pos"] }),
 				queryClient.invalidateQueries({
 					queryKey: ["pos-shift-close-summary"],
 				}),
 			]);
+		},
+	});
+
+	const createCustomerMutation = useMutation({
+		mutationFn: (payload: {
+			name: string;
+			phone: string | null;
+			documentType: string | null;
+			documentNumber: string | null;
+		}) =>
+			createCustomer({
+				data: payload,
+			}),
+		onSuccess: async (result) => {
+			setIsCreateCustomerModalOpen(false);
+			setNewCustomerName("");
+			setNewCustomerPhone("");
+			setNewCustomerDocumentType("CC");
+			setNewCustomerDocumentNumber("");
+			setSelectedCustomerId(result.id);
+			await queryClient.invalidateQueries({ queryKey: ["pos-customers"] });
 		},
 	});
 
@@ -312,8 +400,9 @@ function PosPage() {
 
 		openShiftMutation.mutate({
 			startingCash: parsedStartingCash,
+			notes: openShiftNotes.trim() || null,
 		});
-	}, [openShiftMutation, startingCash]);
+	}, [openShiftMutation, openShiftNotes, startingCash]);
 
 	const handleCashMovement = useCallback(() => {
 		if (!activeShift) {
@@ -364,13 +453,40 @@ function PosPage() {
 		closeShiftMutation.mutate({
 			shiftId: activeShift.id,
 			closures,
+			notes: closeShiftNotes.trim() || null,
 		});
-	}, [activeShift, closeShiftMutation, closureAmounts, shiftCloseSummary]);
+	}, [
+		activeShift,
+		closeShiftMutation,
+		closeShiftNotes,
+		closureAmounts,
+		shiftCloseSummary,
+	]);
+
+	const handleCreateCustomer = () => {
+		if (!newCustomerName.trim()) {
+			return;
+		}
+
+		createCustomerMutation.mutate({
+			name: newCustomerName.trim(),
+			phone: newCustomerPhone.trim() || null,
+			documentType: newCustomerDocumentNumber.trim()
+				? newCustomerDocumentType
+				: null,
+			documentNumber: newCustomerDocumentNumber.trim() || null,
+		});
+	};
 
 	const handleFinalizeSale = useCallback(() => {
 		if (!activeShift || cart.length === 0) {
 			return;
 		}
+
+		const saleDiscountAmount = Math.max(
+			0,
+			Math.round(Number(discountInput) || 0),
+		);
 
 		const salePayments = isCreditSale
 			? []
@@ -385,11 +501,13 @@ function PosPage() {
 		createPosSaleMutation.mutate({
 			shiftId: activeShift.id,
 			customerId: selectedCustomerId || null,
+			discountAmount: saleDiscountAmount,
 			items: cart.map((item) => ({
 				productId: item.product.id,
 				quantity: item.quantity,
 				unitPrice: item.product.price,
 				taxRate: item.product.taxRate,
+				discountAmount: item.discountAmount,
 				modifiers: item.modifiers.map((modifier) => ({
 					modifierProductId: modifier.id,
 					quantity: modifier.quantity,
@@ -405,32 +523,117 @@ function PosPage() {
 		createPosSaleMutation,
 		isCreditSale,
 		payments,
+		discountInput,
 		selectedCustomerId,
 	]);
 
-	const addToCart = useCallback((product: Product) => {
-		setCart((prevCart) => {
-			const existingItem = prevCart.find(
-				(item) => item.product.id === product.id && item.modifiers.length === 0,
-			);
-			if (existingItem) {
-				return prevCart.map((item) =>
-					item.id === existingItem.id
-						? { ...item, quantity: item.quantity + 1 }
-						: item,
+	const buildModifierSignature = useCallback(
+		(modifiers: CartItemModifier[]) => {
+			return modifiers
+				.slice()
+				.sort((modifierA, modifierB) =>
+					modifierA.id.localeCompare(modifierB.id),
+				)
+				.map((modifier) => `${modifier.id}:${modifier.quantity}`)
+				.join("|");
+		},
+		[],
+	);
+
+	const addToCart = useCallback(
+		(product: Product, modifiers: CartItemModifier[]) => {
+			setCart((prevCart) => {
+				const targetModifierSignature = buildModifierSignature(modifiers);
+				const existingItem = prevCart.find(
+					(item) =>
+						item.product.id === product.id &&
+						buildModifierSignature(item.modifiers) === targetModifierSignature,
 				);
+				if (existingItem) {
+					return prevCart.map((item) =>
+						item.id === existingItem.id
+							? { ...item, quantity: item.quantity + 1 }
+							: item,
+					);
+				}
+				return [
+					...prevCart,
+					{
+						id: crypto.randomUUID(),
+						product,
+						quantity: 1,
+						modifiers,
+						discountAmount: 0,
+					},
+				];
+			});
+		},
+		[buildModifierSignature],
+	);
+
+	const handleProductSelection = useCallback(
+		(product: Product) => {
+			if (modifierProducts.length === 0) {
+				addToCart(product, []);
+				return;
 			}
-			return [
-				...prevCart,
-				{
-					id: crypto.randomUUID(),
-					product,
-					quantity: 1,
-					modifiers: [],
-				},
-			];
-		});
-	}, []);
+
+			setSelectedProductForModifiers(product);
+			setModifierQuantities({});
+			setIsModifierModalOpen(true);
+		},
+		[addToCart, modifierProducts.length],
+	);
+
+	const updateModifierQuantity = useCallback(
+		(modifierId: string, delta: number) => {
+			setModifierQuantities((previousQuantities) => {
+				const currentValue = previousQuantities[modifierId] ?? 0;
+				const nextValue = Math.max(0, currentValue + delta);
+				return {
+					...previousQuantities,
+					[modifierId]: nextValue,
+				};
+			});
+		},
+		[],
+	);
+
+	const handleConfirmModifiers = useCallback(() => {
+		if (!selectedProductForModifiers) {
+			return;
+		}
+
+		const selectedModifiers = modifierProducts
+			.map((modifierProduct) => ({
+				id: modifierProduct.id,
+				name: modifierProduct.name,
+				price: modifierProduct.price,
+				quantity: modifierQuantities[modifierProduct.id] ?? 0,
+			}))
+			.filter((modifierProduct) => modifierProduct.quantity > 0);
+
+		addToCart(selectedProductForModifiers, selectedModifiers);
+		setIsModifierModalOpen(false);
+		setSelectedProductForModifiers(null);
+		setModifierQuantities({});
+	}, [
+		addToCart,
+		modifierProducts,
+		modifierQuantities,
+		selectedProductForModifiers,
+	]);
+
+	const handleQuickAddWithoutModifiers = useCallback(() => {
+		if (!selectedProductForModifiers) {
+			return;
+		}
+
+		addToCart(selectedProductForModifiers, []);
+		setIsModifierModalOpen(false);
+		setSelectedProductForModifiers(null);
+		setModifierQuantities({});
+	}, [addToCart, selectedProductForModifiers]);
 
 	const removeFromCart = useCallback((cartItemId: string) => {
 		setCart((prevCart) => prevCart.filter((item) => item.id !== cartItemId));
@@ -451,6 +654,37 @@ function PosPage() {
 	}, []);
 
 	const clearCart = useCallback(() => setCart([]), []);
+
+	const updateItemDiscount = useCallback(
+		(cartItemId: string, nextDiscountValue: string) => {
+			const parsedDiscount = Math.max(
+				0,
+				Math.round(Number(nextDiscountValue) || 0),
+			);
+
+			setCart((prevCart) =>
+				prevCart.map((item) => {
+					if (item.id !== cartItemId) {
+						return item;
+					}
+
+					const lineBaseAmount =
+						item.product.price * item.quantity +
+						item.modifiers.reduce(
+							(sum, modifier) =>
+								sum + modifier.price * modifier.quantity * item.quantity,
+							0,
+						);
+
+					return {
+						...item,
+						discountAmount: Math.min(parsedDiscount, lineBaseAmount),
+					};
+				}),
+			);
+		},
+		[],
+	);
 
 	const getProductQuantity = useCallback(
 		(productId: string) => {
@@ -480,7 +714,16 @@ function PosPage() {
 			),
 		0,
 	);
-	const totalAmount = Math.max(0, subTotal + tax - discount);
+	const saleDiscountAmount = Math.max(
+		0,
+		Math.round(Number(discountInput) || 0),
+	);
+	const itemsDiscountAmount = cart.reduce(
+		(sum, item) => sum + item.discountAmount,
+		0,
+	);
+	const discountAmount = saleDiscountAmount + itemsDiscountAmount;
+	const totalAmount = Math.max(0, subTotal + tax - discountAmount);
 
 	const totalPaid = payments.reduce(
 		(sum, paymentMethod) => sum + (Number(paymentMethod.amount) || 0),
@@ -488,6 +731,8 @@ function PosPage() {
 	);
 	const paymentDifference = totalAmount - totalPaid;
 	const hasPaymentDifference = paymentDifference !== 0;
+	const projectedCreditBalance =
+		(selectedCustomerCreditAccount?.balance ?? 0) + totalAmount;
 	const cashSummary = shiftCloseSummary?.summaryByMethod.find(
 		(summaryRow) => summaryRow.paymentMethod === "cash",
 	);
@@ -548,6 +793,16 @@ function PosPage() {
 								</option>
 							))}
 						</select>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							onClick={() => setIsCreateCustomerModalOpen(true)}
+							className="h-7 px-2 text-xs text-[var(--color-voltage)] hover:text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10"
+						>
+							<Plus className="w-3.5 h-3.5 mr-1" />
+							Cliente
+						</Button>
 					</div>
 				</div>
 				<div className="flex items-center gap-2">
@@ -627,14 +882,16 @@ function PosPage() {
 					{/* Product Grid - Compact Text-Oriented Layout */}
 					<ScrollArea className="flex-1 p-4 min-h-0 bg-[#0a0a0a]">
 						<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 pb-6">
-							{filteredProducts.map((product) => {
+							{regularProducts.map((product) => {
 								const qty = getProductQuantity(product.id);
+								const isOutOfStock =
+									product.trackInventory && product.stock <= 0;
 								return (
 									<button
 										key={product.id}
 										type="button"
-										onClick={() => addToCart(product)}
-										disabled={!activeShift}
+										onClick={() => handleProductSelection(product)}
+										disabled={!activeShift || isOutOfStock}
 										className="text-left bg-[#151515] rounded-xl p-3 border border-gray-800/80 flex flex-col justify-between transition-all hover:border-[var(--color-voltage)]/50 hover:bg-[#1a1a1a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-voltage)] group min-h-[100px] relative overflow-hidden"
 									>
 										{qty > 0 && (
@@ -652,6 +909,15 @@ function PosPage() {
 											<p className="text-[11px] text-gray-500 mt-1 font-medium">
 												{product.categoryName}
 											</p>
+											{product.trackInventory && (
+												<p
+													className={`text-[10px] mt-1 font-medium ${
+														isOutOfStock ? "text-red-400" : "text-gray-500"
+													}`}
+												>
+													Stock: {product.stock}
+												</p>
+											)}
 										</div>
 
 										<div className="mt-3">
@@ -668,7 +934,7 @@ function PosPage() {
 								<p>Cargando productos...</p>
 							</div>
 						)}
-						{filteredProducts.length === 0 && (
+						{regularProducts.length === 0 && (
 							<div className="flex flex-col items-center justify-center h-48 text-gray-500">
 								<p>No se encontraron productos.</p>
 							</div>
@@ -717,9 +983,56 @@ function PosPage() {
 												<div className="text-xs text-gray-500 font-medium mt-0.5 tabular-nums">
 													{formatCurrency(item.product.price)} / un
 												</div>
+												{item.modifiers.length > 0 && (
+													<div className="mt-1 flex flex-wrap gap-1.5">
+														{item.modifiers.map((modifier) => (
+															<span
+																key={`${item.id}-${modifier.id}`}
+																className="text-[10px] bg-black/50 border border-gray-800 rounded px-1.5 py-0.5 text-gray-300"
+															>
+																x{modifier.quantity} {modifier.name}
+															</span>
+														))}
+													</div>
+												)}
 											</div>
 											<div className="font-bold text-sm text-white text-right shrink-0 tabular-nums">
-												{formatCurrency(item.product.price * item.quantity)}
+												{formatCurrency(
+													item.product.price * item.quantity +
+														item.modifiers.reduce(
+															(sum, modifier) =>
+																sum +
+																modifier.price *
+																	modifier.quantity *
+																	item.quantity,
+															0,
+														) -
+														item.discountAmount,
+												)}
+											</div>
+										</div>
+
+										<div className="mt-1">
+											<label
+												htmlFor={`item-discount-${item.id}`}
+												className="text-[10px] text-gray-500"
+											>
+												Descuento ítem
+											</label>
+											<div className="relative mt-1">
+												<span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs">
+													$
+												</span>
+												<Input
+													id={`item-discount-${item.id}`}
+													type="number"
+													min={0}
+													value={item.discountAmount}
+													onChange={(event) =>
+														updateItemDiscount(item.id, event.target.value)
+													}
+													className="h-8 pl-6 bg-black/50 border-gray-800/80 text-xs"
+												/>
 											</div>
 										</div>
 
@@ -785,11 +1098,11 @@ function PosPage() {
 										{formatCurrency(tax)}
 									</span>
 								</div>
-								{discount > 0 && (
+								{discountAmount > 0 && (
 									<div className="flex justify-between text-sm text-red-400">
 										<span>Descuento</span>
 										<span className="tabular-nums">
-											-{formatCurrency(discount)}
+											-{formatCurrency(discountAmount)}
 										</span>
 									</div>
 								)}
@@ -849,6 +1162,21 @@ function PosPage() {
 									className="pl-7 bg-[#0a0a0a] border-gray-800 text-white focus-visible:ring-[var(--color-voltage)] text-lg h-12"
 								/>
 							</div>
+						</div>
+						<div className="grid gap-2 mt-4">
+							<label
+								htmlFor={openShiftNotesId}
+								className="text-sm font-medium text-gray-300"
+							>
+								Notas del turno
+							</label>
+							<Textarea
+								id={openShiftNotesId}
+								placeholder="Opcional: observaciones de apertura"
+								value={openShiftNotes}
+								onChange={(event) => setOpenShiftNotes(event.target.value)}
+								className="min-h-[72px] bg-[#0a0a0a] border-gray-800 text-white focus-visible:ring-[var(--color-voltage)]"
+							/>
 						</div>
 						{openShiftMutation.error instanceof Error && (
 							<p className="text-sm text-red-400 mt-3">
@@ -1081,6 +1409,21 @@ function PosPage() {
 								))}
 							</div>
 						)}
+						<div className="grid gap-2">
+							<label
+								htmlFor={closeShiftNotesId}
+								className="text-sm font-medium text-gray-300"
+							>
+								Notas de cierre
+							</label>
+							<Textarea
+								id={closeShiftNotesId}
+								placeholder="Opcional: explica diferencias o novedades del cierre"
+								value={closeShiftNotes}
+								onChange={(event) => setCloseShiftNotes(event.target.value)}
+								className="min-h-[72px] bg-[#0a0a0a] border-gray-800 text-white focus-visible:ring-[var(--color-voltage)]"
+							/>
+						</div>
 						{closeShiftMutation.error instanceof Error && (
 							<p className="text-sm text-red-400">
 								{closeShiftMutation.error.message}
@@ -1129,6 +1472,28 @@ function PosPage() {
 						</div>
 
 						<div className="space-y-4">
+							<div className="bg-[#0a0a0a] p-3 rounded-lg border border-gray-800 space-y-2">
+								<label
+									className="text-sm font-medium text-gray-300"
+									htmlFor={discountInputId}
+								>
+									Descuento total
+								</label>
+								<div className="relative">
+									<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+										$
+									</span>
+									<Input
+										id={discountInputId}
+										type="number"
+										min={0}
+										value={discountInput}
+										onChange={(event) => setDiscountInput(event.target.value)}
+										className="pl-7 h-10 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)]"
+									/>
+								</div>
+							</div>
+
 							<div className="flex items-center justify-between">
 								<h4 className="text-sm font-semibold text-gray-300">
 									Métodos de Pago
@@ -1154,6 +1519,21 @@ function PosPage() {
 								<p className="text-sm text-amber-400">
 									Selecciona un cliente para registrar venta a crédito.
 								</p>
+							)}
+
+							{selectedCustomerCreditAccount && (
+								<div className="bg-amber-900/20 border border-amber-900/40 rounded-lg p-3 space-y-1 text-sm">
+									<p className="text-amber-300 font-medium">
+										Saldo pendiente actual:{" "}
+										{formatCurrency(selectedCustomerCreditAccount.balance)}
+									</p>
+									{isCreditSale && (
+										<p className="text-amber-200">
+											Saldo proyectado tras esta venta:{" "}
+											{formatCurrency(projectedCreditBalance)}
+										</p>
+									)}
+								</div>
 							)}
 
 							{!isCreditSale && (
@@ -1274,6 +1654,196 @@ function PosPage() {
 								: isCreditSale
 									? "Confirmar Fiado"
 									: "Finalizar Venta"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Modifier Selection Modal */}
+			<Dialog
+				open={isModifierModalOpen}
+				onOpenChange={(isOpen) => {
+					setIsModifierModalOpen(isOpen);
+					if (!isOpen) {
+						setSelectedProductForModifiers(null);
+						setModifierQuantities({});
+					}
+				}}
+			>
+				<DialogContent className="bg-[#151515] border-gray-800 text-white sm:max-w-[500px]">
+					<DialogHeader>
+						<DialogTitle>
+							Añadir modificadores · {selectedProductForModifiers?.name}
+						</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-3 py-2">
+						{modifierProducts.length === 0 ? (
+							<p className="text-sm text-gray-400">
+								No hay modificadores configurados para este negocio.
+							</p>
+						) : (
+							modifierProducts.map((modifierProduct) => (
+								<div
+									key={modifierProduct.id}
+									className="flex items-center justify-between rounded-lg border border-gray-800 bg-[#0a0a0a] p-3"
+								>
+									<div>
+										<p className="text-sm font-medium text-white">
+											{modifierProduct.name}
+										</p>
+										<p className="text-xs text-gray-400">
+											{formatCurrency(modifierProduct.price)} c/u
+										</p>
+									</div>
+									<div className="flex items-center bg-black/50 rounded-md border border-gray-800/80">
+										<button
+											type="button"
+											onClick={() =>
+												updateModifierQuantity(modifierProduct.id, -1)
+											}
+											className="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 rounded-l-md transition-colors"
+										>
+											<Minus className="h-3 w-3" />
+										</button>
+										<div className="w-9 text-center text-sm font-semibold text-white">
+											{modifierQuantities[modifierProduct.id] ?? 0}
+										</div>
+										<button
+											type="button"
+											onClick={() =>
+												updateModifierQuantity(modifierProduct.id, 1)
+											}
+											className="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 rounded-r-md transition-colors"
+										>
+											<Plus className="h-3 w-3" />
+										</button>
+									</div>
+								</div>
+							))
+						)}
+					</div>
+					<DialogFooter>
+						<Button
+							variant="ghost"
+							onClick={handleQuickAddWithoutModifiers}
+							className="text-gray-300 hover:text-white"
+						>
+							Agregar sin modificadores
+						</Button>
+						<Button
+							onClick={handleConfirmModifiers}
+							className="bg-[var(--color-voltage)] text-black hover:bg-[#c9e605]"
+						>
+							Confirmar selección
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Quick Customer Creation Modal */}
+			<Dialog
+				open={isCreateCustomerModalOpen}
+				onOpenChange={setIsCreateCustomerModalOpen}
+			>
+				<DialogContent className="bg-[#151515] border-gray-800 text-white sm:max-w-[450px]">
+					<DialogHeader>
+						<DialogTitle>Crear cliente rápido</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-4 py-2">
+						<div className="grid gap-2">
+							<label
+								htmlFor={customerNameId}
+								className="text-sm font-medium text-gray-300"
+							>
+								Nombre
+							</label>
+							<Input
+								id={customerNameId}
+								value={newCustomerName}
+								onChange={(event) => setNewCustomerName(event.target.value)}
+								placeholder="Nombre del cliente"
+								className="bg-[#0a0a0a] border-gray-800 text-white"
+							/>
+						</div>
+						<div className="grid gap-2">
+							<label
+								htmlFor={customerPhoneId}
+								className="text-sm font-medium text-gray-300"
+							>
+								Teléfono
+							</label>
+							<Input
+								id={customerPhoneId}
+								value={newCustomerPhone}
+								onChange={(event) => setNewCustomerPhone(event.target.value)}
+								placeholder="Opcional"
+								className="bg-[#0a0a0a] border-gray-800 text-white"
+							/>
+						</div>
+						<div className="grid grid-cols-2 gap-3">
+							<div className="grid gap-2">
+								<label
+									htmlFor={customerDocumentTypeId}
+									className="text-sm font-medium text-gray-300"
+								>
+									Tipo doc
+								</label>
+								<select
+									id={customerDocumentTypeId}
+									value={newCustomerDocumentType}
+									onChange={(event) =>
+										setNewCustomerDocumentType(event.target.value)
+									}
+									className="flex h-10 w-full rounded-md border border-gray-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-voltage)]"
+								>
+									<option value="CC">CC</option>
+									<option value="NIT">NIT</option>
+									<option value="CE">CE</option>
+									<option value="PAS">Pasaporte</option>
+								</select>
+							</div>
+							<div className="grid gap-2">
+								<label
+									htmlFor={customerDocumentNumberId}
+									className="text-sm font-medium text-gray-300"
+								>
+									Número doc
+								</label>
+								<Input
+									id={customerDocumentNumberId}
+									value={newCustomerDocumentNumber}
+									onChange={(event) =>
+										setNewCustomerDocumentNumber(event.target.value)
+									}
+									placeholder="Opcional"
+									className="bg-[#0a0a0a] border-gray-800 text-white"
+								/>
+							</div>
+						</div>
+						{createCustomerMutation.error instanceof Error && (
+							<p className="text-sm text-red-400">
+								{createCustomerMutation.error.message}
+							</p>
+						)}
+					</div>
+					<DialogFooter>
+						<Button
+							variant="ghost"
+							onClick={() => setIsCreateCustomerModalOpen(false)}
+							className="text-gray-400 hover:text-white"
+						>
+							Cancelar
+						</Button>
+						<Button
+							onClick={handleCreateCustomer}
+							disabled={
+								!newCustomerName.trim() || createCustomerMutation.isPending
+							}
+							className="bg-[var(--color-voltage)] text-black hover:bg-[#c9e605]"
+						>
+							{createCustomerMutation.isPending
+								? "Creando..."
+								: "Crear cliente"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>

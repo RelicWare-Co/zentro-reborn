@@ -1,8 +1,8 @@
 import "@tanstack/react-start/server-only";
 import { getRequest } from "@tanstack/react-start/server";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
 import { db } from "#/db";
-import { category, member, product } from "#/db/schema";
+import { category, inventoryMovement, member, product } from "#/db/schema";
 import { auth } from "#/lib/auth";
 
 export type CreateProductInput = {
@@ -15,6 +15,7 @@ export type CreateProductInput = {
 	taxRate?: number;
 	stock?: number;
 	trackInventory?: boolean;
+	isModifier?: boolean;
 };
 
 export type UpdateProductInput = {
@@ -28,6 +29,15 @@ export type UpdateProductInput = {
 	taxRate?: number;
 	stock?: number;
 	trackInventory?: boolean;
+	isModifier?: boolean;
+};
+
+export type RegisterInventoryMovementInput = {
+	productId: string;
+	type: "restock" | "waste" | "adjustment";
+	quantity: number;
+	notes?: string | null;
+	createdAt?: number;
 };
 
 export type CreateCategoryInput = {
@@ -59,6 +69,25 @@ function toNonNegativeInteger(value: number, fieldName: string) {
 		);
 	}
 	return Math.round(value);
+}
+
+function toInteger(value: number, fieldName: string) {
+	if (!Number.isFinite(value)) {
+		throw new Error(`El campo "${fieldName}" debe ser un número válido`);
+	}
+	return Math.round(value);
+}
+
+function resolveDate(input?: number) {
+	if (input === undefined) {
+		return new Date();
+	}
+
+	if (!Number.isFinite(input) || input < 0) {
+		throw new Error("La fecha indicada no es válida");
+	}
+
+	return new Date(Math.round(input));
 }
 
 async function requireSession(): Promise<AuthSession> {
@@ -146,6 +175,7 @@ export async function getProductsForCurrentOrganization() {
 			taxRate: product.taxRate,
 			stock: product.stock,
 			trackInventory: product.trackInventory,
+			isModifier: product.isModifier,
 			createdAt: product.createdAt,
 		})
 		.from(product)
@@ -282,6 +312,7 @@ export async function createProductForCurrentOrganization(
 		taxRate: toNonNegativeInteger(input.taxRate ?? 0, "taxRate"),
 		stock: toNonNegativeInteger(input.stock ?? 0, "stock"),
 		trackInventory: input.trackInventory ?? true,
+		isModifier: input.isModifier ?? false,
 		createdAt: new Date(),
 	});
 
@@ -296,7 +327,11 @@ export async function updateProductForCurrentOrganization(
 
 	const updates: Partial<typeof product.$inferInsert> = {};
 	if (input.name !== undefined) {
-		updates.name = input.name.trim();
+		const normalizedName = input.name.trim();
+		if (!normalizedName) {
+			throw new Error("El nombre del producto es obligatorio");
+		}
+		updates.name = normalizedName;
 	}
 	if (input.sku !== undefined) {
 		updates.sku = normalizeOptionalString(input.sku);
@@ -318,6 +353,9 @@ export async function updateProductForCurrentOrganization(
 	}
 	if (input.trackInventory !== undefined) {
 		updates.trackInventory = input.trackInventory;
+	}
+	if (input.isModifier !== undefined) {
+		updates.isModifier = input.isModifier;
 	}
 	if (input.categoryId !== undefined) {
 		updates.categoryId = await assertCategoryFromOrganization(
@@ -342,6 +380,97 @@ export async function updateProductForCurrentOrganization(
 		);
 
 	return { success: true };
+}
+
+export async function registerInventoryMovementForCurrentOrganization(
+	input: RegisterInventoryMovementInput,
+) {
+	const { session, organizationId } = await getAuthContext();
+	if (!organizationId) throw new Error("No hay una organización activa");
+
+	const normalizedType = input.type;
+	const baseQuantity = toInteger(input.quantity, "quantity");
+	if (baseQuantity === 0) {
+		throw new Error("La cantidad debe ser diferente de 0");
+	}
+
+	let deltaQuantity = baseQuantity;
+	if (normalizedType === "restock" && baseQuantity < 0) {
+		throw new Error("La reposición debe tener una cantidad positiva");
+	}
+	if (normalizedType === "waste") {
+		deltaQuantity = -Math.abs(baseQuantity);
+	}
+
+	const createdAt = resolveDate(input.createdAt);
+
+	return db.transaction(async (tx) => {
+		const [targetProduct] = await tx
+			.select({
+				id: product.id,
+				name: product.name,
+				stock: product.stock,
+				trackInventory: product.trackInventory,
+			})
+			.from(product)
+			.where(
+				and(
+					eq(product.id, input.productId),
+					eq(product.organizationId, organizationId),
+					isNull(product.deletedAt),
+				),
+			)
+			.limit(1);
+
+		if (!targetProduct) {
+			throw new Error("Producto no encontrado en la organización activa");
+		}
+
+		if (!targetProduct.trackInventory) {
+			throw new Error(
+				"No puedes registrar movimientos en un producto sin control de inventario",
+			);
+		}
+
+		const updated = await tx
+			.update(product)
+			.set({ stock: sql`${product.stock} + ${deltaQuantity}` })
+			.where(
+				and(
+					eq(product.id, targetProduct.id),
+					eq(product.organizationId, organizationId),
+					isNull(product.deletedAt),
+					...(deltaQuantity < 0
+						? [gte(product.stock, Math.abs(deltaQuantity))]
+						: []),
+				),
+			)
+			.returning({ id: product.id });
+
+		if (updated.length === 0) {
+			throw new Error(
+				`Stock insuficiente para ${targetProduct.name}. Disponible: ${targetProduct.stock}`,
+			);
+		}
+
+		const movementId = crypto.randomUUID();
+		await tx.insert(inventoryMovement).values({
+			id: movementId,
+			organizationId,
+			productId: targetProduct.id,
+			userId: session.user.id,
+			type: normalizedType,
+			quantity: deltaQuantity,
+			notes: normalizeOptionalString(input.notes),
+			createdAt,
+		});
+
+		return {
+			id: movementId,
+			productId: targetProduct.id,
+			quantity: deltaQuantity,
+		};
+	});
 }
 
 export async function deleteProductForCurrentOrganization(id: string) {

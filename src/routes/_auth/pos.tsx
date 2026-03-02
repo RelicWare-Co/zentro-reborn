@@ -1,3 +1,4 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
 	ArrowLeftRight,
@@ -9,7 +10,7 @@ import {
 	Users,
 	XIcon,
 } from "lucide-react";
-import { useCallback, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -21,17 +22,26 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import {
+	closeShift,
+	createPosSale,
+	getPosBootstrap,
+	getShiftCloseSummary,
+	openShift,
+	registerCashMovement,
+	searchPosCustomers,
+	searchPosProducts,
+} from "@/features/pos/pos.functions";
 
 export const Route = createFileRoute("/_auth/pos")({
+	loader: () => getPosBootstrap(),
 	component: PosPage,
 });
 
-type Product = {
-	id: string;
-	name: string;
-	category: string;
-	price: number;
-};
+type Product = Awaited<ReturnType<typeof searchPosProducts>>["data"][number];
+type PosCustomer = Awaited<
+	ReturnType<typeof searchPosCustomers>
+>["data"][number];
 
 type CartItemModifier = {
 	id: string;
@@ -47,32 +57,6 @@ type CartItem = {
 	modifiers: CartItemModifier[];
 };
 
-const mockProducts: Product[] = [
-	{ id: "1", name: "Tuna Sushi", category: "Mariscos", price: 124000 },
-	{ id: "2", name: "Salmon Sushi", category: "Mariscos", price: 126000 },
-	{ id: "3", name: "Spinach Pkhali", category: "Vegetales", price: 79000 },
-	{ id: "4", name: "Dumplings", category: "Pollo", price: 64000 },
-	{ id: "5", name: "Ketoprak", category: "Vegetales", price: 56000 },
-	{ id: "6", name: "Siomay Ikan", category: "Mariscos", price: 73000 },
-	{ id: "7", name: "Chicken Katsu Vegie", category: "Pollo", price: 36000 },
-	{ id: "8", name: "Meat and Vegetables", category: "Res", price: 246000 },
-	{ id: "9", name: "Wagyu with Sambal", category: "Res", price: 210000 },
-	{ id: "10", name: "Doughnut", category: "Postres", price: 92000 },
-	{ id: "11", name: "Orange Juice", category: "Bebidas", price: 24000 },
-	{ id: "12", name: "Kintamani Mojito", category: "Bebidas", price: 128000 },
-];
-
-const categories = [
-	"Todos",
-	"Aperitivos",
-	"Mariscos",
-	"Pollo",
-	"Res",
-	"Vegetales",
-	"Bebidas",
-	"Postres",
-];
-
 function formatCurrency(amount: number) {
 	return new Intl.NumberFormat("es-CO", {
 		style: "currency",
@@ -81,8 +65,25 @@ function formatCurrency(amount: number) {
 	}).format(amount);
 }
 
+function formatPaymentMethodLabel(method: string) {
+	switch (method) {
+		case "cash":
+			return "Efectivo";
+		case "card":
+			return "Tarjeta";
+		case "transfer_nequi":
+			return "Nequi";
+		case "transfer_bancolombia":
+			return "Bancolombia";
+		default:
+			return method.replaceAll("_", " ");
+	}
+}
+
 function PosPage() {
-	const [activeCategory, setActiveCategory] = useState("Todos");
+	const bootstrapData = Route.useLoaderData();
+	const queryClient = useQueryClient();
+	const [activeCategoryId, setActiveCategoryId] = useState("all");
 	const [searchQuery, setSearchQuery] = useState("");
 	const [cart, setCart] = useState<CartItem[]>([]);
 	const [discount] = useState(0);
@@ -95,7 +96,10 @@ function PosPage() {
 	const [movementType, setMovementType] = useState("inflow");
 	const [movementAmount, setMovementAmount] = useState("");
 	const [movementDescription, setMovementDescription] = useState("");
-	const [countedCash, setCountedCash] = useState("");
+	const [closureAmounts, setClosureAmounts] = useState<Record<string, string>>(
+		{},
+	);
+	const [selectedCustomerId, setSelectedCustomerId] = useState("");
 
 	// Checkout States
 	const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -104,40 +108,305 @@ function PosPage() {
 	>([{ id: crypto.randomUUID(), method: "cash", amount: "", reference: "" }]);
 	const [isCreditSale, setIsCreditSale] = useState(false);
 
-	// const selectedCustomerId = 'mostrador' // This would come from the actual select state in a real app
-
 	const startingCashId = useId();
 	const movementTypeId = useId();
 	const movementAmountId = useId();
 	const movementDescriptionId = useId();
-	const countedCashId = useId();
 	const creditSaleId = useId();
 
+	const { data: bootstrap = bootstrapData } = useQuery({
+		queryKey: ["pos-bootstrap"],
+		queryFn: () => getPosBootstrap(),
+		initialData: bootstrapData,
+	});
+
+	const activeShift = bootstrap.activeShift;
+	const categories = useMemo(
+		() => [{ id: "all", name: "Todos" }, ...bootstrap.categories],
+		[bootstrap.categories],
+	);
+
+	const { data: productSearchResult, isFetching: isProductsFetching } =
+		useQuery({
+			queryKey: ["pos-products", activeCategoryId, searchQuery],
+			queryFn: () =>
+				searchPosProducts({
+					data: {
+						searchQuery: searchQuery || null,
+						categoryId: activeCategoryId === "all" ? null : activeCategoryId,
+						limit: 100,
+						cursor: 0,
+					},
+				}),
+		});
+	const filteredProducts = productSearchResult?.data ?? [];
+
+	const { data: customerSearchResult } = useQuery({
+		queryKey: ["pos-customers"],
+		queryFn: () =>
+			searchPosCustomers({
+				data: {
+					limit: 100,
+					cursor: 0,
+				},
+			}),
+	});
+	const customers: PosCustomer[] = customerSearchResult?.data ?? [];
+
+	const { data: shiftCloseSummary, isFetching: isShiftSummaryFetching } =
+		useQuery({
+			queryKey: ["pos-shift-close-summary", activeShift?.id],
+			queryFn: () =>
+				getShiftCloseSummary({
+					data: { shiftId: activeShift?.id ?? "" },
+				}),
+			enabled: isCloseShiftModalOpen && Boolean(activeShift?.id),
+		});
+
+	useEffect(() => {
+		if (!isCloseShiftModalOpen || !shiftCloseSummary) {
+			return;
+		}
+
+		setClosureAmounts(
+			Object.fromEntries(
+				shiftCloseSummary.summaryByMethod.map((row) => [
+					row.paymentMethod,
+					row.actualAmount != null
+						? String(row.actualAmount)
+						: row.paymentMethod === "cash"
+							? ""
+							: String(row.expectedAmount),
+				]),
+			),
+		);
+	}, [isCloseShiftModalOpen, shiftCloseSummary]);
+
+	const openShiftMutation = useMutation({
+		mutationFn: (payload: { startingCash: number }) =>
+			openShift({
+				data: payload,
+			}),
+		onSuccess: async () => {
+			setIsShiftOpenModalOpen(false);
+			setStartingCash("");
+			await queryClient.invalidateQueries({ queryKey: ["pos-bootstrap"] });
+		},
+	});
+
+	const registerCashMovementMutation = useMutation({
+		mutationFn: (payload: {
+			shiftId: string;
+			type: "expense" | "payout" | "inflow";
+			amount: number;
+			description: string;
+		}) =>
+			registerCashMovement({
+				data: payload,
+			}),
+		onSuccess: async () => {
+			setIsCashMovementModalOpen(false);
+			setMovementAmount("");
+			setMovementDescription("");
+			setMovementType("inflow");
+			await queryClient.invalidateQueries({
+				queryKey: ["pos-shift-close-summary"],
+			});
+		},
+	});
+
+	const closeShiftMutation = useMutation({
+		mutationFn: (payload: {
+			shiftId: string;
+			closures: Array<{ paymentMethod: string; actualAmount: number }>;
+		}) =>
+			closeShift({
+				data: payload,
+			}),
+		onSuccess: async () => {
+			setIsCloseShiftModalOpen(false);
+			setClosureAmounts({});
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ["pos-bootstrap"] }),
+				queryClient.invalidateQueries({
+					queryKey: ["pos-shift-close-summary"],
+				}),
+			]);
+		},
+	});
+
+	const createPosSaleMutation = useMutation({
+		mutationFn: (payload: {
+			shiftId: string;
+			customerId: string | null;
+			items: Array<{
+				productId: string;
+				quantity: number;
+				unitPrice: number;
+				taxRate: number;
+				modifiers: Array<{
+					modifierProductId: string;
+					quantity: number;
+					unitPrice: number;
+				}>;
+			}>;
+			payments: Array<{
+				method: string;
+				amount: number;
+				reference: string | null;
+			}>;
+			isCreditSale: boolean;
+		}) =>
+			createPosSale({
+				data: payload,
+			}),
+		onSuccess: async () => {
+			setIsCheckoutModalOpen(false);
+			setCart([]);
+			setIsCreditSale(false);
+			setPayments([
+				{ id: crypto.randomUUID(), method: "cash", amount: "", reference: "" },
+			]);
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ["pos-products"] }),
+				queryClient.invalidateQueries({
+					queryKey: ["pos-shift-close-summary"],
+				}),
+			]);
+		},
+	});
+
 	const addPaymentMethod = () => {
-		setPayments([
-			...payments,
+		setPayments((prevPayments) => [
+			...prevPayments,
 			{ id: crypto.randomUUID(), method: "cash", amount: "", reference: "" },
 		]);
 	};
 	const removePaymentMethod = (index: number) => {
-		setPayments(payments.filter((_, i) => i !== index));
+		setPayments((prevPayments) => prevPayments.filter((_, i) => i !== index));
 	};
-	const updatePayment = (index: number, field: string, value: string) => {
-		const newPayments = [...payments];
-		newPayments[index] = { ...newPayments[index], [field]: value };
-		setPayments(newPayments);
+	const updatePayment = (
+		index: number,
+		field: "method" | "amount" | "reference",
+		value: string,
+	) => {
+		setPayments((prevPayments) =>
+			prevPayments.map((payment, paymentIndex) => {
+				if (paymentIndex !== index) {
+					return payment;
+				}
+
+				return {
+					...payment,
+					[field]: value,
+				};
+			}),
+		);
 	};
 
-	const filteredProducts = useMemo(() => {
-		return mockProducts.filter((product) => {
-			const matchesCategory =
-				activeCategory === "Todos" || product.category === activeCategory;
-			const matchesSearch = product.name
-				.toLowerCase()
-				.includes(searchQuery.toLowerCase());
-			return matchesCategory && matchesSearch;
+	const handleOpenShift = useCallback(() => {
+		const parsedStartingCash = Number(startingCash);
+		if (!Number.isFinite(parsedStartingCash) || parsedStartingCash < 0) {
+			return;
+		}
+
+		openShiftMutation.mutate({
+			startingCash: parsedStartingCash,
 		});
-	}, [activeCategory, searchQuery]);
+	}, [openShiftMutation, startingCash]);
+
+	const handleCashMovement = useCallback(() => {
+		if (!activeShift) {
+			return;
+		}
+
+		const parsedAmount = Number(movementAmount);
+		if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+			return;
+		}
+		if (!movementDescription.trim()) {
+			return;
+		}
+
+		registerCashMovementMutation.mutate({
+			shiftId: activeShift.id,
+			type: movementType as "expense" | "payout" | "inflow",
+			amount: parsedAmount,
+			description: movementDescription.trim(),
+		});
+	}, [
+		activeShift,
+		movementAmount,
+		movementDescription,
+		movementType,
+		registerCashMovementMutation,
+	]);
+
+	const handleCloseShift = useCallback(() => {
+		if (!activeShift || !shiftCloseSummary) {
+			return;
+		}
+
+		const closures = shiftCloseSummary.summaryByMethod.map((summaryRow) => ({
+			paymentMethod: summaryRow.paymentMethod,
+			actualAmount: Number(closureAmounts[summaryRow.paymentMethod] ?? 0),
+		}));
+
+		if (
+			closures.some(
+				(closure) =>
+					!Number.isFinite(closure.actualAmount) || closure.actualAmount < 0,
+			)
+		) {
+			return;
+		}
+
+		closeShiftMutation.mutate({
+			shiftId: activeShift.id,
+			closures,
+		});
+	}, [activeShift, closeShiftMutation, closureAmounts, shiftCloseSummary]);
+
+	const handleFinalizeSale = useCallback(() => {
+		if (!activeShift || cart.length === 0) {
+			return;
+		}
+
+		const salePayments = isCreditSale
+			? []
+			: payments
+					.map((paymentMethod) => ({
+						method: paymentMethod.method,
+						amount: Number(paymentMethod.amount),
+						reference: paymentMethod.reference.trim() || null,
+					}))
+					.filter((paymentMethod) => paymentMethod.amount > 0);
+
+		createPosSaleMutation.mutate({
+			shiftId: activeShift.id,
+			customerId: selectedCustomerId || null,
+			items: cart.map((item) => ({
+				productId: item.product.id,
+				quantity: item.quantity,
+				unitPrice: item.product.price,
+				taxRate: item.product.taxRate,
+				modifiers: item.modifiers.map((modifier) => ({
+					modifierProductId: modifier.id,
+					quantity: modifier.quantity,
+					unitPrice: modifier.price,
+				})),
+			})),
+			payments: salePayments,
+			isCreditSale,
+		});
+	}, [
+		activeShift,
+		cart,
+		createPosSaleMutation,
+		isCreditSale,
+		payments,
+		selectedCustomerId,
+	]);
 
 	const addToCart = useCallback((product: Product) => {
 		setCart((prevCart) => {
@@ -195,20 +464,47 @@ function PosPage() {
 	const subTotal = cart.reduce((sum, item) => {
 		const itemTotal = item.product.price * item.quantity;
 		const modifiersTotal = item.modifiers.reduce(
-			(mSum, m) => mSum + m.price * m.quantity * item.quantity,
+			(modifierTotal, modifier) =>
+				modifierTotal + modifier.price * modifier.quantity * item.quantity,
 			0,
 		);
+
 		return sum + itemTotal + modifiersTotal;
 	}, 0);
 
-	const tax = subTotal * 0.19; // 19% IVA por defecto
+	const tax = cart.reduce(
+		(sum, item) =>
+			sum +
+			Math.round(
+				(item.product.price * item.quantity * item.product.taxRate) / 100,
+			),
+		0,
+	);
 	const totalAmount = Math.max(0, subTotal + tax - discount);
 
 	const totalPaid = payments.reduce(
-		(sum, p) => sum + (Number(p.amount) || 0),
+		(sum, paymentMethod) => sum + (Number(paymentMethod.amount) || 0),
 		0,
 	);
-	const remainingToPay = totalAmount - totalPaid;
+	const paymentDifference = totalAmount - totalPaid;
+	const hasPaymentDifference = paymentDifference !== 0;
+	const cashSummary = shiftCloseSummary?.summaryByMethod.find(
+		(summaryRow) => summaryRow.paymentMethod === "cash",
+	);
+	const hasInvalidCloseAmounts =
+		shiftCloseSummary?.summaryByMethod.some((summaryRow) => {
+			const amount = Number(closureAmounts[summaryRow.paymentMethod]);
+			return !Number.isFinite(amount) || amount < 0;
+		}) ?? false;
+	const canOpenShift =
+		startingCash.trim().length > 0 &&
+		Number.isFinite(Number(startingCash)) &&
+		Number(startingCash) >= 0;
+	const canRegisterCashMovement =
+		Boolean(activeShift) &&
+		movementDescription.trim().length > 0 &&
+		Number.isFinite(Number(movementAmount)) &&
+		Number(movementAmount) > 0;
 
 	return (
 		<div className="flex flex-col h-full w-full bg-[var(--color-void)] text-[var(--color-photon)] overflow-hidden">
@@ -216,36 +512,60 @@ function PosPage() {
 			<header className="h-14 border-b border-gray-800 flex items-center justify-between px-4 shrink-0 bg-[var(--color-carbon)] z-10">
 				<div className="flex items-center gap-4">
 					<div className="flex items-center gap-2 text-sm">
-						<span className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
-						<span className="font-semibold text-white">Caja Principal</span>
+						<span
+							className={`w-2.5 h-2.5 rounded-full ${
+								activeShift
+									? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"
+									: "bg-gray-500"
+							}`}
+						></span>
+						<span className="font-semibold text-white">
+							{activeShift?.terminalName || "Caja Principal"}
+						</span>
 						<span className="text-gray-400 text-xs px-1.5 py-0.5 bg-gray-800 rounded-md">
-							Abierta
+							{activeShift ? "Abierta" : "Cerrada"}
 						</span>
 					</div>
 					<Separator orientation="vertical" className="h-5 border-gray-700" />
 					<div className="flex items-center gap-2 bg-gray-900/50 px-3 py-1.5 rounded-lg border border-gray-800 focus-within:border-gray-600 transition-colors">
 						<Users className="w-4 h-4 text-gray-400" />
 						<select
+							value={selectedCustomerId}
+							onChange={(event) => setSelectedCustomerId(event.target.value)}
 							className="bg-transparent text-sm text-white outline-none border-none focus:ring-0 cursor-pointer min-w-[150px] appearance-none"
 							aria-label="Seleccionar cliente"
 						>
-							<option value="mostrador" className="bg-gray-900">
+							<option value="" className="bg-gray-900">
 								Cliente Mostrador
 							</option>
-							<option value="1" className="bg-gray-900">
-								Juan Pérez
-							</option>
-							<option value="2" className="bg-gray-900">
-								Empresa XYZ
-							</option>
+							{customers.map((customer) => (
+								<option
+									key={customer.id}
+									value={customer.id}
+									className="bg-gray-900"
+								>
+									{customer.name}
+								</option>
+							))}
 						</select>
 					</div>
 				</div>
 				<div className="flex items-center gap-2">
+					{!activeShift && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setIsShiftOpenModalOpen(true)}
+							className="h-9 border-[var(--color-voltage)]/40 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/20 transition-all"
+						>
+							Abrir Turno
+						</Button>
+					)}
 					<Button
 						variant="outline"
 						size="sm"
 						onClick={() => setIsCashMovementModalOpen(true)}
+						disabled={!activeShift}
 						className="h-9 border-gray-700 bg-gray-900/50 text-gray-300 hover:text-white hover:bg-gray-800 hover:border-gray-600 transition-all"
 					>
 						<ArrowLeftRight className="w-4 h-4 mr-2" />
@@ -255,6 +575,7 @@ function PosPage() {
 						variant="outline"
 						size="sm"
 						onClick={() => setIsCloseShiftModalOpen(true)}
+						disabled={!activeShift}
 						className="h-9 border-red-900/30 bg-red-900/10 text-red-400 hover:text-red-300 hover:bg-red-900/30 hover:border-red-900/50 transition-all"
 					>
 						<Lock className="w-4 h-4 mr-2" />
@@ -284,18 +605,18 @@ function PosPage() {
 							<div className="flex w-max space-x-1.5 pb-2">
 								{categories.map((category) => (
 									<Button
-										key={category}
+										key={category.id}
 										variant={
-											activeCategory === category ? "default" : "outline"
+											activeCategoryId === category.id ? "default" : "outline"
 										}
-										onClick={() => setActiveCategory(category)}
+										onClick={() => setActiveCategoryId(category.id)}
 										className={`rounded-lg px-4 h-8 text-sm font-medium transition-all ${
-											activeCategory === category
+											activeCategoryId === category.id
 												? "bg-[var(--color-voltage)] text-black hover:bg-[#c9e605] border-transparent shadow-sm"
 												: "bg-transparent border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800"
 										}`}
 									>
-										{category}
+										{category.name}
 									</Button>
 								))}
 							</div>
@@ -313,6 +634,7 @@ function PosPage() {
 										key={product.id}
 										type="button"
 										onClick={() => addToCart(product)}
+										disabled={!activeShift}
 										className="text-left bg-[#151515] rounded-xl p-3 border border-gray-800/80 flex flex-col justify-between transition-all hover:border-[var(--color-voltage)]/50 hover:bg-[#1a1a1a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-voltage)] group min-h-[100px] relative overflow-hidden"
 									>
 										{qty > 0 && (
@@ -328,7 +650,7 @@ function PosPage() {
 												{product.name}
 											</h3>
 											<p className="text-[11px] text-gray-500 mt-1 font-medium">
-												{product.category}
+												{product.categoryName}
 											</p>
 										</div>
 
@@ -341,6 +663,11 @@ function PosPage() {
 								);
 							})}
 						</div>
+						{isProductsFetching && (
+							<div className="flex flex-col items-center justify-center h-16 text-gray-500">
+								<p>Cargando productos...</p>
+							</div>
+						)}
 						{filteredProducts.length === 0 && (
 							<div className="flex flex-col items-center justify-center h-48 text-gray-500">
 								<p>No se encontraron productos.</p>
@@ -453,7 +780,7 @@ function PosPage() {
 									</span>
 								</div>
 								<div className="flex justify-between text-sm text-gray-400">
-									<span>Impuestos (19%)</span>
+									<span>Impuestos</span>
 									<span className="text-gray-200 tabular-nums">
 										{formatCurrency(tax)}
 									</span>
@@ -477,7 +804,7 @@ function PosPage() {
 
 							<Button
 								className="w-full h-12 bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-bold text-base rounded-xl mt-2 transition-all shadow-[0_4px_14px_rgba(201,230,5,0.2)] hover:shadow-[0_6px_20px_rgba(201,230,5,0.3)]"
-								disabled={cart.length === 0}
+								disabled={cart.length === 0 || !activeShift}
 								onClick={() => setIsCheckoutModalOpen(true)}
 							>
 								Cobrar
@@ -523,6 +850,11 @@ function PosPage() {
 								/>
 							</div>
 						</div>
+						{openShiftMutation.error instanceof Error && (
+							<p className="text-sm text-red-400 mt-3">
+								{openShiftMutation.error.message}
+							</p>
+						)}
 					</div>
 					<DialogFooter>
 						<Button
@@ -533,10 +865,11 @@ function PosPage() {
 							Cancelar
 						</Button>
 						<Button
-							onClick={() => setIsShiftOpenModalOpen(false)}
+							onClick={handleOpenShift}
+							disabled={!canOpenShift || openShiftMutation.isPending}
 							className="bg-[var(--color-voltage)] text-black hover:bg-[#c9e605]"
 						>
-							Abrir Turno
+							{openShiftMutation.isPending ? "Abriendo..." : "Abrir Turno"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
@@ -552,6 +885,11 @@ function PosPage() {
 						<DialogTitle>Movimiento de Caja</DialogTitle>
 					</DialogHeader>
 					<div className="grid gap-4 py-4">
+						{!activeShift && (
+							<p className="text-sm text-red-400">
+								Debes abrir un turno antes de registrar movimientos.
+							</p>
+						)}
 						<div className="grid gap-2">
 							<label
 								htmlFor={movementTypeId}
@@ -601,6 +939,11 @@ function PosPage() {
 								className="bg-[#0a0a0a] border-gray-800 text-white focus-visible:ring-[var(--color-voltage)]"
 							/>
 						</div>
+						{registerCashMovementMutation.error instanceof Error && (
+							<p className="text-sm text-red-400">
+								{registerCashMovementMutation.error.message}
+							</p>
+						)}
 					</div>
 					<DialogFooter>
 						<Button
@@ -611,10 +954,16 @@ function PosPage() {
 							Cancelar
 						</Button>
 						<Button
-							onClick={() => setIsCashMovementModalOpen(false)}
+							onClick={handleCashMovement}
+							disabled={
+								!canRegisterCashMovement ||
+								registerCashMovementMutation.isPending
+							}
 							className="bg-[var(--color-voltage)] text-black hover:bg-[#c9e605]"
 						>
-							Registrar Movimiento
+							{registerCashMovementMutation.isPending
+								? "Registrando..."
+								: "Registrar Movimiento"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
@@ -634,76 +983,109 @@ function PosPage() {
 							<h4 className="text-sm font-medium text-gray-400 mb-3">
 								Resumen del Sistema
 							</h4>
-							<div className="space-y-2 text-sm">
-								<div className="flex justify-between">
-									<span className="text-gray-300">Base inicial</span>
-									<span className="text-white font-medium tabular-nums">
-										$50.000
-									</span>
-								</div>
-								<div className="flex justify-between">
-									<span className="text-gray-300">Ventas en efectivo</span>
-									<span className="text-white font-medium tabular-nums">
-										$124.000
-									</span>
-								</div>
-								<div className="flex justify-between">
-									<span className="text-gray-300">
-										Ventas tarjeta/transferencia
-									</span>
-									<span className="text-white font-medium tabular-nums">
-										$350.000
-									</span>
-								</div>
-								<div className="flex justify-between">
-									<span className="text-gray-300">Movimientos (Gastos)</span>
-									<span className="text-red-400 font-medium tabular-nums">
-										-$10.000
-									</span>
-								</div>
-								<Separator className="my-2 border-gray-700" />
-								<div className="flex justify-between text-base">
-									<span className="text-gray-200 font-semibold">
-										Total Efectivo Esperado
-									</span>
-									<span className="text-[var(--color-voltage)] font-bold tabular-nums">
-										$164.000
-									</span>
-								</div>
-							</div>
-						</div>
-
-						<div className="grid gap-2">
-							<label
-								htmlFor={countedCashId}
-								className="text-sm font-medium text-gray-300"
-							>
-								Efectivo en Caja (Arqueo)
-							</label>
-							<div className="relative">
-								<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-									$
-								</span>
-								<Input
-									id={countedCashId}
-									type="number"
-									placeholder="0"
-									value={countedCash}
-									onChange={(e) => setCountedCash(e.target.value)}
-									className="pl-7 bg-[#0a0a0a] border-gray-800 text-white focus-visible:ring-[var(--color-voltage)] text-lg h-12"
-								/>
-							</div>
-							{countedCash && (
-								<div
-									className={`text-sm mt-1 flex items-center justify-between tabular-nums ${Number(countedCash) === 164000 ? "text-green-400" : "text-red-400"}`}
-								>
-									<span>Diferencia:</span>
-									<span className="font-semibold">
-										{formatCurrency(Number(countedCash) - 164000)}
-									</span>
+							{isShiftSummaryFetching && (
+								<p className="text-sm text-gray-400">Cargando resumen...</p>
+							)}
+							{shiftCloseSummary && (
+								<div className="space-y-2 text-sm">
+									<div className="flex justify-between">
+										<span className="text-gray-300">Base inicial</span>
+										<span className="text-white font-medium tabular-nums">
+											{formatCurrency(shiftCloseSummary.shift.startingCash)}
+										</span>
+									</div>
+									<div className="flex justify-between">
+										<span className="text-gray-300">Efectivo esperado</span>
+										<span className="text-white font-medium tabular-nums">
+											{formatCurrency(cashSummary?.expectedAmount ?? 0)}
+										</span>
+									</div>
+									<Separator className="my-2 border-gray-700" />
+									{shiftCloseSummary.summaryByMethod
+										.filter((summaryRow) => summaryRow.paymentMethod !== "cash")
+										.map((summaryRow) => (
+											<div
+												key={`expected-${summaryRow.paymentMethod}`}
+												className="flex justify-between"
+											>
+												<span className="text-gray-300">
+													{formatPaymentMethodLabel(summaryRow.paymentMethod)}
+												</span>
+												<span className="text-white font-medium tabular-nums">
+													{formatCurrency(summaryRow.expectedAmount)}
+												</span>
+											</div>
+										))}
+									<Separator className="my-2 border-gray-700" />
+									<div className="flex justify-between text-base">
+										<span className="text-gray-200 font-semibold">
+											Total Esperado
+										</span>
+										<span className="text-[var(--color-voltage)] font-bold tabular-nums">
+											{formatCurrency(shiftCloseSummary.totalExpected)}
+										</span>
+									</div>
 								</div>
 							)}
 						</div>
+
+						{shiftCloseSummary && (
+							<div className="grid gap-3">
+								{shiftCloseSummary.summaryByMethod.map((summaryRow) => (
+									<div key={summaryRow.paymentMethod} className="grid gap-2">
+										<label
+											htmlFor={`closure-${summaryRow.paymentMethod}`}
+											className="text-sm font-medium text-gray-300"
+										>
+											{formatPaymentMethodLabel(summaryRow.paymentMethod)}{" "}
+											(Esperado: {formatCurrency(summaryRow.expectedAmount)})
+										</label>
+										<div className="relative">
+											<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+												$
+											</span>
+											<Input
+												id={`closure-${summaryRow.paymentMethod}`}
+												type="number"
+												placeholder="0"
+												value={closureAmounts[summaryRow.paymentMethod] ?? ""}
+												onChange={(event) =>
+													setClosureAmounts((prevState) => ({
+														...prevState,
+														[summaryRow.paymentMethod]: event.target.value,
+													}))
+												}
+												className="pl-7 bg-[#0a0a0a] border-gray-800 text-white focus-visible:ring-[var(--color-voltage)]"
+											/>
+										</div>
+										{closureAmounts[summaryRow.paymentMethod] && (
+											<div
+												className={`text-sm mt-1 flex items-center justify-between tabular-nums ${
+													Number(closureAmounts[summaryRow.paymentMethod]) -
+														summaryRow.expectedAmount ===
+													0
+														? "text-green-400"
+														: "text-red-400"
+												}`}
+											>
+												<span>Diferencia:</span>
+												<span className="font-semibold">
+													{formatCurrency(
+														Number(closureAmounts[summaryRow.paymentMethod]) -
+															summaryRow.expectedAmount,
+													)}
+												</span>
+											</div>
+										)}
+									</div>
+								))}
+							</div>
+						)}
+						{closeShiftMutation.error instanceof Error && (
+							<p className="text-sm text-red-400">
+								{closeShiftMutation.error.message}
+							</p>
+						)}
 					</div>
 					<DialogFooter>
 						<Button
@@ -714,10 +1096,19 @@ function PosPage() {
 							Cancelar
 						</Button>
 						<Button
-							onClick={() => setIsCloseShiftModalOpen(false)}
+							onClick={handleCloseShift}
+							disabled={
+								!activeShift ||
+								!shiftCloseSummary ||
+								hasInvalidCloseAmounts ||
+								isShiftSummaryFetching ||
+								closeShiftMutation.isPending
+							}
 							className="bg-red-900/30 text-red-400 hover:bg-red-900/50 hover:text-red-300 border border-red-900/50"
 						>
-							Cerrar Turno Definitivamente
+							{closeShiftMutation.isPending
+								? "Cerrando..."
+								: "Cerrar Turno Definitivamente"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
@@ -758,6 +1149,12 @@ function PosPage() {
 									</label>
 								</div>
 							</div>
+
+							{isCreditSale && !selectedCustomerId && (
+								<p className="text-sm text-amber-400">
+									Selecciona un cliente para registrar venta a crédito.
+								</p>
+							)}
 
 							{!isCreditSale && (
 								<div className="space-y-3">
@@ -831,15 +1228,26 @@ function PosPage() {
 							)}
 						</div>
 
-						{!isCreditSale && payments.length > 1 && (
+						{!isCreditSale && (
 							<div className="flex justify-between items-center text-sm pt-2 border-t border-gray-800">
-								<span className="text-gray-400">Restante por pagar:</span>
+								<span className="text-gray-400">Diferencia de pago:</span>
 								<span
-									className={`font-semibold ${remainingToPay > 0 ? "text-red-400" : "text-green-400"}`}
+									className={`font-semibold ${
+										paymentDifference === 0
+											? "text-green-400"
+											: paymentDifference > 0
+												? "text-red-400"
+												: "text-amber-400"
+									}`}
 								>
-									{formatCurrency(Math.max(0, remainingToPay))}
+									{formatCurrency(Math.abs(paymentDifference))}
 								</span>
 							</div>
+						)}
+						{createPosSaleMutation.error instanceof Error && (
+							<p className="text-sm text-red-400">
+								{createPosSaleMutation.error.message}
+							</p>
 						)}
 					</div>
 					<DialogFooter>
@@ -851,14 +1259,21 @@ function PosPage() {
 							Cancelar
 						</Button>
 						<Button
-							onClick={() => {
-								setIsCheckoutModalOpen(false);
-								clearCart();
-							}}
-							disabled={!isCreditSale && remainingToPay > 0}
+							onClick={handleFinalizeSale}
+							disabled={
+								!activeShift ||
+								cart.length === 0 ||
+								createPosSaleMutation.isPending ||
+								(isCreditSale && !selectedCustomerId) ||
+								(!isCreditSale && hasPaymentDifference)
+							}
 							className="bg-[var(--color-voltage)] text-black hover:bg-[#c9e605]"
 						>
-							{isCreditSale ? "Confirmar Fiado" : "Finalizar Venta"}
+							{createPosSaleMutation.isPending
+								? "Procesando..."
+								: isCreditSale
+									? "Confirmar Fiado"
+									: "Finalizar Venta"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>

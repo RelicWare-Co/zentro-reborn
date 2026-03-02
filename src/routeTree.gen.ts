@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthProductsRouteImport } from './routes/_auth/products'
 import { Route as AuthPosRouteImport } from './routes/_auth/pos'
+import { Route as AuthDashboardRouteImport } from './routes/_auth/dashboard'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const LoginRoute = LoginRouteImport.update({
@@ -40,6 +41,11 @@ const AuthPosRoute = AuthPosRouteImport.update({
   path: '/pos',
   getParentRoute: () => AuthRoute,
 } as any)
+const AuthDashboardRoute = AuthDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -49,6 +55,7 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/dashboard': typeof AuthDashboardRoute
   '/pos': typeof AuthPosRoute
   '/products': typeof AuthProductsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -56,6 +63,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/dashboard': typeof AuthDashboardRoute
   '/pos': typeof AuthPosRoute
   '/products': typeof AuthProductsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -65,20 +73,28 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
+  '/_auth/dashboard': typeof AuthDashboardRoute
   '/_auth/pos': typeof AuthPosRoute
   '/_auth/products': typeof AuthProductsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/pos' | '/products' | '/api/auth/$'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/dashboard'
+    | '/pos'
+    | '/products'
+    | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/pos' | '/products' | '/api/auth/$'
+  to: '/' | '/login' | '/dashboard' | '/pos' | '/products' | '/api/auth/$'
   id:
     | '__root__'
     | '/'
     | '/_auth'
     | '/login'
+    | '/_auth/dashboard'
     | '/_auth/pos'
     | '/_auth/products'
     | '/api/auth/$'
@@ -128,6 +144,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthPosRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_auth/dashboard': {
+      id: '/_auth/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthDashboardRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -139,11 +162,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthRouteChildren {
+  AuthDashboardRoute: typeof AuthDashboardRoute
   AuthPosRoute: typeof AuthPosRoute
   AuthProductsRoute: typeof AuthProductsRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
+  AuthDashboardRoute: AuthDashboardRoute,
   AuthPosRoute: AuthPosRoute,
   AuthProductsRoute: AuthProductsRoute,
 }

@@ -38,7 +38,7 @@ function LoginForm() {
 		if (error) {
 			setErrorMsg(error.message || "Credenciales inválidas");
 		} else {
-			navigate({ to: "/products" });
+			navigate({ to: "/dashboard" });
 		}
 	};
 
@@ -175,7 +175,7 @@ function RegisterForm() {
 			setErrorMsg(error.message || "Error al crear la cuenta");
 		} else {
 			setSuccessMsg("¡Cuenta creada! Redirigiendo...");
-			navigate({ to: "/products" });
+			navigate({ to: "/dashboard" });
 		}
 	};
 

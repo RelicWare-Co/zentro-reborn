@@ -30,6 +30,17 @@ export type UpdateProductInput = {
 	trackInventory?: boolean;
 };
 
+export type CreateCategoryInput = {
+	name: string;
+	description?: string | null;
+};
+
+export type UpdateCategoryInput = {
+	id: string;
+	name?: string;
+	description?: string | null;
+};
+
 type AuthSession = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
 
 function normalizeOptionalString(value?: string | null) {
@@ -176,6 +187,76 @@ export async function getCategoriesForCurrentOrganization() {
 		.from(category)
 		.where(eq(category.organizationId, organizationId))
 		.orderBy(asc(category.name));
+}
+
+export async function createCategoryForCurrentOrganization(
+	input: CreateCategoryInput,
+) {
+	const { organizationId } = await getAuthContext();
+	if (!organizationId) throw new Error("No hay una organización activa");
+	const normalizedName = input.name.trim();
+	if (!normalizedName) {
+		throw new Error("El nombre de la categoría es obligatorio");
+	}
+
+	const id = crypto.randomUUID();
+	await db.insert(category).values({
+		id,
+		organizationId,
+		name: normalizedName,
+		description: normalizeOptionalString(input.description),
+		createdAt: new Date(),
+	});
+
+	return { id };
+}
+
+export async function updateCategoryForCurrentOrganization(
+	input: UpdateCategoryInput,
+) {
+	const { organizationId } = await getAuthContext();
+	if (!organizationId) throw new Error("No hay una organización activa");
+
+	const updates: Partial<typeof category.$inferInsert> = {};
+	if (input.name !== undefined) {
+		const normalizedName = input.name.trim();
+		if (!normalizedName) {
+			throw new Error("El nombre de la categoría es obligatorio");
+		}
+		updates.name = normalizedName;
+	}
+	if (input.description !== undefined) {
+		updates.description = normalizeOptionalString(input.description);
+	}
+
+	if (Object.keys(updates).length === 0) {
+		throw new Error("No hay campos para actualizar");
+	}
+
+	await db
+		.update(category)
+		.set(updates)
+		.where(
+			and(
+				eq(category.id, input.id),
+				eq(category.organizationId, organizationId),
+			),
+		);
+
+	return { success: true };
+}
+
+export async function deleteCategoryForCurrentOrganization(id: string) {
+	const { organizationId } = await getAuthContext();
+	if (!organizationId) throw new Error("No hay una organización activa");
+
+	await db
+		.delete(category)
+		.where(
+			and(eq(category.id, id), eq(category.organizationId, organizationId)),
+		);
+
+	return { success: true };
 }
 
 export async function createProductForCurrentOrganization(

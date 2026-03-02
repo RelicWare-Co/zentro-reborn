@@ -1,10 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
+	createCategoryForCurrentOrganization,
 	createProductForCurrentOrganization,
+	deleteCategoryForCurrentOrganization,
 	deleteProductForCurrentOrganization,
 	getCategoriesForCurrentOrganization,
 	getProductsForCurrentOrganization,
+	updateCategoryForCurrentOrganization,
 	updateProductForCurrentOrganization,
 } from "./products.server";
 
@@ -55,6 +58,28 @@ const deleteProductInputSchema = z.object({
 	id: z.string().trim().min(1),
 });
 
+const createCategoryInputSchema = z.object({
+	name: z.string().trim().min(1, "El nombre es obligatorio"),
+	description: nullableString,
+});
+
+const updateCategoryInputSchema = z
+	.object({
+		id: z.string().trim().min(1),
+		name: z.string().trim().min(1).optional(),
+		description: nullableString,
+	})
+	.refine(
+		(input) => input.name !== undefined || input.description !== undefined,
+		{
+			message: "Debes enviar al menos un campo para actualizar",
+		},
+	);
+
+const deleteCategoryInputSchema = z.object({
+	id: z.string().trim().min(1),
+});
+
 export const getProducts = createServerFn({ method: "GET" }).handler(
 	async () => {
 		return getProductsForCurrentOrganization();
@@ -83,4 +108,22 @@ export const deleteProduct = createServerFn({ method: "POST" })
 	.inputValidator(deleteProductInputSchema)
 	.handler(async ({ data }) => {
 		return deleteProductForCurrentOrganization(data.id);
+	});
+
+export const createCategory = createServerFn({ method: "POST" })
+	.inputValidator(createCategoryInputSchema)
+	.handler(async ({ data }) => {
+		return createCategoryForCurrentOrganization(data);
+	});
+
+export const updateCategory = createServerFn({ method: "POST" })
+	.inputValidator(updateCategoryInputSchema)
+	.handler(async ({ data }) => {
+		return updateCategoryForCurrentOrganization(data);
+	});
+
+export const deleteCategory = createServerFn({ method: "POST" })
+	.inputValidator(deleteCategoryInputSchema)
+	.handler(async ({ data }) => {
+		return deleteCategoryForCurrentOrganization(data.id);
 	});

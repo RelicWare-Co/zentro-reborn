@@ -1,6 +1,6 @@
-import { afterEach, vi } from "vitest";
+import { afterEach, jest, mock } from "bun:test";
 
 afterEach(() => {
-	vi.restoreAllMocks();
-	vi.unstubAllEnvs();
+	jest.restoreAllMocks();
+	mock.restore();
 });

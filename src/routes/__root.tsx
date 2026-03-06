@@ -1,3 +1,8 @@
+import {
+	ColorSchemeScript,
+	MantineProvider,
+	mantineHtmlProps,
+} from "@mantine/core";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -6,6 +11,8 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { ThemeProvider } from "next-themes";
+import { Toaster } from "../components/ui/sonner";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import TanStackQueryProvider from "../integrations/tanstack-query/root-provider";
 import appCss from "../styles/globals.css?url";
@@ -42,28 +49,39 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="en" suppressHydrationWarning>
+		<html lang="en" {...mantineHtmlProps} suppressHydrationWarning>
 			<head>
 				{/** biome-ignore lint/security/noDangerouslySetInnerHtml: required for theme initialization */}
 				<script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+				<ColorSchemeScript defaultColorScheme="auto" />
 				<HeadContent />
 			</head>
 			<body className="font-sans antialiased [overflow-wrap:anywhere] selection:bg-[rgba(79,184,178,0.24)]">
-				<TanStackQueryProvider>
-					{children}
-					<TanStackDevtools
-						config={{
-							position: "bottom-right",
-						}}
-						plugins={[
-							{
-								name: "Tanstack Router",
-								render: <TanStackRouterDevtoolsPanel />,
-							},
-							TanStackQueryDevtools,
-						]}
-					/>
-				</TanStackQueryProvider>
+				<ThemeProvider
+					attribute="class"
+					defaultTheme="system"
+					enableSystem
+					disableTransitionOnChange
+				>
+					<MantineProvider defaultColorScheme="auto">
+						<TanStackQueryProvider>
+							{children}
+							<TanStackDevtools
+								config={{
+									position: "bottom-right",
+								}}
+								plugins={[
+									{
+										name: "Tanstack Router",
+										render: <TanStackRouterDevtoolsPanel />,
+									},
+									TanStackQueryDevtools,
+								]}
+							/>
+							<Toaster />
+						</TanStackQueryProvider>
+					</MantineProvider>
+				</ThemeProvider>
 				<Scripts />
 			</body>
 		</html>

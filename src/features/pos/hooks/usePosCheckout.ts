@@ -1,6 +1,5 @@
-import { useState, useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { CartItem, PaymentMethod } from "../types";
-import { formatCurrency } from "../utils";
 import { useCreatePosSaleMutation } from "./usePosQueries";
 
 export function usePosCheckout(

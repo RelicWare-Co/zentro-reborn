@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { ActiveShift, ShiftCloseSummary } from "../types";
+import type { ActiveShift } from "../types";
 import {
 	useCloseShiftMutation,
 	useOpenShiftMutation,

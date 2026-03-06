@@ -11,7 +11,7 @@ import {
 	searchPosCustomers,
 	searchPosProducts,
 } from "../pos.functions";
-import type { PosBootstrap, ShiftCloseSummary } from "../types";
+import type { PosBootstrap } from "../types";
 
 export function usePosBootstrap(initialData?: PosBootstrap) {
 	return useQuery({

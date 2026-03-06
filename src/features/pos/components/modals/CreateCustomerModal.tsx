@@ -1,13 +1,5 @@
+import { Button, Group, Modal, NativeSelect, Text, TextInput } from "@mantine/core";
 import { useId } from "react";
-import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 
 interface CreateCustomerModalProps {
 	isOpen: boolean;
@@ -48,13 +40,19 @@ export function CreateCustomerModal({
 	const customerDocumentNumberId = useId();
 
 	return (
-		<Dialog open={isOpen} onOpenChange={onClose}>
-			<DialogContent className="bg-[#151515] border-gray-800 text-white sm:max-w-[450px]">
-				<DialogHeader>
-					<DialogTitle>Crear cliente rápido</DialogTitle>
-				</DialogHeader>
-
-				<div className="space-y-4 py-2">
+		<Modal
+			opened={isOpen}
+			onClose={onClose}
+			title="Crear cliente rápido"
+			size={450}
+			classNames={{
+				content: "bg-[#151515] border border-gray-800 text-white",
+				header: "bg-[#151515] text-white",
+				title: "text-white font-semibold",
+				body: "pt-2",
+			}}
+		>
+			<div className="space-y-4 py-2">
 					<div className="grid gap-2">
 						<label
 							htmlFor={customerNameId}
@@ -62,12 +60,14 @@ export function CreateCustomerModal({
 						>
 							Nombre
 						</label>
-						<Input
+						<TextInput
 							id={customerNameId}
 							value={name}
 							onChange={(event) => setName(event.target.value)}
 							placeholder="Nombre del cliente"
-							className="bg-[#0a0a0a] border-gray-800 text-white"
+							classNames={{
+								input: "bg-[#0a0a0a] border-gray-800 text-white",
+							}}
 						/>
 					</div>
 
@@ -78,12 +78,14 @@ export function CreateCustomerModal({
 						>
 							Teléfono
 						</label>
-						<Input
+						<TextInput
 							id={customerPhoneId}
 							value={phone}
 							onChange={(event) => setPhone(event.target.value)}
 							placeholder="Opcional"
-							className="bg-[#0a0a0a] border-gray-800 text-white"
+							classNames={{
+								input: "bg-[#0a0a0a] border-gray-800 text-white",
+							}}
 						/>
 					</div>
 
@@ -95,17 +97,21 @@ export function CreateCustomerModal({
 							>
 								Tipo doc
 							</label>
-							<select
+							<NativeSelect
 								id={customerDocumentTypeId}
 								value={documentType}
 								onChange={(event) => setDocumentType(event.target.value)}
-								className="flex h-10 w-full rounded-md border border-gray-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-voltage)]"
-							>
-								<option value="CC">CC</option>
-								<option value="NIT">NIT</option>
-								<option value="CE">CE</option>
-								<option value="PAS">Pasaporte</option>
-							</select>
+								data={[
+									{ value: "CC", label: "CC" },
+									{ value: "NIT", label: "NIT" },
+									{ value: "CE", label: "CE" },
+									{ value: "PAS", label: "Pasaporte" },
+								]}
+								classNames={{
+									input:
+										"h-10 border-gray-800 bg-[#0a0a0a] text-sm text-white focus:border-[var(--color-voltage)]",
+								}}
+							/>
 						</div>
 
 						<div className="grid gap-2">
@@ -115,27 +121,22 @@ export function CreateCustomerModal({
 							>
 								Número doc
 							</label>
-							<Input
+							<TextInput
 								id={customerDocumentNumberId}
 								value={documentNumber}
 								onChange={(event) => setDocumentNumber(event.target.value)}
 								placeholder="Opcional"
-								className="bg-[#0a0a0a] border-gray-800 text-white"
+								classNames={{
+									input: "bg-[#0a0a0a] border-gray-800 text-white",
+								}}
 							/>
 						</div>
 					</div>
 
-					{error instanceof Error && (
-						<p className="text-sm text-red-400">{error.message}</p>
-					)}
-				</div>
+					{error instanceof Error && <Text className="text-sm text-red-400">{error.message}</Text>}
 
-				<DialogFooter>
-					<Button
-						variant="ghost"
-						onClick={onClose}
-						className="text-gray-400 hover:text-white"
-					>
+					<Group justify="flex-end" mt="md">
+						<Button variant="subtle" color="gray" onClick={onClose}>
 						Cancelar
 					</Button>
 					<Button
@@ -145,8 +146,8 @@ export function CreateCustomerModal({
 					>
 						{isCreating ? "Creando..." : "Crear cliente"}
 					</Button>
-				</DialogFooter>
-			</DialogContent>
-		</Dialog>
+					</Group>
+				</div>
+		</Modal>
 	);
 }

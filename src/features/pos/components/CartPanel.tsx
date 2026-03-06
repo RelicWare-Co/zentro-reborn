@@ -1,6 +1,5 @@
+import { Button, ScrollArea } from "@mantine/core";
 import { Search, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { CartItem, CartTotals } from "../types";
 import { formatCurrency } from "../utils";
 import { CartItemCard } from "./CartItemCard";
@@ -42,7 +41,8 @@ export function CartPanel({
 					<p className="text-xs text-gray-400 mt-1">{totalItems} artículos</p>
 				</div>
 				<Button
-					variant="ghost"
+					variant="subtle"
+					color="red"
 					onClick={onClearCart}
 					disabled={cart.length === 0}
 					className="text-red-400 hover:text-red-300 hover:bg-red-400/10 font-medium h-8 px-2 text-xs rounded-md transition-all"
@@ -111,6 +111,7 @@ export function CartPanel({
 					</div>
 
 					<Button
+						variant="filled"
 						className="w-full h-12 bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-bold text-base rounded-xl mt-2 transition-all shadow-[0_4px_14px_rgba(201,230,5,0.2)] hover:shadow-[0_6px_20px_rgba(201,230,5,0.3)]"
 						disabled={cart.length === 0 || !isActiveShift}
 						onClick={onCheckout}

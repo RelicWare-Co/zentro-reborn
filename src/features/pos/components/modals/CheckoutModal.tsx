@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { CreditAccount, PaymentMethod } from "../../types";
-import { formatCurrency, formatPaymentMethodLabel } from "../../utils";
+import { formatCurrency } from "../../utils";
 
 interface CheckoutModalProps {
 	isOpen: boolean;
@@ -111,7 +111,7 @@ export function CheckoutModal({
 									type="checkbox"
 									id={creditSaleId}
 									checked={isCreditSale}
-									onChange={(e) => setIsCreditSale(e.target.checked)}
+									onChange={(event) => setIsCreditSale(event.target.checked)}
 									className="w-4 h-4 rounded border-gray-700 bg-[#0a0a0a] text-[var(--color-voltage)] focus:ring-[var(--color-voltage)]"
 								/>
 								<label
@@ -132,12 +132,12 @@ export function CheckoutModal({
 						{selectedCustomerCreditAccount && (
 							<div className="bg-amber-900/20 border border-amber-900/40 rounded-lg p-3 space-y-1 text-sm">
 								<p className="text-amber-300 font-medium">
-									Saldo pendiente actual:{" "}
+									Saldo pendiente actual: {" "}
 									{formatCurrency(selectedCustomerCreditAccount.balance)}
 								</p>
 								{isCreditSale && (
 									<p className="text-amber-200">
-										Saldo proyectado tras esta venta:{" "}
+										Saldo proyectado tras esta venta: {" "}
 										{formatCurrency(projectedCreditBalance)}
 									</p>
 								)}
@@ -165,8 +165,8 @@ export function CheckoutModal({
 										<div className="flex gap-2">
 											<select
 												value={payment.method}
-												onChange={(e) =>
-													onUpdatePayment(index, "method", e.target.value)
+												onChange={(event) =>
+													onUpdatePayment(index, "method", event.target.value)
 												}
 												className="flex-1 h-10 rounded-md border border-gray-700 bg-[#151515] px-3 text-sm text-white focus:outline-none focus:border-[var(--color-voltage)]"
 											>
@@ -184,8 +184,8 @@ export function CheckoutModal({
 													type="number"
 													placeholder="Monto"
 													value={payment.amount}
-													onChange={(e) =>
-														onUpdatePayment(index, "amount", e.target.value)
+													onChange={(event) =>
+														onUpdatePayment(index, "amount", event.target.value)
 													}
 													className="pl-7 h-10 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)]"
 												/>
@@ -196,8 +196,8 @@ export function CheckoutModal({
 											<Input
 												placeholder="Referencia (Ej. últimos 4 dígitos o voucher)"
 												value={payment.reference}
-												onChange={(e) =>
-													onUpdatePayment(index, "reference", e.target.value)
+												onChange={(event) =>
+													onUpdatePayment(index, "reference", event.target.value)
 												}
 												className="h-9 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)] text-sm"
 											/>
@@ -222,7 +222,7 @@ export function CheckoutModal({
 							<span className="text-gray-400">Diferencia de pago:</span>
 							<span
 								className={`font-semibold ${
-									paymentDifference === 0
+									!hasPaymentDifference
 										? "text-green-400"
 										: paymentDifference > 0
 											? "text-red-400"

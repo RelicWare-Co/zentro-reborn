@@ -1,6 +1,5 @@
+import { Button, Divider, NativeSelect } from "@mantine/core";
 import { ArrowLeftRight, Lock, Plus, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import type { ActiveShift, PosCustomer } from "../types";
 
 interface PosHeaderProps {
@@ -43,33 +42,30 @@ export function PosHeader({
 					</span>
 				</div>
 
-				<Separator orientation="vertical" className="h-5 border-gray-700" />
+				<Divider orientation="vertical" className="h-5 border-gray-700" />
 
 				<div className="flex items-center gap-2 bg-gray-900/50 px-3 py-1.5 rounded-lg border border-gray-800 focus-within:border-gray-600 transition-colors">
 					<Users className="w-4 h-4 text-gray-400" />
-					<select
+					<NativeSelect
 						value={selectedCustomerId}
 						onChange={(event) => onCustomerChange(event.target.value)}
-						className="bg-transparent text-sm text-white outline-none border-none focus:ring-0 cursor-pointer min-w-[150px] appearance-none"
+						data={[
+							{ value: "", label: "Cliente Mostrador" },
+							...customers.map((customer) => ({
+								value: customer.id,
+								label: customer.name,
+							})),
+						]}
+						classNames={{
+							input:
+								"bg-transparent text-sm text-white border-none cursor-pointer min-w-[150px] h-7 pl-0",
+						}}
 						aria-label="Seleccionar cliente"
-					>
-						<option value="" className="bg-gray-900">
-							Cliente Mostrador
-						</option>
-						{customers.map((customer) => (
-							<option
-								key={customer.id}
-								value={customer.id}
-								className="bg-gray-900"
-							>
-								{customer.name}
-							</option>
-						))}
-					</select>
+					/>
 					<Button
 						type="button"
-						variant="ghost"
-						size="sm"
+						variant="subtle"
+						size="compact-sm"
 						onClick={onCreateCustomer}
 						className="h-7 px-2 text-xs text-[var(--color-voltage)] hover:text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10"
 					>
@@ -83,7 +79,7 @@ export function PosHeader({
 				{!activeShift && (
 					<Button
 						variant="outline"
-						size="sm"
+						size="compact-sm"
 						onClick={onOpenShift}
 						className="h-9 border-[var(--color-voltage)]/40 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/20 transition-all"
 					>
@@ -92,7 +88,7 @@ export function PosHeader({
 				)}
 				<Button
 					variant="outline"
-					size="sm"
+					size="compact-sm"
 					onClick={onCashMovement}
 					disabled={!activeShift}
 					className="h-9 border-gray-700 bg-gray-900/50 text-gray-300 hover:text-white hover:bg-gray-800 hover:border-gray-600 transition-all"
@@ -102,7 +98,7 @@ export function PosHeader({
 				</Button>
 				<Button
 					variant="outline"
-					size="sm"
+					size="compact-sm"
 					onClick={onCloseShift}
 					disabled={!activeShift}
 					className="h-9 border-red-900/30 bg-red-900/10 text-red-400 hover:text-red-300 hover:bg-red-900/30 hover:border-red-900/50 transition-all"

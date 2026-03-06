@@ -1,5 +1,4 @@
-import { Button } from "@/components/ui/button";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Button, ScrollArea } from "@mantine/core";
 import type { Category } from "../types";
 
 interface CategoryTabsProps {
@@ -14,12 +13,13 @@ export function CategoryTabs({
 	onCategoryChange,
 }: CategoryTabsProps) {
 	return (
-		<ScrollArea className="w-full whitespace-nowrap">
+		<ScrollArea className="w-full whitespace-nowrap" scrollbarSize={0}>
 			<div className="flex w-max space-x-1.5 pb-2">
 				{categories.map((category) => (
 					<Button
 						key={category.id}
-						variant={activeCategoryId === category.id ? "default" : "outline"}
+						variant={activeCategoryId === category.id ? "filled" : "outline"}
+						size="compact-sm"
 						onClick={() => onCategoryChange(category.id)}
 						className={`rounded-lg px-4 h-8 text-sm font-medium transition-all ${
 							activeCategoryId === category.id
@@ -31,7 +31,6 @@ export function CategoryTabs({
 					</Button>
 				))}
 			</div>
-			<ScrollBar orientation="horizontal" className="invisible" />
 		</ScrollArea>
 	);
 }

@@ -1,3 +1,4 @@
+// TODO: migrate to LibSQL and update tests accordingly.
 import { Database } from "bun:sqlite";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { resolve } from "node:path";

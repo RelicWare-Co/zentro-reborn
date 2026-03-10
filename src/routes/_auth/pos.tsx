@@ -8,18 +8,22 @@ import { CreateCustomerModal } from "@/features/pos/components/modals/CreateCust
 import { ModifierModal } from "@/features/pos/components/modals/ModifierModal";
 import { OpenShiftModal } from "@/features/pos/components/modals/OpenShiftModal";
 import { ShiftRequiredDialog } from "@/features/pos/components/modals/ShiftRequiredDialog";
-
 import { PosHeader } from "@/features/pos/components/PosHeader";
 import { ProductGrid } from "@/features/pos/components/ProductGrid";
-import { useCreditAccounts, usePosCustomers, usePosProducts } from "@/features/pos/hooks";
+import {
+	useCreditAccounts,
+	usePosCustomers,
+	usePosProducts,
+} from "@/features/pos/hooks";
 import { useCreateCustomerModal } from "@/features/pos/hooks/useCreateCustomerModal";
 import { useModifierModal } from "@/features/pos/hooks/useModifierModal";
 import { usePosCart } from "@/features/pos/hooks/usePosCart";
 import { usePosCheckout } from "@/features/pos/hooks/usePosCheckout";
 import { usePosBootstrap } from "@/features/pos/hooks/usePosQueries";
 import { usePosShift } from "@/features/pos/hooks/usePosShift";
-
 import { getPosBootstrap } from "@/features/pos/pos.functions";
+import { printThermalReceipt } from "@/features/pos/printing/printThermalReceipt";
+import { buildSaleReceiptDocument } from "@/features/pos/printing/receiptDocuments";
 
 import type { Category, Product } from "@/features/pos/types";
 
@@ -58,6 +62,10 @@ function PosPage() {
 	const posSettings = bootstrap.settings;
 
 	// Credit account lookup
+	const customerById = useMemo(
+		() => new Map(customers.map((customer) => [customer.id, customer])),
+		[customers],
+	);
 	const creditAccountByCustomerId = useMemo(
 		() =>
 			new Map(
@@ -71,20 +79,89 @@ function PosPage() {
 	const selectedCustomerCreditAccount = selectedCustomerId
 		? (creditAccountByCustomerId.get(selectedCustomerId) ?? null)
 		: null;
+	const selectedCustomer = selectedCustomerId
+		? (customerById.get(selectedCustomerId) ?? null)
+		: null;
 
 	// Hooks
 	const cart = usePosCart();
 	const shift = usePosShift(activeShift);
+	const handleSaleCreated = useCallback(
+		(payload: {
+			result: {
+				saleId: string;
+				status: string;
+				subtotal: number;
+				taxAmount: number;
+				discountAmount: number;
+				totalAmount: number;
+				paidAmount: number;
+				balanceDue: number;
+			};
+			snapshot: {
+				cart: typeof cart.cart;
+				payments: Array<{
+					method: string;
+					amount: number;
+					reference: string | null;
+				}>;
+			};
+		}) => {
+			const receiptDocument = buildSaleReceiptDocument({
+				documentId: payload.result.saleId,
+				issuedAt: new Date(),
+				status: payload.result.status,
+				customerName: selectedCustomer?.name ?? "Cliente mostrador",
+				customerMeta: formatPosCustomerMeta(selectedCustomer),
+				terminalName:
+					activeShift?.terminalName ?? posSettings.defaultTerminalName,
+				items: payload.snapshot.cart.map((item) => ({
+					name: item.product.name,
+					quantity: item.quantity,
+					unitPrice: item.product.price,
+					totalAmount:
+						item.product.price * item.quantity +
+						item.modifiers.reduce(
+							(sum, modifier) =>
+								sum + modifier.price * modifier.quantity * item.quantity,
+							0,
+						) -
+						item.discountAmount,
+					discountAmount: item.discountAmount,
+					modifiers: item.modifiers.map((modifier) => ({
+						name: modifier.name,
+						quantity: modifier.quantity,
+						unitPrice: modifier.price,
+					})),
+				})),
+				payments: payload.snapshot.payments,
+				subtotal: payload.result.subtotal,
+				taxAmount: payload.result.taxAmount,
+				discountAmount: payload.result.discountAmount,
+				totalAmount: payload.result.totalAmount,
+				paidAmount: payload.result.paidAmount,
+				balanceDue: payload.result.balanceDue,
+			});
+
+			printThermalReceipt(receiptDocument);
+		},
+		[
+			activeShift?.terminalName,
+			posSettings.defaultTerminalName,
+			selectedCustomer,
+		],
+	);
 	const checkout = usePosCheckout(
 		activeShift?.id,
 		cart.cart,
-		cart.totals.totalAmount,
+		cart.totals,
 		selectedCustomerId,
 		cart.discountInput,
 		cart.clearCart,
 		() => cart.setDiscountInput("0"),
 		posSettings.paymentMethods,
 		posSettings.allowCreditSales,
+		handleSaleCreated,
 	);
 	const modifierModal = useModifierModal(cart.addToCart, modifierProducts);
 	const createCustomer = useCreateCustomerModal((customerId) => {
@@ -93,7 +170,8 @@ function PosPage() {
 
 	// Computed values for checkout modal
 	const projectedCreditBalance =
-		(selectedCustomerCreditAccount?.balance ?? 0) + checkout.remainingCreditAmount;
+		(selectedCustomerCreditAccount?.balance ?? 0) +
+		checkout.remainingCreditAmount;
 
 	const handleOpenShift = useCallback(() => {
 		shift.setStartingCash(String(posSettings.defaultStartingCash));
@@ -141,7 +219,9 @@ function PosPage() {
 				onOpenShift={handleOpenShift}
 				onCashMovement={() => shift.setIsCashMovementModalOpen(true)}
 				onCloseShift={() => shift.setIsCloseShiftModalOpen(true)}
-				onCreateCustomer={() => createCustomer.setIsCreateCustomerModalOpen(true)}
+				onCreateCustomer={() =>
+					createCustomer.setIsCreateCustomerModalOpen(true)
+				}
 			/>
 
 			{/* Main Content */}
@@ -280,4 +360,21 @@ function PosPage() {
 			/>
 		</div>
 	);
+}
+
+function formatPosCustomerMeta(
+	customer:
+		| {
+				phone?: string | null;
+				documentNumber?: string | null;
+		  }
+		| null
+		| undefined,
+) {
+	if (!customer) {
+		return null;
+	}
+
+	const parts = [customer.phone, customer.documentNumber].filter(Boolean);
+	return parts.join(" · ") || null;
 }

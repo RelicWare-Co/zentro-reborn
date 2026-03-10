@@ -23,10 +23,7 @@ COPY --from=build /usr/src/app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=build /usr/src/app/server.ts ./server.ts
 
 ENV NODE_ENV=production
-ENV DATABASE_URL=/tmp/app.db
 ENV PORT=3000
-ENV BETTER_AUTH_SECRET=supersecret
-ENV BETTER_AUTH_URL=https://zentro-bun-health.orb.local
 
 USER bun
 EXPOSE 3000/tcp

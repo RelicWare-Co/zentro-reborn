@@ -1,14 +1,7 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-	Sheet,
-	SheetContent,
-	SheetDescription,
-	SheetHeader,
-	SheetTitle,
-} from "@/components/ui/sheet";
 import {
 	Select,
 	SelectContent,
@@ -16,8 +9,20 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+} from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useRegisterCreditPaymentMutation } from "@/features/pos/hooks/usePosQueries";
+import { printThermalReceipt } from "@/features/pos/printing/printThermalReceipt";
+import {
+	buildPaymentReceiptDocument,
+	buildSaleReceiptDocument,
+} from "@/features/pos/printing/receiptDocuments";
 import type { CreditAccount, SaleDetail } from "@/features/pos/types";
 import { formatCurrency, formatPaymentMethodLabel } from "@/features/pos/utils";
 
@@ -44,6 +49,34 @@ export function SaleDetailSheet({
 	activeShiftId?: string;
 	creditAccount?: CreditAccount | null;
 }) {
+	const handlePrintSale = useCallback(() => {
+		if (!sale) {
+			return;
+		}
+
+		printThermalReceipt(
+			buildSaleReceiptDocument(buildSaleReceiptPayload(sale)),
+		);
+	}, [sale]);
+
+	const handlePrintPayment = useCallback(
+		(payment: NonNullable<SaleDetail>["payments"][number]) => {
+			if (!sale) {
+				return;
+			}
+
+			printThermalReceipt(
+				buildPaymentReceiptDocument(
+					buildPaymentReceiptPayload({
+						sale,
+						payment,
+					}),
+				),
+			);
+		},
+		[sale],
+	);
+
 	return (
 		<Sheet open={isOpen} onOpenChange={onOpenChange}>
 			<SheetContent
@@ -72,14 +105,26 @@ export function SaleDetailSheet({
 								<div className="flex items-start justify-between gap-3">
 									<div>
 										<p className="text-sm text-gray-400">Venta</p>
-										<p className="mt-1 font-medium text-white">#{sale.id.slice(0, 8)}</p>
+										<p className="mt-1 font-medium text-white">
+											#{sale.id.slice(0, 8)}
+										</p>
 										<p className="mt-2 text-sm text-gray-400">
 											{dateTimeFormatter.format(sale.createdAt)}
 										</p>
 									</div>
-									<Badge className={getSaleStatusBadgeClass(sale.status)}>
-										{formatSaleStatus(sale.status)}
-									</Badge>
+									<div className="flex items-center gap-2">
+										<Badge className={getSaleStatusBadgeClass(sale.status)}>
+											{formatSaleStatus(sale.status)}
+										</Badge>
+										<Button
+											type="button"
+											variant="outline"
+											onClick={handlePrintSale}
+											className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+										>
+											Reimprimir factura
+										</Button>
+									</div>
 								</div>
 
 								<div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -133,7 +178,8 @@ export function SaleDetailSheet({
 								<div className="flex items-center justify-between">
 									<h3 className="font-medium text-white">Pagos</h3>
 									<p className="text-sm text-gray-400">
-										{sale.payments.length} registro{sale.payments.length === 1 ? "" : "s"}
+										{sale.payments.length} registro
+										{sale.payments.length === 1 ? "" : "s"}
 									</p>
 								</div>
 
@@ -155,9 +201,19 @@ export function SaleDetailSheet({
 																: "Sin referencia"}
 														</p>
 													</div>
-													<p className="font-medium text-white">
-														{formatCurrency(payment.amount)}
-													</p>
+													<div className="flex items-center gap-3">
+														<p className="font-medium text-white">
+															{formatCurrency(payment.amount)}
+														</p>
+														<Button
+															type="button"
+															variant="outline"
+															onClick={() => handlePrintPayment(payment)}
+															className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+														>
+															Reimprimir
+														</Button>
+													</div>
 												</div>
 											</div>
 										))}
@@ -182,7 +238,8 @@ export function SaleDetailSheet({
 								<div className="flex items-center justify-between">
 									<h3 className="font-medium text-white">Items</h3>
 									<p className="text-sm text-gray-400">
-										{sale.items.length} linea{sale.items.length === 1 ? "" : "s"}
+										{sale.items.length} linea
+										{sale.items.length === 1 ? "" : "s"}
 									</p>
 								</div>
 
@@ -210,11 +267,14 @@ export function SaleDetailSheet({
 												<p>Base: {formatCurrency(item.subtotal)}</p>
 												{item.taxAmount > 0 ? (
 													<p>
-														Impuesto ({item.taxRate}%): {formatCurrency(item.taxAmount)}
+														Impuesto ({item.taxRate}%):{" "}
+														{formatCurrency(item.taxAmount)}
 													</p>
 												) : null}
 												{item.discountAmount > 0 ? (
-													<p>Descuento: {formatCurrency(item.discountAmount)}</p>
+													<p>
+														Descuento: {formatCurrency(item.discountAmount)}
+													</p>
 												) : null}
 											</div>
 
@@ -301,15 +361,46 @@ function CreditPaymentSection({
 			return;
 		}
 
-		registerCreditPaymentMutation.mutate({
-			shiftId: activeShiftId,
-			creditAccountId: creditAccount.id,
-			saleId: sale.id,
-			amount: parsedAmount,
-			method,
-			reference: reference.trim() || null,
-			notes: notes.trim() || null,
-		});
+		const normalizedReference = reference.trim() || null;
+		const normalizedNotes = notes.trim() || null;
+
+		registerCreditPaymentMutation.mutate(
+			{
+				shiftId: activeShiftId,
+				creditAccountId: creditAccount.id,
+				saleId: sale.id,
+				amount: parsedAmount,
+				method,
+				reference: normalizedReference,
+				notes: normalizedNotes,
+			},
+			{
+				onSuccess: (result) => {
+					const remainingSaleBalance = Math.max(
+						sale.balanceDue - parsedAmount,
+						0,
+					);
+
+					printThermalReceipt(
+						buildPaymentReceiptDocument({
+							paymentId: result.paymentId,
+							saleId: sale.id,
+							issuedAt: new Date(),
+							customerName: sale.customer?.name ?? "Cliente sin registrar",
+							cashierName: sale.cashier?.name ?? "Sin registro",
+							terminalName: sale.shift?.terminalName ?? "Sin terminal",
+							method,
+							amount: parsedAmount,
+							reference: normalizedReference,
+							notes: normalizedNotes,
+							remainingSaleBalance,
+							remainingAccountBalance: result.newBalance,
+							title: "Comprobante de abono",
+						}),
+					);
+				},
+			},
+		);
 	};
 
 	return (
@@ -318,7 +409,8 @@ function CreditPaymentSection({
 				<div>
 					<h3 className="font-medium text-white">Registrar abono</h3>
 					<p className="mt-1 text-sm text-gray-400">
-						Este abono se aplicará a la cuenta de crédito del cliente y a esta venta.
+						Este abono se aplicará a la cuenta de crédito del cliente y a esta
+						venta.
 					</p>
 				</div>
 				<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
@@ -342,8 +434,8 @@ function CreditPaymentSection({
 
 			{!sale.customer ? (
 				<EmptyBlock className="mt-4">
-					La venta no tiene un cliente asociado, por lo que no se puede registrar un
-					abono desde aquí.
+					La venta no tiene un cliente asociado, por lo que no se puede
+					registrar un abono desde aquí.
 				</EmptyBlock>
 			) : !activeShiftId ? (
 				<EmptyBlock className="mt-4">
@@ -375,7 +467,8 @@ function CreditPaymentSection({
 								/>
 							</div>
 							<p className="text-xs text-gray-500">
-								Máximo aplicable a esta venta: {formatCurrency(maxPaymentAmount)}
+								Máximo aplicable a esta venta:{" "}
+								{formatCurrency(maxPaymentAmount)}
 							</p>
 						</div>
 
@@ -394,7 +487,9 @@ function CreditPaymentSection({
 									<SelectItem value="cash">Efectivo</SelectItem>
 									<SelectItem value="card">Tarjeta</SelectItem>
 									<SelectItem value="transfer_nequi">Nequi</SelectItem>
-									<SelectItem value="transfer_bancolombia">Bancolombia</SelectItem>
+									<SelectItem value="transfer_bancolombia">
+										Bancolombia
+									</SelectItem>
 								</SelectContent>
 							</Select>
 						</div>
@@ -461,7 +556,9 @@ function InfoBlock({
 		<div className="rounded-2xl border border-gray-800 bg-[var(--color-carbon)] p-4">
 			<p className="text-sm text-gray-400">{label}</p>
 			<p className="mt-2 font-medium text-white">{value}</p>
-			{description ? <p className="mt-1 text-xs text-gray-500">{description}</p> : null}
+			{description ? (
+				<p className="mt-1 text-xs text-gray-500">{description}</p>
+			) : null}
 		</div>
 	);
 }
@@ -478,7 +575,11 @@ function SummaryRow({
 	return (
 		<div className="flex items-center justify-between gap-3">
 			<span className="text-gray-400">{label}</span>
-			<span className={emphasis ? "font-medium text-[var(--color-voltage)]" : "text-white"}>
+			<span
+				className={
+					emphasis ? "font-medium text-[var(--color-voltage)]" : "text-white"
+				}
+			>
 				{value}
 			</span>
 		</div>
@@ -546,4 +647,66 @@ function formatCustomerMeta(sale: NonNullable<SaleDetail>) {
 	].filter(Boolean);
 
 	return parts.join(" · ") || "Cliente registrado";
+}
+
+function buildSaleReceiptPayload(sale: NonNullable<SaleDetail>) {
+	return {
+		documentId: sale.id,
+		issuedAt: sale.createdAt,
+		status: sale.status,
+		customerName: sale.customer?.name ?? "Cliente mostrador",
+		customerMeta: formatCustomerMeta(sale),
+		cashierName: sale.cashier?.name ?? "Sin registro",
+		terminalName: sale.shift?.terminalName ?? "Sin terminal",
+		items: sale.items.map((item) => ({
+			name: item.name,
+			quantity: item.quantity,
+			unitPrice: item.unitPrice,
+			totalAmount: item.totalAmount,
+			discountAmount: item.discountAmount,
+			modifiers: item.modifiers.map((modifier) => ({
+				name: modifier.name,
+				quantity: modifier.quantity,
+				unitPrice: modifier.unitPrice,
+			})),
+		})),
+		payments: sale.payments,
+		subtotal: sale.subtotal,
+		taxAmount: sale.taxAmount,
+		discountAmount: sale.discountAmount,
+		totalAmount: sale.totalAmount,
+		paidAmount: sale.paidAmount,
+		balanceDue: sale.balanceDue,
+	};
+}
+
+function buildPaymentReceiptPayload({
+	sale,
+	payment,
+}: {
+	sale: NonNullable<SaleDetail>;
+	payment: NonNullable<SaleDetail>["payments"][number];
+}) {
+	const orderedPayments = [...sale.payments].sort(
+		(paymentA, paymentB) => paymentA.createdAt - paymentB.createdAt,
+	);
+	const paymentIndex = orderedPayments.findIndex(
+		(currentPayment) => currentPayment.id === payment.id,
+	);
+	const paidUntilThisPayment = orderedPayments
+		.slice(0, paymentIndex + 1)
+		.reduce((total, currentPayment) => total + currentPayment.amount, 0);
+
+	return {
+		paymentId: payment.id,
+		saleId: sale.id,
+		issuedAt: payment.createdAt,
+		customerName: sale.customer?.name ?? "Cliente mostrador",
+		cashierName: sale.cashier?.name ?? "Sin registro",
+		terminalName: sale.shift?.terminalName ?? "Sin terminal",
+		method: payment.method,
+		amount: payment.amount,
+		reference: payment.reference,
+		remainingSaleBalance: Math.max(sale.totalAmount - paidUntilThisPayment, 0),
+	};
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CartItem, PaymentMethod } from "../types";
+import type { CartItem, CartTotals, PaymentMethod } from "../types";
 import { useCreatePosSaleMutation } from "./usePosQueries";
 
 function getDefaultPaymentMethodId(
@@ -11,7 +11,7 @@ function getDefaultPaymentMethodId(
 export function usePosCheckout(
 	activeShiftId: string | undefined,
 	cart: CartItem[],
-	totalAmount: number,
+	cartTotals: CartTotals,
 	selectedCustomerId: string,
 	discountInput: string,
 	clearCart: () => void,
@@ -22,6 +22,27 @@ export function usePosCheckout(
 		requiresReference: boolean;
 	}>,
 	allowCreditSales: boolean,
+	onSaleCreated?: (payload: {
+		result: {
+			saleId: string;
+			status: string;
+			subtotal: number;
+			taxAmount: number;
+			discountAmount: number;
+			totalAmount: number;
+			paidAmount: number;
+			balanceDue: number;
+		};
+		snapshot: {
+			cart: CartItem[];
+			payments: Array<{
+				method: string;
+				amount: number;
+				reference: string | null;
+			}>;
+			totals: CartTotals;
+		};
+	}) => void | Promise<void>,
 ) {
 	const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
 	const [payments, setPayments] = useState<PaymentMethod[]>(() => [
@@ -89,7 +110,11 @@ export function usePosCheckout(
 	}, []);
 
 	const updatePayment = useCallback(
-		(index: number, field: "method" | "amount" | "reference", value: string) => {
+		(
+			index: number,
+			field: "method" | "amount" | "reference",
+			value: string,
+		) => {
 			setPayments((prevPayments) =>
 				prevPayments.map((payment, paymentIndex) => {
 					if (paymentIndex !== index) {
@@ -134,7 +159,17 @@ export function usePosCheckout(
 			.filter((paymentMethod) => paymentMethod.amount > 0);
 		const shouldRegisterAsCreditSale =
 			isCreditSale &&
-			totalAmount - salePayments.reduce((sum, payment) => sum + payment.amount, 0) > 0;
+			cartTotals.totalAmount -
+				salePayments.reduce((sum, payment) => sum + payment.amount, 0) >
+				0;
+		const receiptSnapshot = {
+			cart: cart.map((item) => ({
+				...item,
+				modifiers: item.modifiers.map((modifier) => ({ ...modifier })),
+			})),
+			payments: salePayments.map((payment) => ({ ...payment })),
+			totals: { ...cartTotals },
+		};
 
 		createPosSaleMutation.mutate(
 			{
@@ -157,7 +192,16 @@ export function usePosCheckout(
 				isCreditSale: shouldRegisterAsCreditSale,
 			},
 			{
-				onSuccess: () => {
+				onSuccess: (result) => {
+					void Promise.resolve(
+						onSaleCreated?.({
+							result,
+							snapshot: receiptSnapshot,
+						}),
+					).catch((error) => {
+						console.error("No se pudo imprimir el ticket de venta", error);
+					});
+
 					setIsCheckoutModalOpen(false);
 					clearCart();
 					resetDiscount();
@@ -171,20 +215,23 @@ export function usePosCheckout(
 		createPosSaleMutation,
 		isCreditSale,
 		payments,
-		totalAmount,
+		cartTotals,
 		discountInput,
 		selectedCustomerId,
 		clearCart,
 		resetDiscount,
 		resetPayments,
+		onSaleCreated,
 	]);
 
 	// Computed values
 	const totalPaid = useMemo(
-		() => payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0),
+		() =>
+			payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0),
 		[payments],
 	);
 
+	const totalAmount = cartTotals.totalAmount;
 	const paymentDifference = totalAmount - totalPaid;
 	const hasPaymentDifference = paymentDifference !== 0;
 	const remainingCreditAmount = Math.max(paymentDifference, 0);

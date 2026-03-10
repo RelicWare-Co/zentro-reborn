@@ -1,5 +1,5 @@
 import "@tanstack/react-start/server-only";
-import { and, desc, eq, gte, inArray, like, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, like, lt, or, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { customer, payment, product, sale, saleItem, saleItemModifier, shift, user } from "#/db/schema";
 import { requireAuthContext } from "./auth-context";
@@ -68,6 +68,8 @@ export async function listSalesForCurrentOrganization(input: ListSalesInput = {}
 	if (input.paymentMethod && (!filteredSaleIdsByPaymentMethod || filteredSaleIdsByPaymentMethod.length === 0)) {
 		return {
 			data: [],
+			total: 0,
+			hasMore: false,
 			nextCursor: null,
 		};
 	}
@@ -96,44 +98,60 @@ export async function listSalesForCurrentOrganization(input: ListSalesInput = {}
 		whereConditions.push(inArray(sale.id, filteredSaleIdsByPaymentMethod));
 	}
 
-	const salesRows = await db
-		.select({
-			id: sale.id,
-			totalAmount: sale.totalAmount,
-			status: sale.status,
-			createdAt: sale.createdAt,
-			customerName: customer.name,
-			cashierName: user.name,
-			terminalName: shift.terminalName,
-		})
-		.from(sale)
-		.leftJoin(
-			customer,
-			and(
-				eq(customer.id, sale.customerId),
-				eq(customer.organizationId, organizationId),
-			),
-		)
-		.leftJoin(
-			user,
-			eq(user.id, sale.userId),
-		)
-		.leftJoin(
-			shift,
-			and(eq(shift.id, sale.shiftId), eq(shift.organizationId, organizationId)),
-		)
-		.where(and(...whereConditions))
-		.orderBy(desc(sale.createdAt), desc(sale.id))
-		.limit(limit + 1)
-		.offset(cursor);
+	const [salesRows, totalRows] = await Promise.all([
+		db
+			.select({
+				id: sale.id,
+				totalAmount: sale.totalAmount,
+				status: sale.status,
+				createdAt: sale.createdAt,
+				customerName: customer.name,
+				cashierName: user.name,
+				terminalName: shift.terminalName,
+			})
+			.from(sale)
+			.leftJoin(
+				customer,
+				and(
+					eq(customer.id, sale.customerId),
+					eq(customer.organizationId, organizationId),
+				),
+			)
+			.leftJoin(user, eq(user.id, sale.userId))
+			.leftJoin(
+				shift,
+				and(eq(shift.id, sale.shiftId), eq(shift.organizationId, organizationId)),
+			)
+			.where(and(...whereConditions))
+			.orderBy(desc(sale.createdAt), desc(sale.id))
+			.limit(limit + 1)
+			.offset(cursor),
+		db
+			.select({
+				total: sql<number>`count(*)`,
+			})
+			.from(sale)
+			.leftJoin(
+				customer,
+				and(
+					eq(customer.id, sale.customerId),
+					eq(customer.organizationId, organizationId),
+				),
+			)
+			.leftJoin(user, eq(user.id, sale.userId))
+			.where(and(...whereConditions)),
+	]);
 
 	const pageRows = salesRows.slice(0, limit);
+	const hasMore = salesRows.length > limit;
 	const nextCursor = salesRows.length > limit ? cursor + limit : null;
 	const saleIds = pageRows.map((row) => row.id);
 
 	if (saleIds.length === 0) {
 		return {
 			data: [],
+			total: normalizeNumber(totalRows[0]?.total),
+			hasMore,
 			nextCursor,
 		};
 	}
@@ -215,6 +233,8 @@ export async function listSalesForCurrentOrganization(input: ListSalesInput = {}
 				paymentMethods: paymentSummary?.paymentMethods ?? [],
 			};
 		}),
+		total: normalizeNumber(totalRows[0]?.total),
+		hasMore,
 		nextCursor,
 	};
 }

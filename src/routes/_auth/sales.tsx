@@ -16,6 +16,13 @@ import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@/components/ui/native-select";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { SaleDetailSheet } from "@/features/pos/components/SaleDetailSheet";
 import { useSaleDetail, useSalesList } from "@/features/pos/hooks/usePosQueries";
 import { listSales } from "@/features/pos/pos.functions";
@@ -23,7 +30,7 @@ import type { SaleListItem } from "@/features/pos/types";
 import { formatCurrency, formatPaymentMethodLabel } from "@/features/pos/utils";
 
 const DEFAULT_LIST_PARAMS = {
-	limit: 50,
+	limit: 10,
 	cursor: 0,
 };
 
@@ -35,6 +42,8 @@ const salesSearchSchema = z.object({
 		.optional(),
 	startDate: z.string().optional(),
 	endDate: z.string().optional(),
+	cursor: z.coerce.number().int().min(0).optional(),
+	pageSize: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 const dateTimeFormatter = new Intl.DateTimeFormat("es-CO", {
@@ -50,7 +59,8 @@ export const Route = createFileRoute("/_auth/sales")({
 	loader: ({ deps }) =>
 		listSales({
 			data: {
-				...DEFAULT_LIST_PARAMS,
+				limit: deps.pageSize ?? DEFAULT_LIST_PARAMS.limit,
+				cursor: deps.cursor ?? DEFAULT_LIST_PARAMS.cursor,
 				searchQuery: deps.q ?? null,
 				status: deps.status ?? null,
 				paymentMethod: deps.paymentMethod ?? null,
@@ -72,7 +82,8 @@ function SalesPage() {
 	const initialSales = Route.useLoaderData();
 	const salesQuery = useSalesList(
 		{
-			...DEFAULT_LIST_PARAMS,
+			limit: search.pageSize ?? DEFAULT_LIST_PARAMS.limit,
+			cursor: search.cursor ?? DEFAULT_LIST_PARAMS.cursor,
 			searchQuery: search.q ?? null,
 			status: search.status ?? null,
 			paymentMethod: search.paymentMethod ?? null,
@@ -82,6 +93,8 @@ function SalesPage() {
 		initialSales,
 	);
 	const sales = salesQuery.data?.data ?? [];
+	const pageSize = search.pageSize ?? DEFAULT_LIST_PARAMS.limit;
+	const cursor = search.cursor ?? DEFAULT_LIST_PARAMS.cursor;
 	const [selectedSaleId, setSelectedSaleId] = useState<string | null>(
 		() => sales[0]?.id ?? null,
 	);
@@ -124,6 +137,9 @@ function SalesPage() {
 	const saleDetailQuery = useSaleDetail(isDetailOpen ? selectedSaleId : null);
 	const totalRevenue = sales.reduce((total, sale) => total + sale.totalAmount, 0);
 	const totalPending = sales.reduce((total, sale) => total + sale.balanceDue, 0);
+	const totalResults = salesQuery.data?.total ?? sales.length;
+	const rangeStart = totalResults === 0 ? 0 : cursor + 1;
+	const rangeEnd = totalResults === 0 ? 0 : cursor + sales.length;
 	const activeFilterCount = [
 		search.q,
 		search.status,
@@ -140,6 +156,8 @@ function SalesPage() {
 				paymentMethod: normalizeFilterValue(draftFilters.paymentMethod),
 				startDate: normalizeFilterValue(draftFilters.startDate),
 				endDate: normalizeFilterValue(draftFilters.endDate),
+				cursor: undefined,
+				pageSize,
 			},
 			replace: true,
 		});
@@ -154,7 +172,20 @@ function SalesPage() {
 			endDate: "",
 		});
 		void navigate({
-			search: {},
+			search: {
+				pageSize: pageSize !== DEFAULT_LIST_PARAMS.limit ? pageSize : undefined,
+			},
+			replace: true,
+		});
+	};
+
+	const updatePagination = (nextCursor: number, nextPageSize = pageSize) => {
+		void navigate({
+			search: {
+				...search,
+				cursor: nextCursor > 0 ? nextCursor : undefined,
+				pageSize: nextPageSize !== DEFAULT_LIST_PARAMS.limit ? nextPageSize : undefined,
+			},
 			replace: true,
 		});
 	};
@@ -436,6 +467,61 @@ function SalesPage() {
 											</div>
 										</button>
 									))}
+									<div className="flex flex-col items-center justify-between gap-4 border-t border-gray-800 bg-black/10 p-4 text-sm text-gray-400 sm:flex-row sm:gap-0">
+										<div className="flex w-full items-center justify-between gap-4 sm:w-auto sm:justify-start">
+											<div className="flex items-center gap-2">
+												<span>Show</span>
+												<Select
+													value={`${pageSize}`}
+													onValueChange={(value) => {
+														updatePagination(0, Number(value));
+													}}
+												>
+													<SelectTrigger className="h-8 w-[74px] border-gray-700 bg-[var(--color-carbon)] text-white rounded-md">
+														<SelectValue placeholder={pageSize} />
+													</SelectTrigger>
+													<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+														{[10, 20, 30, 40, 50].map((size) => (
+															<SelectItem key={size} value={`${size}`}>
+																{size}
+															</SelectItem>
+														))}
+													</SelectContent>
+												</Select>
+												<span>rows</span>
+											</div>
+											<div className="hidden sm:block">
+												{rangeStart}-{rangeEnd} of {totalResults} results
+											</div>
+										</div>
+
+										<div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+											<Button
+												variant="outline"
+												size="sm"
+												className="border-gray-700 bg-[var(--color-carbon)] text-gray-300 hover:bg-white/5 hover:text-white rounded-md h-8 px-3"
+												onClick={() =>
+													updatePagination(Math.max(cursor - pageSize, 0))
+												}
+												disabled={cursor === 0}
+											>
+												Previous
+											</Button>
+											<Button
+												variant="default"
+												size="sm"
+												className="bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-medium border-none rounded-md h-8 px-4"
+												onClick={() => {
+													if (salesQuery.data?.nextCursor !== null) {
+														updatePagination(salesQuery.data.nextCursor);
+													}
+												}}
+												disabled={salesQuery.data?.nextCursor === null}
+											>
+												Next
+											</Button>
+										</div>
+									</div>
 								</div>
 							) : (
 								<div className="rounded-2xl border border-dashed border-gray-800 px-4 py-10 text-center">

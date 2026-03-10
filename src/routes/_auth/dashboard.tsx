@@ -562,22 +562,17 @@ function StatCard({
 					</div>
 					<div className="min-w-0 flex-1">
 						<CardDescription className="text-gray-400">{title}</CardDescription>
-						<Badge
-							variant="outline"
-							className="mt-2 max-w-full whitespace-normal border-gray-700 bg-black/20 text-left leading-tight text-gray-300"
-						>
-							{highlight}
-						</Badge>
+						<CardTitle className="mt-1 text-2xl font-semibold tracking-tight text-white">
+							{value}
+						</CardTitle>
 					</div>
 				</div>
-				<CardTitle className="text-2xl font-semibold tracking-tight text-white">
-					{value}
-				</CardTitle>
 			</CardHeader>
 			<CardContent className="pt-0">
 				<p className="break-words text-sm leading-6 text-gray-400">
 					{description}
 				</p>
+				<p className="mt-2 break-words text-xs leading-5 text-gray-500">{highlight}</p>
 			</CardContent>
 		</Card>
 	);

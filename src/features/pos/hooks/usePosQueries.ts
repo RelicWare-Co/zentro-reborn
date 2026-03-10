@@ -71,7 +71,7 @@ export function useSalesList(
 	return useQuery({
 		queryKey: [
 			"sales-list",
-			params.limit ?? 50,
+			params.limit ?? 10,
 			params.cursor ?? 0,
 			params.status ?? "all",
 			params.searchQuery ?? "",

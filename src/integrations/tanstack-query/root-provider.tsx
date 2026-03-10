@@ -21,6 +21,13 @@ export function getContext() {
 	return context;
 }
 
+export async function resetQueryCache() {
+	const { queryClient } = getContext();
+
+	await queryClient.cancelQueries();
+	queryClient.clear();
+}
+
 export default function TanStackQueryProvider({
 	children,
 }: {

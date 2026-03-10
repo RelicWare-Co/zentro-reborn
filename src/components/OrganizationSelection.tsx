@@ -1,11 +1,14 @@
 import { AlertCircle, Building2, Loader2, Plus } from "lucide-react";
 import { useCallback, useEffect, useId, useState } from "react";
+import { useRouter } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { resetQueryCache } from "@/integrations/tanstack-query/root-provider";
 import { authClient } from "@/lib/auth-client";
 
 export function OrganizationSelection() {
+	const router = useRouter();
 	const {
 		data: organizations,
 		isPending: isListPending,
@@ -39,8 +42,13 @@ export function OrganizationSelection() {
 
 	const handleSelect = async (orgId: string) => {
 		setIsSelectingId(orgId);
-		await authClient.organization.setActive({ organizationId: orgId });
-		setIsSelectingId(null);
+		try {
+			await authClient.organization.setActive({ organizationId: orgId });
+			await resetQueryCache();
+			await router.invalidate();
+		} finally {
+			setIsSelectingId(null);
+		}
 	};
 
 	const handleSlugChange = useCallback(
@@ -114,6 +122,8 @@ export function OrganizationSelection() {
 			} else if (data) {
 				await refetch();
 				await authClient.organization.setActive({ organizationId: data.id });
+				await resetQueryCache();
+				await router.invalidate();
 			}
 		} catch {
 			setErrorMsg("Ocurrió un error inesperado");

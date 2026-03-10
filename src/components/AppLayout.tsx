@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import {
 	Building2,
 	ChevronLeft,
@@ -13,6 +13,7 @@ import {
 	Store,
 } from "lucide-react";
 import { useState } from "react";
+import { resetQueryCache } from "@/integrations/tanstack-query/root-provider";
 import { authClient } from "@/lib/auth-client";
 import { OrganizationSelection } from "./OrganizationSelection";
 
@@ -21,6 +22,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 	const [isCollapsed, setIsCollapsed] = useState(false);
 	const location = useLocation();
 	const navigate = useNavigate();
+	const router = useRouter();
 
 	const { data: activeOrganization, isPending: isActiveOrgPending } =
 		authClient.useActiveOrganization();
@@ -96,6 +98,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 						type="button"
 						onClick={async () => {
 							await authClient.organization.setActive({ organizationId: null });
+							await resetQueryCache();
+							await router.invalidate();
 							// We don't strictly need to navigate, but forcing a re-render or letting the layout catch it works.
 							// Since activeOrganization will become null, AppLayout will re-render and show <OrganizationSelection />
 						}}

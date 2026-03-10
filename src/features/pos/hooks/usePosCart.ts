@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { parseMoneyInput } from "@/lib/utils";
 import type { CartItem, CartItemModifier, Product } from "../types";
 import {
 	buildModifierSignature,
@@ -68,10 +69,7 @@ export function usePosCart() {
 
 	const updateItemDiscount = useCallback(
 		(cartItemId: string, nextDiscountValue: string) => {
-			const parsedDiscount = Math.max(
-				0,
-				Math.round(Number(nextDiscountValue) || 0),
-			);
+			const parsedDiscount = parseMoneyInput(nextDiscountValue);
 
 			setCart((prevCart) =>
 				prevCart.map((item) => {

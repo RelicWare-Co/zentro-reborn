@@ -3,6 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+	formatMoneyInput,
+	parseMoneyInput,
+	sanitizeMoneyInput,
+} from "@/lib/utils";
+import {
 	Select,
 	SelectContent,
 	SelectItem,
@@ -362,7 +367,7 @@ function CreditPaymentSection({
 		setNotes("");
 	}, [maxPaymentAmount]);
 
-	const parsedAmount = Math.round(Number(amount) || 0);
+	const parsedAmount = parseMoneyInput(amount);
 	const canSubmit =
 		Boolean(activeShiftId) &&
 		Boolean(creditAccount) &&
@@ -472,11 +477,12 @@ function CreditPaymentSection({
 								</span>
 								<Input
 									id={amountId}
-									type="number"
-									min={1}
-									max={maxPaymentAmount}
-									value={amount}
-									onChange={(event) => setAmount(event.target.value)}
+									type="text"
+									inputMode="numeric"
+									value={formatMoneyInput(amount)}
+									onChange={(event) =>
+										setAmount(sanitizeMoneyInput(event.target.value))
+									}
 									className="border-gray-700 bg-[var(--color-carbon)] pl-7 text-white"
 								/>
 							</div>

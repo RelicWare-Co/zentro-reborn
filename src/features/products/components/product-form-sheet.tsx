@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { formatMoneyInput, parseMoneyInput, sanitizeMoneyInput } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,8 +110,8 @@ export function ProductFormSheet({
 			categoryId: productForm.categoryId || null,
 			sku: productForm.sku || null,
 			barcode: productForm.barcode || null,
-			price: Number(productForm.price),
-			cost: Number(productForm.cost),
+			price: parseMoneyInput(productForm.price),
+			cost: parseMoneyInput(productForm.cost),
 			taxRate: Number(productForm.taxRate),
 			stock: Number(productForm.stock),
 			trackInventory: productForm.trackInventory,
@@ -240,14 +241,13 @@ export function ProductFormSheet({
 									</Label>
 									<Input
 										id={priceId}
-										type="number"
-										step="0.01"
-										min={0}
-										value={productForm.price}
+										type="text"
+										inputMode="numeric"
+										value={formatMoneyInput(productForm.price)}
 										onChange={(e) =>
 											setProductForm((prev) => ({
 												...prev,
-												price: e.target.value,
+												price: sanitizeMoneyInput(e.target.value),
 											}))
 										}
 										placeholder="0"
@@ -261,13 +261,13 @@ export function ProductFormSheet({
 									</Label>
 									<Input
 										id={costId}
-										type="number"
-										min={0}
-										value={productForm.cost}
+										type="text"
+										inputMode="numeric"
+										value={formatMoneyInput(productForm.cost)}
 										onChange={(e) =>
 											setProductForm((prev) => ({
 												...prev,
-												cost: e.target.value,
+												cost: sanitizeMoneyInput(e.target.value),
 											}))
 										}
 										placeholder="0"

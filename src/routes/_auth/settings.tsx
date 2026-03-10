@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { formatMoneyInput, parseMoneyInput } from "@/lib/utils";
 import {
 	useSettings,
 	useUpdateSettingsMutation,
@@ -229,17 +230,16 @@ function SettingsPage() {
 							</Label>
 							<Input
 								id={defaultStartingCashId}
-								type="number"
-								min={0}
-								value={draftSettings.pos.defaultStartingCash}
+								type="text"
+								inputMode="numeric"
+								value={formatMoneyInput(draftSettings.pos.defaultStartingCash)}
 								onChange={(event) =>
 									setDraftSettings((currentValue) => ({
 										...currentValue,
 										pos: {
 											...currentValue.pos,
-											defaultStartingCash: Math.max(
-												0,
-												Number(event.target.value) || 0,
+											defaultStartingCash: parseMoneyInput(
+												event.target.value,
 											),
 										},
 									}))

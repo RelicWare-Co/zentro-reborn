@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { parseMoneyInput } from "@/lib/utils";
 import type { CartItem, CartTotals, PaymentMethod } from "../types";
 import { useCreatePosSaleMutation } from "./usePosQueries";
 
@@ -145,15 +146,12 @@ export function usePosCheckout(
 			return;
 		}
 
-		const saleDiscountAmount = Math.max(
-			0,
-			Math.round(Number(discountInput) || 0),
-		);
+		const saleDiscountAmount = parseMoneyInput(discountInput);
 
 		const salePayments = payments
 			.map((paymentMethod) => ({
 				method: paymentMethod.method,
-				amount: Number(paymentMethod.amount),
+				amount: parseMoneyInput(paymentMethod.amount),
 				reference: paymentMethod.reference.trim() || null,
 			}))
 			.filter((paymentMethod) => paymentMethod.amount > 0);
@@ -227,7 +225,10 @@ export function usePosCheckout(
 	// Computed values
 	const totalPaid = useMemo(
 		() =>
-			payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0),
+			payments.reduce(
+				(sum, payment) => sum + parseMoneyInput(payment.amount),
+				0,
+			),
 		[payments],
 	);
 

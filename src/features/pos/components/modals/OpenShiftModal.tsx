@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { formatMoneyInput, sanitizeMoneyInput } from "@/lib/utils";
 
 interface OpenShiftModalProps {
 	isOpen: boolean;
@@ -63,10 +64,13 @@ export function OpenShiftModal({
 							</span>
 							<Input
 								id={startingCashId}
-								type="number"
+								type="text"
+								inputMode="numeric"
 								placeholder="0"
-								value={startingCash}
-								onChange={(e) => setStartingCash(e.target.value)}
+								value={formatMoneyInput(startingCash)}
+								onChange={(e) =>
+									setStartingCash(sanitizeMoneyInput(e.target.value))
+								}
 								className="pl-7 bg-[#0a0a0a] border-gray-800 text-white focus-visible:ring-[var(--color-voltage)] text-lg h-12"
 							/>
 						</div>

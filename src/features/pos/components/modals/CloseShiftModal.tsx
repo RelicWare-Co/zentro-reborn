@@ -10,6 +10,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import {
+	formatMoneyInput,
+	parseMoneyInput,
+	sanitizeMoneyInput,
+} from "@/lib/utils";
 import type { ActiveShift, ShiftCloseSummary } from "../../types";
 import { formatCurrency, formatPaymentMethodLabel } from "../../utils";
 
@@ -138,13 +143,18 @@ export function CloseShiftModal({
 										</span>
 										<Input
 											id={`closure-${row.paymentMethod}`}
-											type="number"
+											type="text"
+											inputMode="numeric"
 											placeholder="0"
-											value={closureAmounts[row.paymentMethod] ?? ""}
+											value={formatMoneyInput(
+												closureAmounts[row.paymentMethod] ?? "",
+											)}
 											onChange={(event) =>
 												setClosureAmounts({
 													...closureAmounts,
-													[row.paymentMethod]: event.target.value,
+													[row.paymentMethod]: sanitizeMoneyInput(
+														event.target.value,
+													),
 												})
 											}
 											className="pl-7 bg-[#0a0a0a] border-gray-800 text-white focus-visible:ring-[var(--color-voltage)]"
@@ -153,7 +163,8 @@ export function CloseShiftModal({
 									{closureAmounts[row.paymentMethod] && (
 										<div
 											className={`text-sm mt-1 flex items-center justify-between tabular-nums ${
-												Number(closureAmounts[row.paymentMethod]) - row.expectedAmount ===
+												parseMoneyInput(closureAmounts[row.paymentMethod]) -
+													row.expectedAmount ===
 												0
 													? "text-green-400"
 													: "text-red-400"
@@ -162,7 +173,7 @@ export function CloseShiftModal({
 											<span>Diferencia:</span>
 											<span className="font-semibold">
 												{formatCurrency(
-													Number(closureAmounts[row.paymentMethod]) -
+													parseMoneyInput(closureAmounts[row.paymentMethod]) -
 														row.expectedAmount,
 												)}
 											</span>

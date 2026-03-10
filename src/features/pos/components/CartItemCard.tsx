@@ -1,5 +1,6 @@
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { formatMoneyInput, sanitizeMoneyInput } from "@/lib/utils";
 import type { CartItem } from "../types";
 import { calculateItemTotal, formatCurrency } from "../utils";
 
@@ -58,10 +59,12 @@ export function CartItemCard({
 							</span>
 							<Input
 								id={`item-discount-${item.id}`}
-								type="number"
-								min={0}
-								value={item.discountAmount}
-								onChange={(event) => onUpdateDiscount(event.target.value)}
+								type="text"
+								inputMode="numeric"
+								value={formatMoneyInput(item.discountAmount)}
+								onChange={(event) =>
+									onUpdateDiscount(sanitizeMoneyInput(event.target.value))
+								}
 								className="h-8 pl-6 bg-black/50 border-gray-800/80 text-xs"
 							/>
 						</div>

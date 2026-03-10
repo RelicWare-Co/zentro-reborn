@@ -15,6 +15,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { formatMoneyInput, sanitizeMoneyInput } from "@/lib/utils";
 import type { CashMovementType } from "../../types";
 
 interface CashMovementModalProps {
@@ -102,10 +103,13 @@ export function CashMovementModal({
 						</label>
 						<Input
 							id={movementAmountId}
-							type="number"
+							type="text"
+							inputMode="numeric"
 							placeholder="0"
-							value={movementAmount}
-							onChange={(e) => setMovementAmount(e.target.value)}
+							value={formatMoneyInput(movementAmount)}
+							onChange={(e) =>
+								setMovementAmount(sanitizeMoneyInput(e.target.value))
+							}
 							className="bg-[#0a0a0a] border-gray-800 text-white focus-visible:ring-[var(--color-voltage)]"
 						/>
 					</div>

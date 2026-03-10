@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { parseMoneyInput } from "@/lib/utils";
 import type { ActiveShift } from "../types";
 import {
 	useCloseShiftMutation,
@@ -38,7 +39,7 @@ export function usePosShift(activeShift: ActiveShift | null) {
 
 	// Open shift handler
 	const handleOpenShift = useCallback(() => {
-		const parsedStartingCash = Number(startingCash);
+		const parsedStartingCash = parseMoneyInput(startingCash);
 		if (!Number.isFinite(parsedStartingCash) || parsedStartingCash < 0) {
 			return;
 		}
@@ -64,7 +65,7 @@ export function usePosShift(activeShift: ActiveShift | null) {
 			return;
 		}
 
-		const parsedAmount = Number(movementAmount);
+		const parsedAmount = parseMoneyInput(movementAmount);
 		if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
 			return;
 		}
@@ -104,7 +105,9 @@ export function usePosShift(activeShift: ActiveShift | null) {
 
 		const closures = shiftCloseSummary.summaryByMethod.map((summaryRow) => ({
 			paymentMethod: summaryRow.paymentMethod,
-			actualAmount: Number(closureAmounts[summaryRow.paymentMethod] ?? 0),
+			actualAmount: parseMoneyInput(
+				closureAmounts[summaryRow.paymentMethod] ?? 0,
+			),
 		}));
 
 		if (
@@ -141,18 +144,17 @@ export function usePosShift(activeShift: ActiveShift | null) {
 	// Computed values
 	const canOpenShift =
 		startingCash.trim().length > 0 &&
-		Number.isFinite(Number(startingCash)) &&
-		Number(startingCash) >= 0;
+		parseMoneyInput(startingCash) >= 0;
 
 	const canRegisterCashMovement =
 		Boolean(activeShift) &&
 		movementDescription.trim().length > 0 &&
-		Number.isFinite(Number(movementAmount)) &&
-		Number(movementAmount) > 0;
+		parseMoneyInput(movementAmount) > 0;
 
 	const hasInvalidCloseAmounts =
 		shiftCloseSummary?.summaryByMethod.some((summaryRow) => {
-			const amount = Number(closureAmounts[summaryRow.paymentMethod]);
+			const rawAmount = closureAmounts[summaryRow.paymentMethod];
+			const amount = parseMoneyInput(rawAmount);
 			return !Number.isFinite(amount) || amount < 0;
 		}) ?? false;
 

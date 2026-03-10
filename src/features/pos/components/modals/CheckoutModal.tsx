@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import type { CreditAccount, PaymentMethod } from "../../types";
 import { formatCurrency } from "../../utils";
+import { formatMoneyInput, sanitizeMoneyInput } from "@/lib/utils";
 
 interface CheckoutModalProps {
 	isOpen: boolean;
@@ -114,10 +115,12 @@ export function CheckoutModal({
 								</span>
 								<Input
 									id={discountInputId}
-									type="number"
-									min={0}
-									value={discountInput}
-									onChange={(event) => setDiscountInput(event.target.value)}
+									type="text"
+									inputMode="numeric"
+									value={formatMoneyInput(discountInput)}
+									onChange={(event) =>
+										setDiscountInput(sanitizeMoneyInput(event.target.value))
+									}
 									className="pl-7 h-10 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)]"
 								/>
 							</div>
@@ -245,11 +248,16 @@ export function CheckoutModal({
 												$
 											</span>
 											<Input
-												type="number"
+												type="text"
+												inputMode="numeric"
 												placeholder="Monto"
-												value={payment.amount}
+												value={formatMoneyInput(payment.amount)}
 												onChange={(e) =>
-													onUpdatePayment(index, "amount", e.target.value)
+													onUpdatePayment(
+														index,
+														"amount",
+														sanitizeMoneyInput(e.target.value),
+													)
 												}
 												className="pl-7 h-10 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)]"
 											/>

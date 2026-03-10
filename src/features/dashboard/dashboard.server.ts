@@ -1,0 +1,504 @@
+import "@tanstack/react-start/server-only";
+import { and, asc, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
+import { db } from "#/db";
+import {
+	category,
+	creditAccount,
+	customer,
+	payment,
+	product,
+	sale,
+	saleItem,
+	shift,
+} from "#/db/schema";
+import { requireAuthContext } from "#/features/pos/server/auth-context";
+
+export const LOW_STOCK_THRESHOLD = 5;
+const TREND_DAYS = 7;
+const TOP_PRODUCTS_WINDOW_DAYS = 30;
+
+type AggregateSalesMetrics = {
+	revenue: number;
+	salesCount: number;
+	avgTicket: number;
+	distinctCustomers: number;
+};
+
+export type DashboardOverview = {
+	generatedAt: number;
+	lowStockThreshold: number;
+	activeShift: {
+		id: string;
+		terminalName: string | null;
+		startingCash: number;
+		openedAt: number;
+	} | null;
+	stats: {
+		todayRevenue: number;
+		todaySalesCount: number;
+		todayAvgTicket: number;
+		todayCustomersServed: number;
+		yesterdayRevenue: number;
+		monthRevenue: number;
+		monthSalesCount: number;
+		previousMonthRevenue: number;
+		activeProductsCount: number;
+		activeCustomersCount: number;
+		lowStockCount: number;
+		pendingCreditBalance: number;
+		creditAccountsCount: number;
+	};
+	salesTrend: Array<{
+		dateKey: string;
+		revenue: number;
+		salesCount: number;
+	}>;
+	paymentMix: Array<{
+		method: string;
+		amount: number;
+	}>;
+	topProducts: Array<{
+		productId: string;
+		name: string;
+		quantitySold: number;
+		revenue: number;
+		stock: number;
+	}>;
+	lowStockProducts: Array<{
+		id: string;
+		name: string;
+		categoryName: string | null;
+		stock: number;
+	}>;
+	recentSales: Array<{
+		id: string;
+		totalAmount: number;
+		status: string;
+		customerName: string | null;
+		createdAt: number;
+	}>;
+};
+
+function startOfDay(date: Date) {
+	return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addDays(date: Date, amount: number) {
+	const next = new Date(date);
+	next.setDate(next.getDate() + amount);
+	return next;
+}
+
+function startOfMonth(date: Date) {
+	return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function formatDateKey(date: Date) {
+	const month = `${date.getMonth() + 1}`.padStart(2, "0");
+	const day = `${date.getDate()}`.padStart(2, "0");
+	return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function normalizeNumber(value: number | string | null | undefined) {
+	if (typeof value === "number") {
+		return Number.isFinite(value) ? value : 0;
+	}
+
+	if (typeof value === "string") {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : 0;
+	}
+
+	return 0;
+}
+
+function normalizeSalesMetrics(
+	row: AggregateSalesMetrics | undefined,
+): AggregateSalesMetrics {
+	return {
+		revenue: normalizeNumber(row?.revenue),
+		salesCount: normalizeNumber(row?.salesCount),
+		avgTicket: normalizeNumber(row?.avgTicket),
+		distinctCustomers: normalizeNumber(row?.distinctCustomers),
+	};
+}
+
+function buildSalesTrend(
+	rows: Array<{ dateKey: string; revenue: number; salesCount: number }>,
+	now: Date,
+) {
+	const trendByDate = new Map(
+		rows.map((row) => [
+			row.dateKey,
+			{
+				revenue: normalizeNumber(row.revenue),
+				salesCount: normalizeNumber(row.salesCount),
+			},
+		]),
+	);
+
+	return Array.from({ length: TREND_DAYS }, (_, index) => {
+		const currentDate = addDays(startOfDay(now), index - (TREND_DAYS - 1));
+		const dateKey = formatDateKey(currentDate);
+		const point = trendByDate.get(dateKey);
+
+		return {
+			dateKey,
+			revenue: point?.revenue ?? 0,
+			salesCount: point?.salesCount ?? 0,
+		};
+	});
+}
+
+export async function getDashboardOverviewForCurrentOrganization(): Promise<DashboardOverview> {
+	const { session, organizationId } = await requireAuthContext();
+	const now = new Date();
+	const todayStart = startOfDay(now);
+	const tomorrowStart = addDays(todayStart, 1);
+	const yesterdayStart = addDays(todayStart, -1);
+	const monthStart = startOfMonth(now);
+	const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+	const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+	const trendStart = addDays(todayStart, -(TREND_DAYS - 1));
+	const topProductsStart = addDays(todayStart, -(TOP_PRODUCTS_WINDOW_DAYS - 1));
+	const saleDateKey = sql<string>`strftime('%Y-%m-%d', ${sale.createdAt} / 1000, 'unixepoch', 'localtime')`;
+
+	const saleBaseClauses = [
+		eq(sale.organizationId, organizationId),
+		ne(sale.status, "cancelled"),
+	] as const;
+
+	const [
+		activeShiftRows,
+		todayMetricsRows,
+		yesterdayMetricsRows,
+		currentMonthRows,
+		previousMonthRows,
+		activeProductsRows,
+		activeCustomersRows,
+		lowStockCountRows,
+		pendingCreditRows,
+		trendRows,
+		paymentMixRows,
+		topProductsRows,
+		lowStockProductRows,
+		recentSalesRows,
+	] = await Promise.all([
+		db
+			.select({
+				id: shift.id,
+				terminalName: shift.terminalName,
+				startingCash: shift.startingCash,
+				openedAt: shift.openedAt,
+			})
+			.from(shift)
+			.where(
+				and(
+					eq(shift.organizationId, organizationId),
+					eq(shift.userId, session.user.id),
+					eq(shift.status, "open"),
+				),
+			)
+			.orderBy(desc(shift.openedAt))
+			.limit(1),
+		db
+			.select({
+				revenue: sql<number>`coalesce(sum(${sale.totalAmount}), 0)`,
+				salesCount: sql<number>`count(*)`,
+				avgTicket: sql<number>`coalesce(avg(${sale.totalAmount}), 0)`,
+				distinctCustomers: sql<number>`count(distinct ${sale.customerId})`,
+			})
+			.from(sale)
+			.where(
+				and(
+					...saleBaseClauses,
+					sql`${sale.createdAt} >= ${todayStart.getTime()}`,
+					sql`${sale.createdAt} < ${tomorrowStart.getTime()}`,
+				),
+			),
+		db
+			.select({
+				revenue: sql<number>`coalesce(sum(${sale.totalAmount}), 0)`,
+				salesCount: sql<number>`count(*)`,
+				avgTicket: sql<number>`coalesce(avg(${sale.totalAmount}), 0)`,
+				distinctCustomers: sql<number>`count(distinct ${sale.customerId})`,
+			})
+			.from(sale)
+			.where(
+				and(
+					...saleBaseClauses,
+					sql`${sale.createdAt} >= ${yesterdayStart.getTime()}`,
+					sql`${sale.createdAt} < ${todayStart.getTime()}`,
+				),
+			),
+		db
+			.select({
+				revenue: sql<number>`coalesce(sum(${sale.totalAmount}), 0)`,
+				salesCount: sql<number>`count(*)`,
+			})
+			.from(sale)
+			.where(
+				and(
+					...saleBaseClauses,
+					sql`${sale.createdAt} >= ${monthStart.getTime()}`,
+					sql`${sale.createdAt} < ${nextMonthStart.getTime()}`,
+				),
+			),
+		db
+			.select({
+				revenue: sql<number>`coalesce(sum(${sale.totalAmount}), 0)`,
+				salesCount: sql<number>`count(*)`,
+			})
+			.from(sale)
+			.where(
+				and(
+					...saleBaseClauses,
+					sql`${sale.createdAt} >= ${previousMonthStart.getTime()}`,
+					sql`${sale.createdAt} < ${monthStart.getTime()}`,
+				),
+			),
+		db
+			.select({
+				total: sql<number>`count(*)`,
+			})
+			.from(product)
+			.where(
+				and(
+					eq(product.organizationId, organizationId),
+					isNull(product.deletedAt),
+					eq(product.isModifier, false),
+				),
+			),
+		db
+			.select({
+				total: sql<number>`count(*)`,
+			})
+			.from(customer)
+			.where(
+				and(
+					eq(customer.organizationId, organizationId),
+					isNull(customer.deletedAt),
+				),
+			),
+		db
+			.select({
+				total: sql<number>`count(*)`,
+			})
+			.from(product)
+			.where(
+				and(
+					eq(product.organizationId, organizationId),
+					isNull(product.deletedAt),
+					eq(product.isModifier, false),
+					eq(product.trackInventory, true),
+					sql`${product.stock} <= ${LOW_STOCK_THRESHOLD}`,
+				),
+			),
+		db
+			.select({
+				balance: sql<number>`coalesce(sum(${creditAccount.balance}), 0)`,
+				total: sql<number>`count(*)`,
+			})
+			.from(creditAccount)
+			.innerJoin(
+				customer,
+				and(
+					eq(customer.id, creditAccount.customerId),
+					eq(customer.organizationId, organizationId),
+					isNull(customer.deletedAt),
+				),
+			)
+			.where(
+				and(
+					eq(creditAccount.organizationId, organizationId),
+					gt(creditAccount.balance, 0),
+				),
+			),
+		db
+			.select({
+				dateKey: saleDateKey,
+				revenue: sql<number>`coalesce(sum(${sale.totalAmount}), 0)`,
+				salesCount: sql<number>`count(*)`,
+			})
+			.from(sale)
+			.where(
+				and(
+					...saleBaseClauses,
+					sql`${sale.createdAt} >= ${trendStart.getTime()}`,
+					sql`${sale.createdAt} < ${tomorrowStart.getTime()}`,
+				),
+			)
+			.groupBy(saleDateKey)
+			.orderBy(asc(saleDateKey)),
+		db
+			.select({
+				method: payment.method,
+				amount: sql<number>`coalesce(sum(${payment.amount}), 0)`,
+			})
+			.from(payment)
+			.where(
+				and(
+					eq(payment.organizationId, organizationId),
+					sql`${payment.createdAt} >= ${todayStart.getTime()}`,
+					sql`${payment.createdAt} < ${tomorrowStart.getTime()}`,
+				),
+			)
+			.groupBy(payment.method)
+			.orderBy(desc(sql`sum(${payment.amount})`)),
+		db
+			.select({
+				productId: saleItem.productId,
+				name: product.name,
+				quantitySold: sql<number>`coalesce(sum(${saleItem.quantity}), 0)`,
+				revenue: sql<number>`coalesce(sum(${saleItem.totalAmount}), 0)`,
+				stock: product.stock,
+			})
+			.from(saleItem)
+			.innerJoin(
+				sale,
+				and(
+					eq(sale.id, saleItem.saleId),
+					eq(sale.organizationId, organizationId),
+					ne(sale.status, "cancelled"),
+				),
+			)
+			.innerJoin(
+				product,
+				and(
+					eq(product.id, saleItem.productId),
+					eq(product.organizationId, organizationId),
+					isNull(product.deletedAt),
+				),
+			)
+			.where(
+				and(
+					eq(saleItem.organizationId, organizationId),
+					sql`${sale.createdAt} >= ${topProductsStart.getTime()}`,
+					sql`${sale.createdAt} < ${tomorrowStart.getTime()}`,
+				),
+			)
+			.groupBy(saleItem.productId, product.name, product.stock)
+			.orderBy(
+				desc(sql`sum(${saleItem.quantity})`),
+				desc(sql`sum(${saleItem.totalAmount})`),
+			)
+			.limit(5),
+		db
+			.select({
+				id: product.id,
+				name: product.name,
+				categoryName: category.name,
+				stock: product.stock,
+			})
+			.from(product)
+			.leftJoin(
+				category,
+				and(
+					eq(category.id, product.categoryId),
+					eq(category.organizationId, organizationId),
+				),
+			)
+			.where(
+				and(
+					eq(product.organizationId, organizationId),
+					isNull(product.deletedAt),
+					eq(product.isModifier, false),
+					eq(product.trackInventory, true),
+					sql`${product.stock} <= ${LOW_STOCK_THRESHOLD}`,
+				),
+			)
+			.orderBy(asc(product.stock), asc(product.name))
+			.limit(6),
+		db
+			.select({
+				id: sale.id,
+				totalAmount: sale.totalAmount,
+				status: sale.status,
+				customerName: customer.name,
+				createdAt: sale.createdAt,
+			})
+			.from(sale)
+			.leftJoin(
+				customer,
+				and(
+					eq(customer.id, sale.customerId),
+					eq(customer.organizationId, organizationId),
+				),
+			)
+			.where(and(...saleBaseClauses))
+			.orderBy(desc(sale.createdAt))
+			.limit(6),
+	]);
+
+	const activeShiftRow = activeShiftRows[0] ?? null;
+	const todayMetrics = normalizeSalesMetrics(todayMetricsRows[0]);
+	const yesterdayMetrics = normalizeSalesMetrics(yesterdayMetricsRows[0]);
+	const currentMonth = currentMonthRows[0];
+	const previousMonth = previousMonthRows[0];
+
+	return {
+		generatedAt: now.getTime(),
+		lowStockThreshold: LOW_STOCK_THRESHOLD,
+		activeShift: activeShiftRow
+			? {
+					id: activeShiftRow.id,
+					terminalName: activeShiftRow.terminalName,
+					startingCash: normalizeNumber(activeShiftRow.startingCash),
+					openedAt:
+						activeShiftRow.openedAt instanceof Date
+							? activeShiftRow.openedAt.getTime()
+							: new Date(activeShiftRow.openedAt).getTime(),
+				}
+			: null,
+		stats: {
+			todayRevenue: todayMetrics.revenue,
+			todaySalesCount: todayMetrics.salesCount,
+			todayAvgTicket: todayMetrics.avgTicket,
+			todayCustomersServed: todayMetrics.distinctCustomers,
+			yesterdayRevenue: yesterdayMetrics.revenue,
+			monthRevenue: normalizeNumber(currentMonth?.revenue),
+			monthSalesCount: normalizeNumber(currentMonth?.salesCount),
+			previousMonthRevenue: normalizeNumber(previousMonth?.revenue),
+			activeProductsCount: normalizeNumber(activeProductsRows[0]?.total),
+			activeCustomersCount: normalizeNumber(activeCustomersRows[0]?.total),
+			lowStockCount: normalizeNumber(lowStockCountRows[0]?.total),
+			pendingCreditBalance: normalizeNumber(pendingCreditRows[0]?.balance),
+			creditAccountsCount: normalizeNumber(pendingCreditRows[0]?.total),
+		},
+		salesTrend: buildSalesTrend(
+			trendRows.map((row) => ({
+				dateKey: row.dateKey,
+				revenue: normalizeNumber(row.revenue),
+				salesCount: normalizeNumber(row.salesCount),
+			})),
+			now,
+		),
+		paymentMix: paymentMixRows.map((row) => ({
+			method: row.method,
+			amount: normalizeNumber(row.amount),
+		})),
+		topProducts: topProductsRows.map((row) => ({
+			productId: row.productId,
+			name: row.name,
+			quantitySold: normalizeNumber(row.quantitySold),
+			revenue: normalizeNumber(row.revenue),
+			stock: normalizeNumber(row.stock),
+		})),
+		lowStockProducts: lowStockProductRows.map((row) => ({
+			id: row.id,
+			name: row.name,
+			categoryName: row.categoryName,
+			stock: normalizeNumber(row.stock),
+		})),
+		recentSales: recentSalesRows.map((row) => ({
+			id: row.id,
+			totalAmount: normalizeNumber(row.totalAmount),
+			status: row.status,
+			customerName: row.customerName,
+			createdAt:
+				row.createdAt instanceof Date
+					? row.createdAt.getTime()
+					: new Date(row.createdAt).getTime(),
+		})),
+	};
+}

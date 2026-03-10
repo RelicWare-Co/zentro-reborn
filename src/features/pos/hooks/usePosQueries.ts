@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { searchCreditAccounts } from "@/features/credit/credit.functions";
+import {
+	registerCreditPayment,
+	searchCreditAccounts,
+} from "@/features/credit/credit.functions";
 import { createCustomer } from "@/features/customers/customers.functions";
 import {
 	closeShift,
@@ -237,6 +240,33 @@ export function useCreatePosSaleMutation() {
 				queryClient.invalidateQueries({
 					queryKey: ["pos-shift-close-summary"],
 				}),
+				queryClient.invalidateQueries({ queryKey: ["sales-list"] }),
+				queryClient.invalidateQueries({ queryKey: ["sales-detail"] }),
+			]);
+		},
+	});
+}
+
+export function useRegisterCreditPaymentMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (payload: {
+			shiftId: string;
+			creditAccountId: string;
+			saleId?: string | null;
+			amount: number;
+			method: string;
+			reference: string | null;
+			notes: string | null;
+		}) =>
+			registerCreditPayment({
+				data: payload,
+			}),
+		onSuccess: async () => {
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ["credit-accounts-pos"] }),
+				queryClient.invalidateQueries({ queryKey: ["pos-shift-close-summary"] }),
 				queryClient.invalidateQueries({ queryKey: ["sales-list"] }),
 				queryClient.invalidateQueries({ queryKey: ["sales-detail"] }),
 			]);

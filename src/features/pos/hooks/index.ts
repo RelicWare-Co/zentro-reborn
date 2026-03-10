@@ -12,6 +12,7 @@ export {
 	usePosCustomers,
 	usePosProducts,
 	useRegisterCashMovementMutation,
+	useRegisterCreditPaymentMutation,
 	useShiftCloseSummary,
 } from "./usePosQueries";
 export { usePosShift } from "./usePosShift";

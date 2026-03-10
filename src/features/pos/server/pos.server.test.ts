@@ -201,6 +201,66 @@ describe("pos server modules", () => {
 		}
 	});
 
+	test("allows partial upfront payment on credit sales", async () => {
+		const { ctx, shiftsServer, salesServer } = await setupPosServers();
+		try {
+			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 5000,
+				terminalId: "terminal-1",
+				terminalName: "Caja 1",
+			});
+			const customerId = await insertCustomer({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Cliente Mixto",
+				documentNumber: "110",
+			});
+			const productId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Producto credito parcial",
+				price: 3000,
+				trackInventory: false,
+				stock: 0,
+			});
+
+			const sale = await salesServer.createPosSaleForCurrentOrganization({
+				shiftId: openedShift.id,
+				customerId,
+				items: [{ productId, quantity: 2 }],
+				payments: [{ method: "cash", amount: 2000 }],
+				isCreditSale: true,
+			});
+
+			expect(sale.status).toBe("credit");
+			expect(sale.totalAmount).toBe(6000);
+			expect(sale.paidAmount).toBe(2000);
+			expect(sale.balanceDue).toBe(4000);
+
+			const [accountRow] = await ctx.db
+				.select({ balance: schema.creditAccount.balance })
+				.from(schema.creditAccount)
+				.where(
+					and(
+						eq(schema.creditAccount.organizationId, ctx.organizationId),
+						eq(schema.creditAccount.customerId, customerId),
+					),
+				)
+				.limit(1);
+			expect(accountRow?.balance).toBe(4000);
+
+			const createdPayments = await ctx.db
+				.select({ saleId: schema.payment.saleId, amount: schema.payment.amount })
+				.from(schema.payment)
+				.where(eq(schema.payment.shiftId, openedShift.id));
+			expect(createdPayments).toHaveLength(1);
+			expect(createdPayments[0]?.amount).toBe(2000);
+			expect(createdPayments[0]?.saleId).toBe(sale.saleId);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
 	test("registers cash movements and includes them in shift close summary", async () => {
 		const { ctx, shiftsServer, salesServer } = await setupPosServers();
 		try {

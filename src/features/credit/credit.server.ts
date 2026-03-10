@@ -6,6 +6,7 @@ import {
 	creditTransaction,
 	customer,
 	payment,
+	sale,
 	shift,
 } from "#/db/schema";
 import { requireAuthContext } from "#/features/pos/server/auth-context";
@@ -31,6 +32,7 @@ export type ListCreditTransactionsInput = {
 export type RegisterCreditPaymentInput = {
 	shiftId: string;
 	creditAccountId: string;
+	saleId?: string | null;
 	amount: number;
 	method: string;
 	reference?: string | null;
@@ -181,6 +183,7 @@ export async function registerCreditPaymentForCurrentOrganization(
 ) {
 	const { session, organizationId } = await requireAuthContext();
 	const amount = toPositiveInteger(input.amount, "amount");
+	const saleId = normalizeOptionalString(input.saleId);
 	const method = normalizeRequiredString(input.method, "method").toLowerCase();
 	const reference = normalizeOptionalString(input.reference);
 	const notes = normalizeOptionalString(input.notes);
@@ -211,6 +214,7 @@ export async function registerCreditPaymentForCurrentOrganization(
 		const [accountRow] = await tx
 			.select({
 				id: creditAccount.id,
+				customerId: creditAccount.customerId,
 				balance: creditAccount.balance,
 				customerDeletedAt: customer.deletedAt,
 			})
@@ -240,11 +244,72 @@ export async function registerCreditPaymentForCurrentOrganization(
 			throw new Error("El abono no puede superar el saldo pendiente");
 		}
 
+		let targetSale:
+			| {
+					id: string;
+					customerId: string | null;
+					status: string;
+					totalAmount: number;
+			  }
+			| null = null;
+		let saleBalanceDue: number | null = null;
+		if (saleId) {
+			const [saleRow] = await tx
+				.select({
+					id: sale.id,
+					customerId: sale.customerId,
+					status: sale.status,
+					totalAmount: sale.totalAmount,
+				})
+				.from(sale)
+				.where(
+					and(
+						eq(sale.id, saleId),
+						eq(sale.organizationId, organizationId),
+					),
+				)
+				.limit(1);
+
+			if (!saleRow) {
+				throw new Error("Venta no encontrada para la organización activa");
+			}
+			if (!saleRow.customerId || saleRow.customerId !== accountRow.customerId) {
+				throw new Error(
+					"La venta seleccionada no pertenece a la cuenta de crédito indicada",
+				);
+			}
+			if (saleRow.status === "cancelled") {
+				throw new Error("No se puede registrar un abono sobre una venta cancelada");
+			}
+
+			const salePaymentRows = await tx
+				.select({ amount: payment.amount })
+				.from(payment)
+				.where(
+					and(
+						eq(payment.organizationId, organizationId),
+						eq(payment.saleId, saleRow.id),
+					),
+				);
+
+			saleBalanceDue =
+				saleRow.totalAmount -
+				salePaymentRows.reduce((total, currentPayment) => total + currentPayment.amount, 0);
+			if (saleBalanceDue <= 0) {
+				throw new Error("La venta seleccionada ya no tiene saldo pendiente");
+			}
+			if (amount > saleBalanceDue) {
+				throw new Error("El abono no puede superar el saldo pendiente de la venta");
+			}
+
+			targetSale = saleRow;
+		}
+
 		const paymentId = crypto.randomUUID();
 		await tx.insert(payment).values({
 			id: paymentId,
 			organizationId,
-			saleId: null,
+			saleId,
 			shiftId: input.shiftId,
 			method,
 			reference,
@@ -268,7 +333,7 @@ export async function registerCreditPaymentForCurrentOrganization(
 			id: transactionId,
 			organizationId,
 			creditAccountId: input.creditAccountId,
-			saleId: null,
+			saleId,
 			paymentId,
 			type: "payment",
 			amount,
@@ -276,8 +341,24 @@ export async function registerCreditPaymentForCurrentOrganization(
 			createdAt,
 		});
 
+		if (targetSale && saleBalanceDue !== null) {
+			const remainingSaleBalance = saleBalanceDue - amount;
+			await tx
+				.update(sale)
+				.set({
+					status: remainingSaleBalance > 0 ? "credit" : "completed",
+				})
+				.where(
+					and(
+						eq(sale.id, targetSale.id),
+						eq(sale.organizationId, organizationId),
+					),
+				);
+		}
+
 		return {
 			creditAccountId: input.creditAccountId,
+			saleId,
 			paymentId,
 			transactionId,
 			amount,

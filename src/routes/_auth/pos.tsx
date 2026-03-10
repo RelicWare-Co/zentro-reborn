@@ -90,7 +90,7 @@ function PosPage() {
 
 	// Computed values for checkout modal
 	const projectedCreditBalance =
-		(selectedCustomerCreditAccount?.balance ?? 0) + cart.totals.totalAmount;
+		(selectedCustomerCreditAccount?.balance ?? 0) + checkout.remainingCreditAmount;
 
 	const handleCategoryChange = useCallback((categoryId: string) => {
 		setActiveCategoryId(categoryId);
@@ -255,6 +255,8 @@ function PosPage() {
 				selectedCustomerId={selectedCustomerId}
 				selectedCustomerCreditAccount={selectedCustomerCreditAccount}
 				projectedCreditBalance={projectedCreditBalance}
+				remainingCreditAmount={checkout.remainingCreditAmount}
+				shouldCreateCreditBalance={checkout.shouldCreateCreditBalance}
 				canFinalize={checkout.canFinalizeSale}
 				isProcessing={checkout.isProcessing}
 				paymentDifference={checkout.paymentDifference}

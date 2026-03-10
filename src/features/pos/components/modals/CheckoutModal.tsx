@@ -31,6 +31,8 @@ interface CheckoutModalProps {
 	selectedCustomerId: string;
 	selectedCustomerCreditAccount: CreditAccount | null;
 	projectedCreditBalance: number;
+	remainingCreditAmount: number;
+	shouldCreateCreditBalance: boolean;
 	canFinalize: boolean;
 	isProcessing: boolean;
 	paymentDifference: number;
@@ -58,6 +60,8 @@ export function CheckoutModal({
 	selectedCustomerId,
 	selectedCustomerCreditAccount,
 	projectedCreditBalance,
+	remainingCreditAmount,
+	shouldCreateCreditBalance,
 	canFinalize,
 	isProcessing,
 	paymentDifference,
@@ -124,14 +128,31 @@ export function CheckoutModal({
 									htmlFor={creditSaleId}
 									className="text-sm text-gray-400 cursor-pointer"
 								>
-									Venta a Crédito (Fiado)
+									Dejar saldo a crédito
 								</label>
 							</div>
 						</div>
 
-						{isCreditSale && !selectedCustomerId && (
+						{shouldCreateCreditBalance && !selectedCustomerId && (
 							<p className="text-sm text-amber-400">
 								Selecciona un cliente para registrar venta a crédito.
+							</p>
+						)}
+
+						{shouldCreateCreditBalance &&
+							selectedCustomerId &&
+							!selectedCustomerCreditAccount && (
+							<p className="text-sm text-amber-300">
+								Se creará la cuenta de crédito del cliente con el saldo pendiente de esta
+								venta.
+							</p>
+							)}
+
+						{isCreditSale && (
+							<p className="text-sm text-gray-400">
+								{shouldCreateCreditBalance
+									? "Puedes registrar un abono inicial ahora y el restante quedará pendiente en la cuenta del cliente."
+									: "Con los descuentos y pagos actuales no quedará saldo pendiente, así que la venta se registrará como pagada."}
 							</p>
 						)}
 
@@ -142,109 +163,125 @@ export function CheckoutModal({
 									{formatCurrency(selectedCustomerCreditAccount.balance)}
 								</p>
 								{isCreditSale && (
-									<p className="text-amber-200">
-										Saldo proyectado tras esta venta:{" "}
-										{formatCurrency(projectedCreditBalance)}
-									</p>
+									<>
+										<p className="text-amber-200">
+											{shouldCreateCreditBalance
+												? "Saldo que quedará pendiente por esta venta: "
+												: "Saldo pendiente por esta venta: "}
+											{formatCurrency(remainingCreditAmount)}
+										</p>
+										{shouldCreateCreditBalance ? (
+											<p className="text-amber-200">
+												Saldo proyectado total tras esta venta:{" "}
+												{formatCurrency(projectedCreditBalance)}
+											</p>
+										) : null}
+									</>
 								)}
 							</div>
 						)}
 
-						{!isCreditSale && (
-							<div className="space-y-3">
-								{payments.map((payment, index) => (
-									<div
-										key={payment.id}
-										className="flex flex-col gap-2 p-3 bg-[#0a0a0a] rounded-lg border border-gray-800 relative group"
-									>
-										{payments.length > 1 && (
-											<button
-												type="button"
-												onClick={() => onRemovePaymentMethod(index)}
-												className="absolute -top-2 -right-2 bg-red-500/20 text-red-400 hover:bg-red-500/40 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-												aria-label="Eliminar método de pago"
-											>
-												<XIcon className="w-3 h-3" />
-											</button>
-										)}
-
-										<div className="flex gap-2">
-											<Select
-												value={payment.method}
-												onValueChange={(value) =>
-													onUpdatePayment(index, "method", value)
-												}
-											>
-												<SelectTrigger className="flex-1 h-10 rounded-md border border-gray-700 bg-[#151515] px-3 text-sm text-white focus:outline-none focus:border-[var(--color-voltage)] focus:ring-0">
-													<SelectValue placeholder="Método" />
-												</SelectTrigger>
-												<SelectContent className="bg-[#151515] border-gray-700 text-white">
-													<SelectItem value="cash">Efectivo</SelectItem>
-													<SelectItem value="card">Tarjeta</SelectItem>
-													<SelectItem value="transfer_nequi">Nequi</SelectItem>
-													<SelectItem value="transfer_bancolombia">
-														Bancolombia
-													</SelectItem>
-												</SelectContent>
-											</Select>
-
-											<div className="relative flex-1">
-												<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-													$
-												</span>
-												<Input
-													type="number"
-													placeholder="Monto"
-													value={payment.amount}
-													onChange={(e) =>
-														onUpdatePayment(index, "amount", e.target.value)
-													}
-													className="pl-7 h-10 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)]"
-												/>
-											</div>
-										</div>
-
-										{payment.method !== "cash" && (
-											<Input
-												placeholder="Referencia (Ej. últimos 4 dígitos o voucher)"
-												value={payment.reference}
-												onChange={(e) =>
-													onUpdatePayment(index, "reference", e.target.value)
-												}
-												className="h-9 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)] text-sm"
-											/>
-										)}
-									</div>
-								))}
-
-								<Button
-									variant="outline"
-									onClick={onAddPaymentMethod}
-									className="w-full h-9 border-dashed border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 bg-transparent"
+						<div className="space-y-3">
+							{payments.map((payment, index) => (
+								<div
+									key={payment.id}
+									className="flex flex-col gap-2 p-3 bg-[#0a0a0a] rounded-lg border border-gray-800 relative group"
 								>
-									<Plus className="w-4 h-4 mr-2" />
-									Dividir Pago (Otro método)
-								</Button>
-							</div>
-						)}
+									{payments.length > 1 && (
+										<button
+											type="button"
+											onClick={() => onRemovePaymentMethod(index)}
+											className="absolute -top-2 -right-2 bg-red-500/20 text-red-400 hover:bg-red-500/40 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+											aria-label="Eliminar método de pago"
+										>
+											<XIcon className="w-3 h-3" />
+										</button>
+									)}
+
+									<div className="flex gap-2">
+										<Select
+											value={payment.method}
+											onValueChange={(value) =>
+												onUpdatePayment(index, "method", value)
+											}
+										>
+											<SelectTrigger className="flex-1 h-10 rounded-md border border-gray-700 bg-[#151515] px-3 text-sm text-white focus:outline-none focus:border-[var(--color-voltage)] focus:ring-0">
+												<SelectValue placeholder="Método" />
+											</SelectTrigger>
+											<SelectContent className="bg-[#151515] border-gray-700 text-white">
+												<SelectItem value="cash">Efectivo</SelectItem>
+												<SelectItem value="card">Tarjeta</SelectItem>
+												<SelectItem value="transfer_nequi">Nequi</SelectItem>
+												<SelectItem value="transfer_bancolombia">
+													Bancolombia
+												</SelectItem>
+											</SelectContent>
+										</Select>
+
+										<div className="relative flex-1">
+											<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+												$
+											</span>
+											<Input
+												type="number"
+												placeholder="Monto"
+												value={payment.amount}
+												onChange={(e) =>
+													onUpdatePayment(index, "amount", e.target.value)
+												}
+												className="pl-7 h-10 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)]"
+											/>
+										</div>
+									</div>
+
+									{payment.method !== "cash" && (
+										<Input
+											placeholder="Referencia (Ej. últimos 4 dígitos o voucher)"
+											value={payment.reference}
+											onChange={(e) =>
+												onUpdatePayment(index, "reference", e.target.value)
+											}
+											className="h-9 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)] text-sm"
+										/>
+									)}
+								</div>
+							))}
+
+							<Button
+								variant="outline"
+								onClick={onAddPaymentMethod}
+								className="w-full h-9 border-dashed border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 bg-transparent"
+							>
+								<Plus className="w-4 h-4 mr-2" />
+								Dividir Pago (Otro método)
+							</Button>
+						</div>
 					</div>
 
-					{!isCreditSale && (
-						<div className="flex justify-between items-center text-sm pt-2 border-t border-gray-800">
-							<span className="text-gray-400">Diferencia de pago:</span>
-							<span
-								className={`font-semibold ${
-									paymentDifference === 0
+					<div className="flex justify-between items-center text-sm pt-2 border-t border-gray-800">
+						<span className="text-gray-400">
+							{isCreditSale
+								? shouldCreateCreditBalance
+									? "Saldo que quedará a crédito:"
+									: "Saldo que quedará a crédito:"
+								: "Diferencia de pago:"}
+						</span>
+						<span
+							className={`font-semibold ${
+								isCreditSale
+									? shouldCreateCreditBalance
+										? "text-[var(--color-voltage)]"
+										: "text-green-400"
+									: paymentDifference === 0
 										? "text-green-400"
 										: paymentDifference > 0
 											? "text-red-400"
 											: "text-amber-400"
-								}`}
-							>
-								{formatCurrency(Math.abs(paymentDifference))}
-							</span>
-						</div>
-					)}
+							}`}
+						>
+							{formatCurrency(Math.abs(paymentDifference))}
+						</span>
+					</div>
 
 					{error instanceof Error && (
 						<p className="text-sm text-red-400">{error.message}</p>
@@ -266,8 +303,8 @@ export function CheckoutModal({
 					>
 						{isProcessing
 							? "Procesando..."
-							: isCreditSale
-								? "Confirmar Fiado"
+							: shouldCreateCreditBalance
+								? "Registrar Venta con Saldo"
 								: "Finalizar Venta"}
 					</Button>
 				</DialogFooter>

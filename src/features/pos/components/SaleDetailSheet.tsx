@@ -1,4 +1,7 @@
+import { useEffect, useId, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
 	Sheet,
 	SheetContent,
@@ -6,7 +9,16 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
-import type { SaleDetail } from "@/features/pos/types";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useRegisterCreditPaymentMutation } from "@/features/pos/hooks/usePosQueries";
+import type { CreditAccount, SaleDetail } from "@/features/pos/types";
 import { formatCurrency, formatPaymentMethodLabel } from "@/features/pos/utils";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("es-CO", {
@@ -22,11 +34,15 @@ export function SaleDetailSheet({
 	onOpenChange,
 	sale,
 	isLoading,
+	activeShiftId,
+	creditAccount,
 }: {
 	isOpen: boolean;
 	onOpenChange: (open: boolean) => void;
 	sale: SaleDetail | null | undefined;
 	isLoading: boolean;
+	activeShiftId?: string;
+	creditAccount?: CreditAccount | null;
 }) {
 	return (
 		<Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -153,6 +169,15 @@ export function SaleDetailSheet({
 								)}
 							</section>
 
+							{sale.balanceDue > 0 ? (
+								<CreditPaymentSection
+									key={sale.id}
+									sale={sale}
+									activeShiftId={activeShiftId}
+									creditAccount={creditAccount}
+								/>
+							) : null}
+
 							<section className="rounded-2xl border border-gray-800 bg-black/20 p-4">
 								<div className="flex items-center justify-between">
 									<h3 className="font-medium text-white">Items</h3>
@@ -228,6 +253,198 @@ export function SaleDetailSheet({
 				</div>
 			</SheetContent>
 		</Sheet>
+	);
+}
+
+function CreditPaymentSection({
+	sale,
+	activeShiftId,
+	creditAccount,
+}: {
+	sale: NonNullable<SaleDetail>;
+	activeShiftId?: string;
+	creditAccount?: CreditAccount | null;
+}) {
+	const amountId = useId();
+	const methodId = useId();
+	const referenceId = useId();
+	const notesId = useId();
+	const registerCreditPaymentMutation = useRegisterCreditPaymentMutation();
+	const [amount, setAmount] = useState("");
+	const [method, setMethod] = useState("cash");
+	const [reference, setReference] = useState("");
+	const [notes, setNotes] = useState("");
+
+	const maxPaymentAmount = useMemo(() => {
+		const saleBalance = sale.balanceDue;
+		const accountBalance = creditAccount?.balance ?? saleBalance;
+		return Math.max(Math.min(saleBalance, accountBalance), 0);
+	}, [creditAccount?.balance, sale.balanceDue]);
+
+	useEffect(() => {
+		setAmount(maxPaymentAmount > 0 ? String(maxPaymentAmount) : "");
+		setMethod("cash");
+		setReference("");
+		setNotes("");
+	}, [maxPaymentAmount]);
+
+	const parsedAmount = Math.round(Number(amount) || 0);
+	const canSubmit =
+		Boolean(activeShiftId) &&
+		Boolean(creditAccount) &&
+		parsedAmount > 0 &&
+		parsedAmount <= maxPaymentAmount &&
+		!registerCreditPaymentMutation.isPending;
+
+	const handleSubmit = () => {
+		if (!activeShiftId || !creditAccount || !canSubmit) {
+			return;
+		}
+
+		registerCreditPaymentMutation.mutate({
+			shiftId: activeShiftId,
+			creditAccountId: creditAccount.id,
+			saleId: sale.id,
+			amount: parsedAmount,
+			method,
+			reference: reference.trim() || null,
+			notes: notes.trim() || null,
+		});
+	};
+
+	return (
+		<section className="rounded-2xl border border-gray-800 bg-black/20 p-4">
+			<div className="flex items-center justify-between gap-3">
+				<div>
+					<h3 className="font-medium text-white">Registrar abono</h3>
+					<p className="mt-1 text-sm text-gray-400">
+						Este abono se aplicará a la cuenta de crédito del cliente y a esta venta.
+					</p>
+				</div>
+				<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+					Pendiente {formatCurrency(sale.balanceDue)}
+				</Badge>
+			</div>
+
+			<div className="mt-4 space-y-3 text-sm">
+				<SummaryRow
+					label="Saldo pendiente de esta venta"
+					value={formatCurrency(sale.balanceDue)}
+					emphasis
+				/>
+				{creditAccount ? (
+					<SummaryRow
+						label="Saldo total en cuenta del cliente"
+						value={formatCurrency(creditAccount.balance)}
+					/>
+				) : null}
+			</div>
+
+			{!sale.customer ? (
+				<EmptyBlock className="mt-4">
+					La venta no tiene un cliente asociado, por lo que no se puede registrar un
+					abono desde aquí.
+				</EmptyBlock>
+			) : !activeShiftId ? (
+				<EmptyBlock className="mt-4">
+					Necesitas un turno activo para registrar abonos.
+				</EmptyBlock>
+			) : !creditAccount ? (
+				<EmptyBlock className="mt-4">
+					No se encontró la cuenta de crédito del cliente para esta venta.
+				</EmptyBlock>
+			) : (
+				<div className="mt-4 space-y-4">
+					<div className="grid gap-3 sm:grid-cols-2">
+						<div className="space-y-2">
+							<label className="text-sm text-gray-400" htmlFor={amountId}>
+								Monto a abonar
+							</label>
+							<div className="relative">
+								<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+									$
+								</span>
+								<Input
+									id={amountId}
+									type="number"
+									min={1}
+									max={maxPaymentAmount}
+									value={amount}
+									onChange={(event) => setAmount(event.target.value)}
+									className="border-gray-700 bg-[var(--color-carbon)] pl-7 text-white"
+								/>
+							</div>
+							<p className="text-xs text-gray-500">
+								Máximo aplicable a esta venta: {formatCurrency(maxPaymentAmount)}
+							</p>
+						</div>
+
+						<div className="space-y-2">
+							<label className="text-sm text-gray-400" htmlFor={methodId}>
+								Método
+							</label>
+							<Select value={method} onValueChange={setMethod}>
+								<SelectTrigger
+									id={methodId}
+									className="border-gray-700 bg-[var(--color-carbon)] text-white"
+								>
+									<SelectValue placeholder="Selecciona un método" />
+								</SelectTrigger>
+								<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+									<SelectItem value="cash">Efectivo</SelectItem>
+									<SelectItem value="card">Tarjeta</SelectItem>
+									<SelectItem value="transfer_nequi">Nequi</SelectItem>
+									<SelectItem value="transfer_bancolombia">Bancolombia</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+					</div>
+
+					<div className="space-y-2">
+						<label className="text-sm text-gray-400" htmlFor={referenceId}>
+							Referencia
+						</label>
+						<Input
+							id={referenceId}
+							value={reference}
+							onChange={(event) => setReference(event.target.value)}
+							placeholder="Opcional: voucher, últimos 4 dígitos, comprobante"
+							className="border-gray-700 bg-[var(--color-carbon)] text-white"
+						/>
+					</div>
+
+					<div className="space-y-2">
+						<label className="text-sm text-gray-400" htmlFor={notesId}>
+							Notas
+						</label>
+						<Textarea
+							id={notesId}
+							value={notes}
+							onChange={(event) => setNotes(event.target.value)}
+							placeholder="Opcional: observación del abono"
+							className="min-h-[88px] border-gray-700 bg-[var(--color-carbon)] text-white"
+						/>
+					</div>
+
+					{registerCreditPaymentMutation.error instanceof Error ? (
+						<p className="text-sm text-red-400">
+							{registerCreditPaymentMutation.error.message}
+						</p>
+					) : null}
+
+					<Button
+						type="button"
+						onClick={handleSubmit}
+						disabled={!canSubmit}
+						className="w-full bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
+					>
+						{registerCreditPaymentMutation.isPending
+							? "Registrando abono..."
+							: "Registrar abono"}
+					</Button>
+				</div>
+			)}
+		</section>
 	);
 }
 

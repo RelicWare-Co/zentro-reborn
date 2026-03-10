@@ -24,7 +24,12 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { SaleDetailSheet } from "@/features/pos/components/SaleDetailSheet";
-import { useSaleDetail, useSalesList } from "@/features/pos/hooks/usePosQueries";
+import {
+	useCreditAccounts,
+	usePosBootstrap,
+	useSaleDetail,
+	useSalesList,
+} from "@/features/pos/hooks/usePosQueries";
 import { listSales } from "@/features/pos/pos.functions";
 import type { SaleListItem } from "@/features/pos/types";
 import { formatCurrency, formatPaymentMethodLabel } from "@/features/pos/utils";
@@ -80,6 +85,8 @@ function SalesPage() {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const search = Route.useSearch();
 	const initialSales = Route.useLoaderData();
+	const { data: posBootstrap } = usePosBootstrap();
+	const { data: creditAccountsSearchResult } = useCreditAccounts();
 	const salesQuery = useSalesList(
 		{
 			limit: search.pageSize ?? DEFAULT_LIST_PARAMS.limit,
@@ -93,6 +100,7 @@ function SalesPage() {
 		initialSales,
 	);
 	const sales = salesQuery.data?.data ?? [];
+	const creditAccounts = creditAccountsSearchResult?.data ?? [];
 	const pageSize = search.pageSize ?? DEFAULT_LIST_PARAMS.limit;
 	const cursor = search.cursor ?? DEFAULT_LIST_PARAMS.cursor;
 	const [selectedSaleId, setSelectedSaleId] = useState<string | null>(
@@ -133,8 +141,21 @@ function SalesPage() {
 		() => sales.find((sale) => sale.id === selectedSaleId) ?? null,
 		[sales, selectedSaleId],
 	);
+	const creditAccountByCustomerId = useMemo(
+		() =>
+			new Map(
+				creditAccounts.map((creditAccount) => [
+					creditAccount.customerId,
+					creditAccount,
+				]),
+			),
+		[creditAccounts],
+	);
 
 	const saleDetailQuery = useSaleDetail(isDetailOpen ? selectedSaleId : null);
+	const selectedSaleCreditAccount = saleDetailQuery.data?.customer?.id
+		? (creditAccountByCustomerId.get(saleDetailQuery.data.customer.id) ?? null)
+		: null;
 	const totalRevenue = sales.reduce((total, sale) => total + sale.totalAmount, 0);
 	const totalPending = sales.reduce((total, sale) => total + sale.balanceDue, 0);
 	const totalResults = salesQuery.data?.total ?? sales.length;
@@ -547,6 +568,8 @@ function SalesPage() {
 				onOpenChange={setIsDetailOpen}
 				sale={saleDetailQuery.data}
 				isLoading={saleDetailQuery.isFetching}
+				activeShiftId={posBootstrap?.activeShift?.id}
+				creditAccount={selectedSaleCreditAccount}
 			/>
 		</>
 	);

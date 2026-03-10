@@ -23,6 +23,7 @@ const listCreditTransactionsInputSchema = z.object({
 const registerCreditPaymentInputSchema = z.object({
 	shiftId: z.string().trim().min(1),
 	creditAccountId: z.string().trim().min(1),
+	saleId: nullableString,
 	amount: z.coerce.number().int().positive(),
 	method: z.string().trim().min(1),
 	reference: nullableString,

@@ -226,6 +226,95 @@ describe("credit.server", () => {
 		}
 	});
 
+	test("links a credit payment to a sale and marks it paid", async () => {
+		const { ctx, server } = await setupCreditServer();
+		try {
+			const shiftId = await insertOpenShift({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				userId: ctx.userId,
+			});
+			const customerId = crypto.randomUUID();
+			const creditAccountId = crypto.randomUUID();
+			const saleId = crypto.randomUUID();
+			await ctx.db.insert(schema.customer).values({
+				id: customerId,
+				organizationId: ctx.organizationId,
+				type: "natural",
+				documentType: null,
+				documentNumber: "905",
+				name: "Cliente Venta Vinculada",
+				email: null,
+				phone: null,
+				address: null,
+				city: null,
+				taxRegime: null,
+				deletedAt: null,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			});
+			await ctx.db.insert(schema.creditAccount).values({
+				id: creditAccountId,
+				organizationId: ctx.organizationId,
+				customerId,
+				balance: 7000,
+				interestRate: 0,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			});
+			await ctx.db.insert(schema.sale).values({
+				id: saleId,
+				organizationId: ctx.organizationId,
+				shiftId,
+				customerId,
+				userId: ctx.userId,
+				subtotal: 7000,
+				taxAmount: 0,
+				discountAmount: 0,
+				totalAmount: 7000,
+				status: "credit",
+				createdAt: new Date(),
+			});
+
+			const paymentResult =
+				await server.registerCreditPaymentForCurrentOrganization({
+					shiftId,
+					creditAccountId,
+					saleId,
+					amount: 7000,
+					method: "cash",
+					reference: "AB-VENTA",
+				});
+
+			expect(paymentResult.saleId).toBe(saleId);
+			expect(paymentResult.newBalance).toBe(0);
+
+			const [updatedSale] = await ctx.db
+				.select({ status: schema.sale.status })
+				.from(schema.sale)
+				.where(eq(schema.sale.id, saleId))
+				.limit(1);
+			expect(updatedSale?.status).toBe("completed");
+
+			const [linkedPayment] = await ctx.db
+				.select({ saleId: schema.payment.saleId, amount: schema.payment.amount })
+				.from(schema.payment)
+				.where(eq(schema.payment.id, paymentResult.paymentId))
+				.limit(1);
+			expect(linkedPayment?.saleId).toBe(saleId);
+			expect(linkedPayment?.amount).toBe(7000);
+
+			const [linkedTransaction] = await ctx.db
+				.select({ saleId: schema.creditTransaction.saleId })
+				.from(schema.creditTransaction)
+				.where(eq(schema.creditTransaction.id, paymentResult.transactionId))
+				.limit(1);
+			expect(linkedTransaction?.saleId).toBe(saleId);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
 	test("rejects credit payments that exceed account balance", async () => {
 		const { ctx, server } = await setupCreditServer();
 		try {

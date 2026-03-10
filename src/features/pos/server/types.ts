@@ -51,3 +51,17 @@ export type CreatePosSaleInput = {
 	isCreditSale?: boolean;
 	createdAt?: number;
 };
+
+export type ListSalesInput = {
+	limit?: number;
+	cursor?: number;
+	status?: string | null;
+	searchQuery?: string | null;
+	paymentMethod?: string | null;
+	startDate?: string | null;
+	endDate?: string | null;
+};
+
+export type GetSaleByIdInput = {
+	saleId: string;
+};

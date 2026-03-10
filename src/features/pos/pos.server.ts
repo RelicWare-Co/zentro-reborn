@@ -5,6 +5,10 @@ export {
 	searchPosProductsForCurrentOrganization,
 } from "./server/catalog";
 export { createPosSaleForCurrentOrganization } from "./server/sales";
+export {
+	getSaleByIdForCurrentOrganization,
+	listSalesForCurrentOrganization,
+} from "./server/sales-history";
 
 export {
 	closeShiftForCurrentOrganization,
@@ -18,6 +22,8 @@ export {
 	type CashMovementType,
 	type CloseShiftInput,
 	type CreatePosSaleInput,
+	type GetSaleByIdInput,
+	type ListSalesInput,
 	type OpenShiftInput,
 	type RegisterCashMovementInput,
 } from "./server/types";

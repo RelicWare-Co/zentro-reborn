@@ -1,8 +1,10 @@
 import type {
-	searchPosProducts,
-	searchPosCustomers,
 	getPosBootstrap,
+	getSaleById,
 	getShiftCloseSummary,
+	listSales,
+	searchPosCustomers,
+	searchPosProducts,
 } from "./pos.functions";
 import type { searchCreditAccounts } from "@/features/credit/credit.functions";
 
@@ -27,6 +29,15 @@ export type ActiveShift = PosBootstrap["activeShift"];
 
 // Resumen de cierre de turno
 export type ShiftCloseSummary = Awaited<ReturnType<typeof getShiftCloseSummary>>;
+
+// Resultado del historial de ventas
+export type SaleListResult = Awaited<ReturnType<typeof listSales>>;
+
+// Item resumido del historial de ventas
+export type SaleListItem = SaleListResult["data"][number];
+
+// Detalle de una venta
+export type SaleDetail = Awaited<ReturnType<typeof getSaleById>>;
 
 // Categoría de productos
 export type Category = {

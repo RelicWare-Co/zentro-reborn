@@ -4,14 +4,16 @@ import { createCustomer } from "@/features/customers/customers.functions";
 import {
 	closeShift,
 	createPosSale,
+	getSaleById,
 	getPosBootstrap,
 	getShiftCloseSummary,
+	listSales,
 	openShift,
 	registerCashMovement,
 	searchPosCustomers,
 	searchPosProducts,
 } from "../pos.functions";
-import type { PosBootstrap } from "../types";
+import type { PosBootstrap, SaleListResult, SaleDetail } from "../types";
 
 export function usePosBootstrap(initialData?: PosBootstrap) {
 	return useQuery({
@@ -49,6 +51,64 @@ export function usePosCustomers() {
 					cursor: 0,
 				},
 			}),
+	});
+}
+
+type SalesListParams = {
+	limit?: number;
+	cursor?: number;
+	status?: string | null;
+	searchQuery?: string | null;
+	paymentMethod?: string | null;
+	startDate?: string | null;
+	endDate?: string | null;
+};
+
+export function useSalesList(
+	params: SalesListParams = {},
+	initialData?: SaleListResult,
+) {
+	return useQuery({
+		queryKey: [
+			"sales-list",
+			params.limit ?? 50,
+			params.cursor ?? 0,
+			params.status ?? "all",
+			params.searchQuery ?? "",
+			params.paymentMethod ?? "all",
+			params.startDate ?? "",
+			params.endDate ?? "",
+		],
+		queryFn: () =>
+			listSales({
+				data: {
+					limit: params.limit,
+					cursor: params.cursor,
+					status: params.status ?? null,
+					searchQuery: params.searchQuery ?? null,
+					paymentMethod: params.paymentMethod ?? null,
+					startDate: params.startDate ?? null,
+					endDate: params.endDate ?? null,
+				},
+			}),
+		initialData,
+	});
+}
+
+export function useSaleDetail(
+	saleId: string | null,
+	initialData?: SaleDetail | null,
+) {
+	return useQuery({
+		queryKey: ["sales-detail", saleId],
+		queryFn: () =>
+			getSaleById({
+				data: {
+					saleId: saleId ?? "",
+				},
+			}),
+		enabled: Boolean(saleId),
+		initialData,
 	});
 }
 
@@ -177,6 +237,8 @@ export function useCreatePosSaleMutation() {
 				queryClient.invalidateQueries({
 					queryKey: ["pos-shift-close-summary"],
 				}),
+				queryClient.invalidateQueries({ queryKey: ["sales-list"] }),
+				queryClient.invalidateQueries({ queryKey: ["sales-detail"] }),
 			]);
 		},
 	});

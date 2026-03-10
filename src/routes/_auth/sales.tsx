@@ -1,0 +1,564 @@
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ArrowRight, Clock3, Filter, Receipt, Search, Store, UserRound, Wallet, X } from "lucide-react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { z } from "zod";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+	NativeSelect,
+	NativeSelectOption,
+} from "@/components/ui/native-select";
+import { SaleDetailSheet } from "@/features/pos/components/SaleDetailSheet";
+import { useSaleDetail, useSalesList } from "@/features/pos/hooks/usePosQueries";
+import { listSales } from "@/features/pos/pos.functions";
+import type { SaleListItem } from "@/features/pos/types";
+import { formatCurrency, formatPaymentMethodLabel } from "@/features/pos/utils";
+
+const DEFAULT_LIST_PARAMS = {
+	limit: 50,
+	cursor: 0,
+};
+
+const salesSearchSchema = z.object({
+	q: z.string().optional(),
+	status: z.enum(["completed", "credit", "cancelled"]).optional(),
+	paymentMethod: z
+		.enum(["cash", "card", "transfer_nequi", "transfer_bancolombia"])
+		.optional(),
+	startDate: z.string().optional(),
+	endDate: z.string().optional(),
+});
+
+const dateTimeFormatter = new Intl.DateTimeFormat("es-CO", {
+	day: "numeric",
+	month: "short",
+	hour: "numeric",
+	minute: "2-digit",
+});
+
+export const Route = createFileRoute("/_auth/sales")({
+	validateSearch: salesSearchSchema,
+	loaderDeps: ({ search }) => search,
+	loader: ({ deps }) =>
+		listSales({
+			data: {
+				...DEFAULT_LIST_PARAMS,
+				searchQuery: deps.q ?? null,
+				status: deps.status ?? null,
+				paymentMethod: deps.paymentMethod ?? null,
+				startDate: deps.startDate ?? null,
+				endDate: deps.endDate ?? null,
+			},
+		}),
+	component: SalesPage,
+});
+
+function SalesPage() {
+	const salesSearchId = useId();
+	const salesStatusId = useId();
+	const salesPaymentMethodId = useId();
+	const salesStartDateId = useId();
+	const salesEndDateId = useId();
+	const navigate = useNavigate({ from: Route.fullPath });
+	const search = Route.useSearch();
+	const initialSales = Route.useLoaderData();
+	const salesQuery = useSalesList(
+		{
+			...DEFAULT_LIST_PARAMS,
+			searchQuery: search.q ?? null,
+			status: search.status ?? null,
+			paymentMethod: search.paymentMethod ?? null,
+			startDate: search.startDate ?? null,
+			endDate: search.endDate ?? null,
+		},
+		initialSales,
+	);
+	const sales = salesQuery.data?.data ?? [];
+	const [selectedSaleId, setSelectedSaleId] = useState<string | null>(
+		() => sales[0]?.id ?? null,
+	);
+	const [isDetailOpen, setIsDetailOpen] = useState(false);
+	const [draftFilters, setDraftFilters] = useState(() => ({
+		q: search.q ?? "",
+		status: search.status ?? "",
+		paymentMethod: search.paymentMethod ?? "",
+		startDate: search.startDate ?? "",
+		endDate: search.endDate ?? "",
+	}));
+
+	useEffect(() => {
+		if (sales.length === 0) {
+			setSelectedSaleId(null);
+			setIsDetailOpen(false);
+			return;
+		}
+
+		if (!selectedSaleId || !sales.some((sale) => sale.id === selectedSaleId)) {
+			setSelectedSaleId(sales[0]?.id ?? null);
+		}
+	}, [sales, selectedSaleId]);
+
+	useEffect(() => {
+		setDraftFilters({
+			q: search.q ?? "",
+			status: search.status ?? "",
+			paymentMethod: search.paymentMethod ?? "",
+			startDate: search.startDate ?? "",
+			endDate: search.endDate ?? "",
+		});
+	}, [search.endDate, search.paymentMethod, search.q, search.startDate, search.status]);
+
+	const selectedSaleSummary = useMemo(
+		() => sales.find((sale) => sale.id === selectedSaleId) ?? null,
+		[sales, selectedSaleId],
+	);
+
+	const saleDetailQuery = useSaleDetail(isDetailOpen ? selectedSaleId : null);
+	const totalRevenue = sales.reduce((total, sale) => total + sale.totalAmount, 0);
+	const totalPending = sales.reduce((total, sale) => total + sale.balanceDue, 0);
+	const activeFilterCount = [
+		search.q,
+		search.status,
+		search.paymentMethod,
+		search.startDate,
+		search.endDate,
+	].filter(Boolean).length;
+
+	const applyFilters = () => {
+		void navigate({
+			search: {
+				q: normalizeFilterValue(draftFilters.q),
+				status: normalizeFilterValue(draftFilters.status),
+				paymentMethod: normalizeFilterValue(draftFilters.paymentMethod),
+				startDate: normalizeFilterValue(draftFilters.startDate),
+				endDate: normalizeFilterValue(draftFilters.endDate),
+			},
+			replace: true,
+		});
+	};
+
+	const clearFilters = () => {
+		setDraftFilters({
+			q: "",
+			status: "",
+			paymentMethod: "",
+			startDate: "",
+			endDate: "",
+		});
+		void navigate({
+			search: {},
+			replace: true,
+		});
+	};
+
+	return (
+		<>
+			<main className="flex-1 space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12">
+				<section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+					<div className="space-y-3">
+						<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+							Historial operativo
+						</Badge>
+						<div className="space-y-2">
+							<h1 className="text-3xl font-bold tracking-tight">Ventas</h1>
+							<p className="max-w-2xl text-sm text-gray-400 md:text-base">
+								Consulta el historial reciente, valida pagos y abre el detalle
+								completo de cada venta.
+							</p>
+						</div>
+					</div>
+
+					<div className="flex flex-col gap-3 sm:flex-row">
+						<Button
+							asChild
+							className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
+						>
+							<Link to="/pos">
+								<Store className="h-4 w-4" />
+								Ir al POS
+							</Link>
+						</Button>
+						<Button
+							asChild
+							variant="outline"
+							className="border-gray-700 bg-[var(--color-carbon)] text-gray-200 hover:bg-white/5 hover:text-white"
+						>
+							<Link to="/dashboard">
+								Ver dashboard
+								<ArrowRight className="h-4 w-4" />
+							</Link>
+						</Button>
+					</div>
+				</section>
+
+				<section className="grid gap-4 md:grid-cols-3">
+					<SummaryCard
+						title="Ventas cargadas"
+						value={`${sales.length}`}
+						description={
+							activeFilterCount > 0
+								? "Resultados del filtro actual"
+								: "Ultimos registros disponibles en pantalla"
+						}
+						icon={Receipt}
+					/>
+					<SummaryCard
+						title="Monto acumulado"
+						value={formatCurrency(totalRevenue)}
+						description="Suma de las ventas listadas"
+						icon={Wallet}
+					/>
+					<SummaryCard
+						title="Saldo pendiente"
+						value={formatCurrency(totalPending)}
+						description="Principalmente ventas a credito"
+						icon={Clock3}
+					/>
+				</section>
+
+				<section>
+					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
+						<CardHeader>
+							<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+								<div>
+									<CardTitle className="flex items-center gap-2">
+										<Filter className="h-4 w-4 text-[var(--color-voltage)]" />
+										Filtros
+									</CardTitle>
+									<CardDescription className="mt-1 text-gray-400">
+										Busca por cliente, cajero o id, y combina estado, fechas y
+										medio de pago.
+									</CardDescription>
+								</div>
+								{activeFilterCount > 0 ? (
+									<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+										{activeFilterCount} filtro{activeFilterCount === 1 ? "" : "s"} activo
+										{activeFilterCount === 1 ? "" : "s"}
+									</Badge>
+								) : null}
+							</div>
+						</CardHeader>
+						<CardContent>
+							<form
+								className="space-y-4"
+								onSubmit={(event) => {
+									event.preventDefault();
+									applyFilters();
+								}}
+							>
+								<div className="grid gap-4 xl:grid-cols-[1.3fr_repeat(4,minmax(0,1fr))]">
+									<div className="space-y-2">
+										<label className="text-sm text-gray-400" htmlFor={salesSearchId}>
+											Busqueda
+										</label>
+										<div className="relative">
+											<Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-500" />
+											<Input
+												id={salesSearchId}
+												value={draftFilters.q}
+												onChange={(event) =>
+													setDraftFilters((current) => ({
+														...current,
+														q: event.target.value,
+													}))
+												}
+												placeholder="Cliente, cajero o id"
+												className="border-gray-700 bg-black/20 pl-9 text-white placeholder:text-gray-500"
+											/>
+										</div>
+									</div>
+
+									<FilterField label="Estado" htmlFor={salesStatusId}>
+										<NativeSelect
+											id={salesStatusId}
+											value={draftFilters.status}
+											onChange={(event) =>
+												setDraftFilters((current) => ({
+													...current,
+													status: event.target.value,
+												}))
+											}
+											className="w-full"
+										>
+											<NativeSelectOption value="">Todos</NativeSelectOption>
+											<NativeSelectOption value="completed">Pagada</NativeSelectOption>
+											<NativeSelectOption value="credit">Credito</NativeSelectOption>
+											<NativeSelectOption value="cancelled">Cancelada</NativeSelectOption>
+										</NativeSelect>
+									</FilterField>
+
+									<FilterField label="Medio de pago" htmlFor={salesPaymentMethodId}>
+										<NativeSelect
+											id={salesPaymentMethodId}
+											value={draftFilters.paymentMethod}
+											onChange={(event) =>
+												setDraftFilters((current) => ({
+													...current,
+													paymentMethod: event.target.value,
+												}))
+											}
+											className="w-full"
+										>
+											<NativeSelectOption value="">Todos</NativeSelectOption>
+											<NativeSelectOption value="cash">Efectivo</NativeSelectOption>
+											<NativeSelectOption value="card">Tarjeta</NativeSelectOption>
+											<NativeSelectOption value="transfer_nequi">Nequi</NativeSelectOption>
+											<NativeSelectOption value="transfer_bancolombia">
+												Bancolombia
+											</NativeSelectOption>
+										</NativeSelect>
+									</FilterField>
+
+									<FilterField label="Desde" htmlFor={salesStartDateId}>
+										<Input
+											id={salesStartDateId}
+											type="date"
+											value={draftFilters.startDate}
+											onChange={(event) =>
+												setDraftFilters((current) => ({
+													...current,
+													startDate: event.target.value,
+												}))
+											}
+											className="border-gray-700 bg-black/20 text-white"
+										/>
+									</FilterField>
+
+									<FilterField label="Hasta" htmlFor={salesEndDateId}>
+										<Input
+											id={salesEndDateId}
+											type="date"
+											value={draftFilters.endDate}
+											onChange={(event) =>
+												setDraftFilters((current) => ({
+													...current,
+													endDate: event.target.value,
+												}))
+											}
+											className="border-gray-700 bg-black/20 text-white"
+										/>
+									</FilterField>
+								</div>
+
+								<div className="flex flex-col gap-3 sm:flex-row">
+									<Button
+										type="submit"
+										className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
+									>
+										<Filter className="h-4 w-4" />
+										Aplicar filtros
+									</Button>
+									<Button
+										type="button"
+										variant="outline"
+										onClick={clearFilters}
+										className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+									>
+										<X className="h-4 w-4" />
+										Limpiar
+									</Button>
+								</div>
+							</form>
+						</CardContent>
+					</Card>
+				</section>
+
+				<section>
+					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
+						<CardHeader>
+							<CardTitle>Historial de ventas</CardTitle>
+							<CardDescription className="text-gray-400">
+								Selecciona una venta para revisar items, cliente y pagos.
+							</CardDescription>
+						</CardHeader>
+						<CardContent>
+							{sales.length > 0 ? (
+								<div className="space-y-3">
+									{sales.map((sale) => (
+										<button
+											key={sale.id}
+											type="button"
+											onClick={() => {
+												setSelectedSaleId(sale.id);
+												setIsDetailOpen(true);
+											}}
+											className={`flex w-full flex-col gap-4 rounded-2xl border px-4 py-4 text-left transition-colors sm:flex-row sm:items-center sm:justify-between ${
+												selectedSaleSummary?.id === sale.id
+													? "border-[var(--color-voltage)]/30 bg-[var(--color-voltage)]/5"
+													: "border-gray-800 bg-black/20 hover:border-gray-700 hover:bg-black/30"
+											}`}
+										>
+											<div className="min-w-0 flex-1">
+												<div className="flex flex-wrap items-center gap-2">
+													<p className="truncate font-medium text-white">
+														{sale.customerName ?? "Cliente mostrador"}
+													</p>
+													<Badge className={getSaleStatusBadgeClass(sale.status)}>
+														{formatSaleStatus(sale.status)}
+													</Badge>
+												</div>
+												<div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-400">
+													<span className="inline-flex items-center gap-1.5">
+														<UserRound className="h-3.5 w-3.5" />
+														{sale.cashierName ?? "Sin cajero"}
+													</span>
+													<span className="inline-flex items-center gap-1.5">
+														<Clock3 className="h-3.5 w-3.5" />
+														{dateTimeFormatter.format(sale.createdAt)}
+													</span>
+													<span>{sale.itemCount} items</span>
+													<span>{formatPaymentSummary(sale)}</span>
+												</div>
+											</div>
+
+											<div className="flex items-center gap-4">
+												<div className="text-right">
+													<p className="text-lg font-semibold text-white">
+														{formatCurrency(sale.totalAmount)}
+													</p>
+													<p className="text-sm text-gray-400">
+														{sale.balanceDue > 0
+															? `Pendiente ${formatCurrency(sale.balanceDue)}`
+															: "Sin saldo pendiente"}
+													</p>
+												</div>
+												<div className="rounded-full border border-gray-800 p-2 text-gray-400">
+													<ArrowRight className="h-4 w-4" />
+												</div>
+											</div>
+										</button>
+									))}
+								</div>
+							) : (
+								<div className="rounded-2xl border border-dashed border-gray-800 px-4 py-10 text-center">
+									<p className="text-sm text-gray-400">
+										No se han registrado ventas todavia.
+									</p>
+									<Button
+										asChild
+										variant="outline"
+										className="mt-4 border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+									>
+										<Link to="/pos">Registrar una venta</Link>
+									</Button>
+								</div>
+							)}
+						</CardContent>
+					</Card>
+				</section>
+			</main>
+
+			<SaleDetailSheet
+				isOpen={isDetailOpen}
+				onOpenChange={setIsDetailOpen}
+				sale={saleDetailQuery.data}
+				isLoading={saleDetailQuery.isFetching}
+			/>
+		</>
+	);
+}
+
+function SummaryCard({
+	title,
+	value,
+	description,
+	icon: Icon,
+}: {
+	title: string;
+	value: string;
+	description: string;
+	icon: typeof Receipt;
+}) {
+	return (
+		<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
+			<CardHeader className="space-y-4">
+				<div className="flex items-center gap-3">
+					<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]">
+						<Icon className="h-4 w-4" />
+					</div>
+					<div>
+						<CardDescription className="text-gray-400">{title}</CardDescription>
+						<CardTitle className="mt-1 text-2xl font-semibold tracking-tight text-white">
+							{value}
+						</CardTitle>
+					</div>
+				</div>
+			</CardHeader>
+			<CardContent className="pt-0">
+				<p className="text-sm text-gray-400">{description}</p>
+			</CardContent>
+		</Card>
+	);
+}
+
+function formatSaleStatus(status: string) {
+	if (status === "credit") {
+		return "Credito";
+	}
+
+	if (status === "completed") {
+		return "Pagada";
+	}
+
+	if (status === "cancelled") {
+		return "Cancelada";
+	}
+
+	return status;
+}
+
+function getSaleStatusBadgeClass(status: string) {
+	if (status === "credit") {
+		return "border-sky-500/20 bg-sky-500/10 text-sky-300 hover:bg-sky-500/10";
+	}
+
+	if (status === "completed") {
+		return "border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10";
+	}
+
+	if (status === "cancelled") {
+		return "border-rose-500/20 bg-rose-500/10 text-rose-300 hover:bg-rose-500/10";
+	}
+
+	return "border-gray-700 bg-gray-800/80 text-gray-300 hover:bg-gray-800/80";
+}
+
+function formatPaymentSummary(sale: SaleListItem) {
+	if (sale.paymentMethods.length === 0) {
+		return sale.status === "credit" ? "Venta a credito" : "Sin pagos";
+	}
+
+	return sale.paymentMethods.map(formatPaymentMethodLabel).join(" + ");
+}
+
+function normalizeFilterValue(value: string) {
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function FilterField({
+	label,
+	htmlFor,
+	children,
+}: {
+	label: string;
+	htmlFor: string;
+	children: React.ReactNode;
+}) {
+	return (
+		<div className="space-y-2">
+			<label className="text-sm text-gray-400" htmlFor={htmlFor}>
+				{label}
+			</label>
+			{children}
+		</div>
+	);
+}

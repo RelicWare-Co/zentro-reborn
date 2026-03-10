@@ -8,6 +8,7 @@ import {
 	LogOut,
 	Menu,
 	Package,
+	Receipt,
 	Settings,
 	Store,
 } from "lucide-react";
@@ -27,6 +28,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 	const navItems = [
 		{ name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
 		{ name: "POS", path: "/pos", icon: Store },
+		{ name: "Ventas", path: "/sales", icon: Receipt },
 		{ name: "Productos", path: "/products", icon: Package },
 		{ name: "Configuración", path: "/settings", icon: Settings },
 	];

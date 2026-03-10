@@ -3,8 +3,10 @@ import { z } from "zod";
 import {
 	closeShiftForCurrentOrganization,
 	createPosSaleForCurrentOrganization,
+	getSaleByIdForCurrentOrganization,
 	getPosBootstrapForCurrentOrganization,
 	getShiftCloseSummaryForCurrentOrganization,
+	listSalesForCurrentOrganization,
 	openShiftForCurrentOrganization,
 	registerCashMovementForCurrentOrganization,
 	searchPosCustomersForCurrentOrganization,
@@ -24,6 +26,20 @@ const searchPosCustomersInputSchema = z.object({
 	searchQuery: nullableString,
 	limit: z.coerce.number().int().min(1).max(100).optional(),
 	cursor: z.coerce.number().int().min(0).optional(),
+});
+
+const listSalesInputSchema = z.object({
+	limit: z.coerce.number().int().min(1).max(100).optional(),
+	cursor: z.coerce.number().int().min(0).optional(),
+	status: nullableString,
+	searchQuery: nullableString,
+	paymentMethod: nullableString,
+	startDate: nullableString,
+	endDate: nullableString,
+});
+
+const getSaleByIdInputSchema = z.object({
+	saleId: z.string().trim().min(1),
 });
 
 const openShiftInputSchema = z.object({
@@ -137,6 +153,28 @@ export const searchPosCustomers = createServerFn({ method: "GET" })
 			searchQuery: data.searchQuery ?? undefined,
 			limit: data.limit,
 			cursor: data.cursor,
+		});
+	});
+
+export const listSales = createServerFn({ method: "GET" })
+	.inputValidator(listSalesInputSchema)
+	.handler(async ({ data }) => {
+		return listSalesForCurrentOrganization({
+			limit: data.limit,
+			cursor: data.cursor,
+			status: data.status ?? undefined,
+			searchQuery: data.searchQuery ?? undefined,
+			paymentMethod: data.paymentMethod ?? undefined,
+			startDate: data.startDate ?? undefined,
+			endDate: data.endDate ?? undefined,
+		});
+	});
+
+export const getSaleById = createServerFn({ method: "GET" })
+	.inputValidator(getSaleByIdInputSchema)
+	.handler(async ({ data }) => {
+		return getSaleByIdForCurrentOrganization({
+			saleId: data.saleId,
 		});
 	});
 

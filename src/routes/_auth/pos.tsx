@@ -7,6 +7,7 @@ import { CloseShiftModal } from "@/features/pos/components/modals/CloseShiftModa
 import { CreateCustomerModal } from "@/features/pos/components/modals/CreateCustomerModal";
 import { ModifierModal } from "@/features/pos/components/modals/ModifierModal";
 import { OpenShiftModal } from "@/features/pos/components/modals/OpenShiftModal";
+import { ShiftRequiredDialog } from "@/features/pos/components/modals/ShiftRequiredDialog";
 
 import { PosHeader } from "@/features/pos/components/PosHeader";
 import { ProductGrid } from "@/features/pos/components/ProductGrid";
@@ -34,6 +35,8 @@ function PosPage() {
 	const [activeCategoryId, setActiveCategoryId] = useState("all");
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCustomerId, setSelectedCustomerId] = useState("");
+	const [isShiftRequiredDialogOpen, setIsShiftRequiredDialogOpen] =
+		useState(false);
 
 	// Data queries
 	const { data: bootstrap = bootstrapData } = usePosBootstrap(bootstrapData);
@@ -101,6 +104,23 @@ function PosPage() {
 		setSelectedCustomerId(customerId);
 	}, []);
 
+	const handleProductSelect = useCallback(
+		(product: Product) => {
+			if (!activeShift) {
+				setIsShiftRequiredDialogOpen(true);
+				return;
+			}
+
+			modifierModal.handleProductSelection(product);
+		},
+		[activeShift, modifierModal.handleProductSelection],
+	);
+
+	const handleOpenShiftFromDialog = useCallback(() => {
+		setIsShiftRequiredDialogOpen(false);
+		shift.setIsShiftOpenModalOpen(true);
+	}, [shift]);
+
 	return (
 		<div className="flex flex-col h-full w-full bg-[var(--color-void)] text-[var(--color-photon)] overflow-hidden">
 			{/* Header */}
@@ -127,7 +147,7 @@ function PosPage() {
 					getProductQuantity={cart.getProductQuantity}
 					onCategoryChange={handleCategoryChange}
 					onSearchChange={handleSearchChange}
-					onProductSelect={modifierModal.handleProductSelection}
+					onProductSelect={handleProductSelect}
 				/>
 
 				<CartPanel
@@ -215,6 +235,12 @@ function PosPage() {
 				isCreating={createCustomer.isCreating}
 				error={createCustomer.error}
 				onConfirm={createCustomer.handleCreateCustomer}
+			/>
+
+			<ShiftRequiredDialog
+				isOpen={isShiftRequiredDialogOpen}
+				onClose={() => setIsShiftRequiredDialogOpen(false)}
+				onOpenShift={handleOpenShiftFromDialog}
 			/>
 
 			<CheckoutModal

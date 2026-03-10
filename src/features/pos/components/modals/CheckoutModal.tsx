@@ -9,8 +9,15 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import type { CreditAccount, PaymentMethod } from "../../types";
-import { formatCurrency, formatPaymentMethodLabel } from "../../utils";
+import { formatCurrency } from "../../utils";
 
 interface CheckoutModalProps {
 	isOpen: boolean;
@@ -54,7 +61,6 @@ export function CheckoutModal({
 	canFinalize,
 	isProcessing,
 	paymentDifference,
-	hasPaymentDifference,
 	error,
 	onAddPaymentMethod,
 	onRemovePaymentMethod,
@@ -163,18 +169,24 @@ export function CheckoutModal({
 										)}
 
 										<div className="flex gap-2">
-											<select
+											<Select
 												value={payment.method}
-												onChange={(e) =>
-													onUpdatePayment(index, "method", e.target.value)
+												onValueChange={(value) =>
+													onUpdatePayment(index, "method", value)
 												}
-												className="flex-1 h-10 rounded-md border border-gray-700 bg-[#151515] px-3 text-sm text-white focus:outline-none focus:border-[var(--color-voltage)]"
 											>
-												<option value="cash">Efectivo</option>
-												<option value="card">Tarjeta</option>
-												<option value="transfer_nequi">Nequi</option>
-												<option value="transfer_bancolombia">Bancolombia</option>
-											</select>
+												<SelectTrigger className="flex-1 h-10 rounded-md border border-gray-700 bg-[#151515] px-3 text-sm text-white focus:outline-none focus:border-[var(--color-voltage)] focus:ring-0">
+													<SelectValue placeholder="Método" />
+												</SelectTrigger>
+												<SelectContent className="bg-[#151515] border-gray-700 text-white">
+													<SelectItem value="cash">Efectivo</SelectItem>
+													<SelectItem value="card">Tarjeta</SelectItem>
+													<SelectItem value="transfer_nequi">Nequi</SelectItem>
+													<SelectItem value="transfer_bancolombia">
+														Bancolombia
+													</SelectItem>
+												</SelectContent>
+											</Select>
 
 											<div className="relative flex-1">
 												<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">

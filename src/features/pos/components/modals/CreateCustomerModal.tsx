@@ -8,6 +8,13 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 
 interface CreateCustomerModalProps {
 	isOpen: boolean;
@@ -95,17 +102,20 @@ export function CreateCustomerModal({
 							>
 								Tipo doc
 							</label>
-							<select
-								id={customerDocumentTypeId}
-								value={documentType}
-								onChange={(event) => setDocumentType(event.target.value)}
-								className="flex h-10 w-full rounded-md border border-gray-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-voltage)]"
-							>
-								<option value="CC">CC</option>
-								<option value="NIT">NIT</option>
-								<option value="CE">CE</option>
-								<option value="PAS">Pasaporte</option>
-							</select>
+							<Select value={documentType} onValueChange={setDocumentType}>
+								<SelectTrigger
+									id={customerDocumentTypeId}
+									className="h-10 w-full rounded-md border border-gray-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white focus:ring-[var(--color-voltage)] focus:ring-2"
+								>
+									<SelectValue placeholder="Tipo doc" />
+								</SelectTrigger>
+								<SelectContent className="bg-[#0a0a0a] border-gray-800 text-white">
+									<SelectItem value="CC">CC</SelectItem>
+									<SelectItem value="NIT">NIT</SelectItem>
+									<SelectItem value="CE">CE</SelectItem>
+									<SelectItem value="PAS">Pasaporte</SelectItem>
+								</SelectContent>
+							</Select>
 						</div>
 
 						<div className="grid gap-2">

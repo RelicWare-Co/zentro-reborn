@@ -8,6 +8,13 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import type { CashMovementType } from "../../types";
 
 interface CashMovementModalProps {
@@ -66,16 +73,24 @@ export function CashMovementModal({
 						>
 							Tipo de Movimiento
 						</label>
-						<select
-							id={movementTypeId}
+						<Select
 							value={movementType}
-							onChange={(e) => setMovementType(e.target.value as CashMovementType)}
-							className="flex h-10 w-full rounded-md border border-gray-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-voltage)] focus:border-transparent"
+							onValueChange={(value) =>
+								setMovementType(value as CashMovementType)
+							}
 						>
-							<option value="inflow">Ingreso (Entrada manual)</option>
-							<option value="expense">Gasto Operativo</option>
-							<option value="payout">Pago a Proveedor</option>
-						</select>
+							<SelectTrigger
+								id={movementTypeId}
+								className="h-10 w-full rounded-md border border-gray-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white focus:ring-[var(--color-voltage)] focus:ring-2"
+							>
+								<SelectValue placeholder="Tipo de Movimiento" />
+							</SelectTrigger>
+							<SelectContent className="bg-[#0a0a0a] border-gray-800 text-white">
+								<SelectItem value="inflow">Ingreso (Entrada manual)</SelectItem>
+								<SelectItem value="expense">Gasto Operativo</SelectItem>
+								<SelectItem value="payout">Pago a Proveedor</SelectItem>
+							</SelectContent>
+						</Select>
 					</div>
 
 					<div className="grid gap-2">

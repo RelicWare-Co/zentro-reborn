@@ -1,5 +1,12 @@
 import { ArrowLeftRight, Lock, Plus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import type { ActiveShift, PosCustomer } from "../types";
 
@@ -45,27 +52,26 @@ export function PosHeader({
 
 				<Separator orientation="vertical" className="h-5 border-gray-700" />
 
-				<div className="flex items-center gap-2 bg-gray-900/50 px-3 py-1.5 rounded-lg border border-gray-800 focus-within:border-gray-600 transition-colors">
+				<div className="flex items-center gap-2 bg-gray-900/50 px-3 py-1.5 rounded-lg border border-gray-800 focus-within:border-[var(--color-voltage)] focus-within:ring-1 focus-within:ring-[var(--color-voltage)]/20 transition-colors">
 					<Users className="w-4 h-4 text-gray-400" />
-					<select
-						value={selectedCustomerId}
-						onChange={(event) => onCustomerChange(event.target.value)}
-						className="bg-transparent text-sm text-white outline-none border-none focus:ring-0 cursor-pointer min-w-[150px] appearance-none"
-						aria-label="Seleccionar cliente"
+					<Select
+						value={selectedCustomerId === "" ? "mostrador" : selectedCustomerId}
+						onValueChange={(value) =>
+							onCustomerChange(value === "mostrador" ? "" : value)
+						}
 					>
-						<option value="" className="bg-gray-900">
-							Cliente Mostrador
-						</option>
-						{customers.map((customer) => (
-							<option
-								key={customer.id}
-								value={customer.id}
-								className="bg-gray-900"
-							>
-								{customer.name}
-							</option>
-						))}
-					</select>
+						<SelectTrigger className="w-[180px] h-7 !bg-transparent border-0 !border-transparent shadow-none px-0 py-0 text-sm text-white outline-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:border-transparent [&>svg]:hidden !ring-0">
+							<SelectValue placeholder="Seleccionar cliente" />
+						</SelectTrigger>
+						<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+							<SelectItem value="mostrador">Cliente Mostrador</SelectItem>
+							{customers.map((customer) => (
+								<SelectItem key={customer.id} value={customer.id}>
+									{customer.name}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 					<Button
 						type="button"
 						variant="ghost"

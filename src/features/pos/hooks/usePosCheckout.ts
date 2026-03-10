@@ -1,6 +1,12 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CartItem, PaymentMethod } from "../types";
 import { useCreatePosSaleMutation } from "./usePosQueries";
+
+function getDefaultPaymentMethodId(
+	paymentMethodOptions: Array<{ id: string }>,
+) {
+	return paymentMethodOptions[0]?.id ?? "cash";
+}
 
 export function usePosCheckout(
 	activeShiftId: string | undefined,
@@ -10,21 +16,73 @@ export function usePosCheckout(
 	discountInput: string,
 	clearCart: () => void,
 	resetDiscount: () => void,
+	paymentMethodOptions: Array<{
+		id: string;
+		label: string;
+		requiresReference: boolean;
+	}>,
+	allowCreditSales: boolean,
 ) {
 	const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
-	const [payments, setPayments] = useState<PaymentMethod[]>([
-		{ id: crypto.randomUUID(), method: "cash", amount: "", reference: "" },
+	const [payments, setPayments] = useState<PaymentMethod[]>(() => [
+		{
+			id: crypto.randomUUID(),
+			method: getDefaultPaymentMethodId(paymentMethodOptions),
+			amount: "",
+			reference: "",
+		},
 	]);
 	const [isCreditSale, setIsCreditSale] = useState(false);
 
 	const createPosSaleMutation = useCreatePosSaleMutation();
 
+	useEffect(() => {
+		const defaultMethodId = getDefaultPaymentMethodId(paymentMethodOptions);
+		const enabledMethodIds = new Set(
+			paymentMethodOptions.map((paymentMethod) => paymentMethod.id),
+		);
+
+		setPayments((currentValue) => {
+			if (currentValue.length === 0) {
+				return [
+					{
+						id: crypto.randomUUID(),
+						method: defaultMethodId,
+						amount: "",
+						reference: "",
+					},
+				];
+			}
+
+			return currentValue.map((payment) =>
+				enabledMethodIds.has(payment.method)
+					? payment
+					: {
+							...payment,
+							method: defaultMethodId,
+						},
+			);
+		});
+	}, [paymentMethodOptions]);
+
+	useEffect(() => {
+		if (!allowCreditSales) {
+			setIsCreditSale(false);
+		}
+	}, [allowCreditSales]);
+
 	const addPaymentMethod = useCallback(() => {
+		const defaultMethodId = getDefaultPaymentMethodId(paymentMethodOptions);
 		setPayments((prevPayments) => [
 			...prevPayments,
-			{ id: crypto.randomUUID(), method: "cash", amount: "", reference: "" },
+			{
+				id: crypto.randomUUID(),
+				method: defaultMethodId,
+				amount: "",
+				reference: "",
+			},
 		]);
-	}, []);
+	}, [paymentMethodOptions]);
 
 	const removePaymentMethod = useCallback((index: number) => {
 		setPayments((prevPayments) => prevPayments.filter((_, i) => i !== index));
@@ -45,11 +103,17 @@ export function usePosCheckout(
 	);
 
 	const resetPayments = useCallback(() => {
+		const defaultMethodId = getDefaultPaymentMethodId(paymentMethodOptions);
 		setPayments([
-			{ id: crypto.randomUUID(), method: "cash", amount: "", reference: "" },
+			{
+				id: crypto.randomUUID(),
+				method: defaultMethodId,
+				amount: "",
+				reference: "",
+			},
 		]);
 		setIsCreditSale(false);
-	}, []);
+	}, [paymentMethodOptions]);
 
 	const handleFinalizeSale = useCallback(() => {
 		if (!activeShiftId || cart.length === 0) {

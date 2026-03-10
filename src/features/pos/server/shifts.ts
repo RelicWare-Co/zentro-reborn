@@ -4,12 +4,17 @@ import { db } from "#/db";
 import {
 	cashMovement,
 	category,
+	organization,
 	payment,
 	product,
 	shift,
 	shiftClosure,
 } from "#/db/schema";
 import { requireAuthContext } from "./auth-context";
+import {
+	getEnabledPaymentMethods,
+	parseOrganizationSettingsMetadata,
+} from "#/features/settings/settings.shared";
 import {
 	CASH_MOVEMENT_TYPES,
 	type CloseShiftInput,
@@ -64,7 +69,8 @@ function buildExpectedAmountsByMethod(
 export async function getPosBootstrapForCurrentOrganization() {
 	const { session, organizationId } = await requireAuthContext();
 
-	const [activeShiftRows, categories, modifierProducts] = await Promise.all([
+	const [activeShiftRows, categories, modifierProducts, organizationRows] =
+		await Promise.all([
 		db
 			.select({
 				id: shift.id,
@@ -125,9 +131,26 @@ export async function getPosBootstrapForCurrentOrganization() {
 				),
 			)
 			.orderBy(asc(product.name)),
+		db
+			.select({
+				metadata: organization.metadata,
+			})
+			.from(organization)
+			.where(eq(organization.id, organizationId))
+			.limit(1),
 	]);
 
 	const activeShift = activeShiftRows[0] ?? null;
+	const organizationSettings = parseOrganizationSettingsMetadata(
+		organizationRows[0]?.metadata,
+	);
+	const paymentMethods = getEnabledPaymentMethods(organizationSettings).map(
+		(paymentMethod) => ({
+			id: paymentMethod.id,
+			label: paymentMethod.label,
+			requiresReference: paymentMethod.requiresReference,
+		}),
+	);
 
 	return {
 		activeShift: activeShift
@@ -139,6 +162,12 @@ export async function getPosBootstrapForCurrentOrganization() {
 			: null,
 		categories,
 		modifierProducts,
+		settings: {
+			defaultTerminalName: organizationSettings.pos.defaultTerminalName,
+			defaultStartingCash: organizationSettings.pos.defaultStartingCash,
+			paymentMethods,
+			allowCreditSales: organizationSettings.credit.allowCreditSales,
+		},
 	};
 }
 
@@ -147,9 +176,21 @@ export async function openShiftForCurrentOrganization(input: OpenShiftInput) {
 
 	const startingCash = toNonNegativeInteger(input.startingCash, "startingCash");
 	const terminalId = normalizeOptionalString(input.terminalId);
-	const terminalName = normalizeOptionalString(input.terminalName);
 	const notes = normalizeOptionalString(input.notes);
 	const openedAt = resolveDate(input.openedAt, "openedAt");
+	const organizationSettingsRows = await db
+		.select({
+			metadata: organization.metadata,
+		})
+		.from(organization)
+		.where(eq(organization.id, organizationId))
+		.limit(1);
+	const organizationSettings = parseOrganizationSettingsMetadata(
+		organizationSettingsRows[0]?.metadata,
+	);
+	const terminalName =
+		normalizeOptionalString(input.terminalName) ??
+		organizationSettings.pos.defaultTerminalName;
 
 	const [userOpenShift] = await db
 		.select({ id: shift.id })

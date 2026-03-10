@@ -55,6 +55,7 @@ function PosPage() {
 	const modifierProducts = (bootstrap.modifierProducts ?? []) as Product[];
 	const customers = customerSearchResult?.data ?? [];
 	const creditAccounts = creditAccountsSearchResult?.data ?? [];
+	const posSettings = bootstrap.settings;
 
 	// Credit account lookup
 	const creditAccountByCustomerId = useMemo(
@@ -82,6 +83,8 @@ function PosPage() {
 		cart.discountInput,
 		cart.clearCart,
 		() => cart.setDiscountInput("0"),
+		posSettings.paymentMethods,
+		posSettings.allowCreditSales,
 	);
 	const modifierModal = useModifierModal(cart.addToCart, modifierProducts);
 	const createCustomer = useCreateCustomerModal((customerId) => {
@@ -91,6 +94,11 @@ function PosPage() {
 	// Computed values for checkout modal
 	const projectedCreditBalance =
 		(selectedCustomerCreditAccount?.balance ?? 0) + checkout.remainingCreditAmount;
+
+	const handleOpenShift = useCallback(() => {
+		shift.setStartingCash(String(posSettings.defaultStartingCash));
+		shift.setIsShiftOpenModalOpen(true);
+	}, [posSettings.defaultStartingCash, shift]);
 
 	const handleCategoryChange = useCallback((categoryId: string) => {
 		setActiveCategoryId(categoryId);
@@ -118,18 +126,19 @@ function PosPage() {
 
 	const handleOpenShiftFromDialog = useCallback(() => {
 		setIsShiftRequiredDialogOpen(false);
-		shift.setIsShiftOpenModalOpen(true);
-	}, [shift]);
+		handleOpenShift();
+	}, [handleOpenShift]);
 
 	return (
 		<div className="flex flex-col h-full w-full bg-[var(--color-void)] text-[var(--color-photon)] overflow-hidden">
 			{/* Header */}
 			<PosHeader
 				activeShift={activeShift}
+				defaultTerminalName={posSettings.defaultTerminalName}
 				customers={customers}
 				selectedCustomerId={selectedCustomerId}
 				onCustomerChange={handleCustomerChange}
-				onOpenShift={() => shift.setIsShiftOpenModalOpen(true)}
+				onOpenShift={handleOpenShift}
 				onCashMovement={() => shift.setIsCashMovementModalOpen(true)}
 				onCloseShift={() => shift.setIsCloseShiftModalOpen(true)}
 				onCreateCustomer={() => createCustomer.setIsCreateCustomerModalOpen(true)}
@@ -250,6 +259,8 @@ function PosPage() {
 				discountInput={cart.discountInput}
 				setDiscountInput={cart.setDiscountInput}
 				payments={checkout.payments}
+				paymentMethodOptions={posSettings.paymentMethods}
+				allowCreditSales={posSettings.allowCreditSales}
 				isCreditSale={checkout.isCreditSale}
 				setIsCreditSale={checkout.setIsCreditSale}
 				selectedCustomerId={selectedCustomerId}

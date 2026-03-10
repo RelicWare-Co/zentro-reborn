@@ -5,6 +5,7 @@ import {
 	category,
 	creditAccount,
 	customer,
+	organization,
 	payment,
 	product,
 	sale,
@@ -12,8 +13,8 @@ import {
 	shift,
 } from "#/db/schema";
 import { requireAuthContext } from "#/features/pos/server/auth-context";
+import { parseOrganizationSettingsMetadata } from "#/features/settings/settings.shared";
 
-export const LOW_STOCK_THRESHOLD = 5;
 const TREND_DAYS = 7;
 const TOP_PRODUCTS_WINDOW_DAYS = 30;
 
@@ -162,6 +163,16 @@ export async function getDashboardOverviewForCurrentOrganization(): Promise<Dash
 	const trendStart = addDays(todayStart, -(TREND_DAYS - 1));
 	const topProductsStart = addDays(todayStart, -(TOP_PRODUCTS_WINDOW_DAYS - 1));
 	const saleDateKey = sql<string>`strftime('%Y-%m-%d', ${sale.createdAt} / 1000, 'unixepoch', 'localtime')`;
+	const organizationRows = await db
+		.select({
+			metadata: organization.metadata,
+		})
+		.from(organization)
+		.where(eq(organization.id, organizationId))
+		.limit(1);
+	const lowStockThreshold = parseOrganizationSettingsMetadata(
+		organizationRows[0]?.metadata,
+	).inventory.lowStockThreshold;
 
 	const saleBaseClauses = [
 		eq(sale.organizationId, organizationId),
@@ -291,7 +302,7 @@ export async function getDashboardOverviewForCurrentOrganization(): Promise<Dash
 					isNull(product.deletedAt),
 					eq(product.isModifier, false),
 					eq(product.trackInventory, true),
-					sql`${product.stock} <= ${LOW_STOCK_THRESHOLD}`,
+					sql`${product.stock} <= ${lowStockThreshold}`,
 				),
 			),
 		db
@@ -404,7 +415,7 @@ export async function getDashboardOverviewForCurrentOrganization(): Promise<Dash
 					isNull(product.deletedAt),
 					eq(product.isModifier, false),
 					eq(product.trackInventory, true),
-					sql`${product.stock} <= ${LOW_STOCK_THRESHOLD}`,
+					sql`${product.stock} <= ${lowStockThreshold}`,
 				),
 			)
 			.orderBy(asc(product.stock), asc(product.name))
@@ -438,7 +449,7 @@ export async function getDashboardOverviewForCurrentOrganization(): Promise<Dash
 
 	return {
 		generatedAt: now.getTime(),
-		lowStockThreshold: LOW_STOCK_THRESHOLD,
+		lowStockThreshold,
 		activeShift: activeShiftRow
 			? {
 					id: activeShiftRow.id,

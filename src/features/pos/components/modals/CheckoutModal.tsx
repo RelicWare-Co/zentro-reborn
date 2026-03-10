@@ -26,6 +26,12 @@ interface CheckoutModalProps {
 	discountInput: string;
 	setDiscountInput: (value: string) => void;
 	payments: PaymentMethod[];
+	paymentMethodOptions: Array<{
+		id: string;
+		label: string;
+		requiresReference: boolean;
+	}>;
+	allowCreditSales: boolean;
 	isCreditSale: boolean;
 	setIsCreditSale: (value: boolean) => void;
 	selectedCustomerId: string;
@@ -55,6 +61,8 @@ export function CheckoutModal({
 	discountInput,
 	setDiscountInput,
 	payments,
+	paymentMethodOptions,
+	allowCreditSales,
 	isCreditSale,
 	setIsCreditSale,
 	selectedCustomerId,
@@ -73,6 +81,9 @@ export function CheckoutModal({
 }: CheckoutModalProps) {
 	const discountInputId = useId();
 	const creditSaleId = useId();
+	const paymentMethodById = new Map(
+		paymentMethodOptions.map((paymentMethod) => [paymentMethod.id, paymentMethod]),
+	);
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
@@ -116,21 +127,27 @@ export function CheckoutModal({
 							<h4 className="text-sm font-semibold text-gray-300">
 								Métodos de Pago
 							</h4>
-							<div className="flex items-center gap-2">
-								<input
-									type="checkbox"
-									id={creditSaleId}
-									checked={isCreditSale}
-									onChange={(e) => setIsCreditSale(e.target.checked)}
-									className="w-4 h-4 rounded border-gray-700 bg-[#0a0a0a] text-[var(--color-voltage)] focus:ring-[var(--color-voltage)]"
-								/>
-								<label
-									htmlFor={creditSaleId}
-									className="text-sm text-gray-400 cursor-pointer"
-								>
-									Dejar saldo a crédito
-								</label>
-							</div>
+							{allowCreditSales ? (
+								<div className="flex items-center gap-2">
+									<input
+										type="checkbox"
+										id={creditSaleId}
+										checked={isCreditSale}
+										onChange={(e) => setIsCreditSale(e.target.checked)}
+										className="w-4 h-4 rounded border-gray-700 bg-[#0a0a0a] text-[var(--color-voltage)] focus:ring-[var(--color-voltage)]"
+									/>
+									<label
+										htmlFor={creditSaleId}
+										className="text-sm text-gray-400 cursor-pointer"
+									>
+										Dejar saldo a crédito
+									</label>
+								</div>
+							) : (
+								<span className="text-sm text-gray-500">
+									Crédito deshabilitado en ajustes
+								</span>
+							)}
 						</div>
 
 						{shouldCreateCreditBalance && !selectedCustomerId && (
@@ -182,11 +199,14 @@ export function CheckoutModal({
 						)}
 
 						<div className="space-y-3">
-							{payments.map((payment, index) => (
-								<div
-									key={payment.id}
-									className="flex flex-col gap-2 p-3 bg-[#0a0a0a] rounded-lg border border-gray-800 relative group"
-								>
+							{payments.map((payment, index) => {
+								const selectedPaymentMethod = paymentMethodById.get(payment.method);
+
+								return (
+									<div
+										key={payment.id}
+										className="flex flex-col gap-2 p-3 bg-[#0a0a0a] rounded-lg border border-gray-800 relative group"
+									>
 									{payments.length > 1 && (
 										<button
 											type="button"
@@ -209,12 +229,14 @@ export function CheckoutModal({
 												<SelectValue placeholder="Método" />
 											</SelectTrigger>
 											<SelectContent className="bg-[#151515] border-gray-700 text-white">
-												<SelectItem value="cash">Efectivo</SelectItem>
-												<SelectItem value="card">Tarjeta</SelectItem>
-												<SelectItem value="transfer_nequi">Nequi</SelectItem>
-												<SelectItem value="transfer_bancolombia">
-													Bancolombia
-												</SelectItem>
+												{paymentMethodOptions.map((paymentMethodOption) => (
+													<SelectItem
+														key={paymentMethodOption.id}
+														value={paymentMethodOption.id}
+													>
+														{paymentMethodOption.label}
+													</SelectItem>
+												))}
 											</SelectContent>
 										</Select>
 
@@ -234,7 +256,7 @@ export function CheckoutModal({
 										</div>
 									</div>
 
-									{payment.method !== "cash" && (
+									{selectedPaymentMethod?.requiresReference ? (
 										<Input
 											placeholder="Referencia (Ej. últimos 4 dígitos o voucher)"
 											value={payment.reference}
@@ -243,9 +265,10 @@ export function CheckoutModal({
 											}
 											className="h-9 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)] text-sm"
 										/>
-									)}
-								</div>
-							))}
+									) : null}
+									</div>
+								);
+							})}
 
 							<Button
 								variant="outline"

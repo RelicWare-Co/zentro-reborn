@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthSettingsRouteImport } from './routes/_auth/settings'
 import { Route as AuthSalesRouteImport } from './routes/_auth/sales'
 import { Route as AuthProductsRouteImport } from './routes/_auth/products'
 import { Route as AuthPosRouteImport } from './routes/_auth/pos'
@@ -31,6 +32,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthSettingsRoute = AuthSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthRoute,
 } as any)
 const AuthSalesRoute = AuthSalesRouteImport.update({
   id: '/sales',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/pos': typeof AuthPosRoute
   '/products': typeof AuthProductsRoute
   '/sales': typeof AuthSalesRoute
+  '/settings': typeof AuthSettingsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/pos': typeof AuthPosRoute
   '/products': typeof AuthProductsRoute
   '/sales': typeof AuthSalesRoute
+  '/settings': typeof AuthSettingsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/_auth/pos': typeof AuthPosRoute
   '/_auth/products': typeof AuthProductsRoute
   '/_auth/sales': typeof AuthSalesRoute
+  '/_auth/settings': typeof AuthSettingsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/pos'
     | '/products'
     | '/sales'
+    | '/settings'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
     | '/pos'
     | '/products'
     | '/sales'
+    | '/settings'
     | '/api/auth/$'
   id:
     | '__root__'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '/_auth/pos'
     | '/_auth/products'
     | '/_auth/sales'
+    | '/_auth/settings'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
@@ -147,6 +159,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_auth/settings': {
+      id: '/_auth/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthSettingsRouteImport
+      parentRoute: typeof AuthRoute
     }
     '/_auth/sales': {
       id: '/_auth/sales'
@@ -191,6 +210,7 @@ interface AuthRouteChildren {
   AuthPosRoute: typeof AuthPosRoute
   AuthProductsRoute: typeof AuthProductsRoute
   AuthSalesRoute: typeof AuthSalesRoute
+  AuthSettingsRoute: typeof AuthSettingsRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
@@ -198,6 +218,7 @@ const AuthRouteChildren: AuthRouteChildren = {
   AuthPosRoute: AuthPosRoute,
   AuthProductsRoute: AuthProductsRoute,
   AuthSalesRoute: AuthSalesRoute,
+  AuthSettingsRoute: AuthSettingsRoute,
 }
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)

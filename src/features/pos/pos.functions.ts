@@ -3,8 +3,8 @@ import { z } from "zod";
 import {
 	closeShiftForCurrentOrganization,
 	createPosSaleForCurrentOrganization,
-	getSaleByIdForCurrentOrganization,
 	getPosBootstrapForCurrentOrganization,
+	getSaleByIdForCurrentOrganization,
 	getShiftCloseSummaryForCurrentOrganization,
 	listSalesForCurrentOrganization,
 	openShiftForCurrentOrganization,

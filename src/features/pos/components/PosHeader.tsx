@@ -21,6 +21,7 @@ import type { ActiveShift, PosCustomer } from "../types";
 
 interface PosHeaderProps {
 	activeShift: ActiveShift | null;
+	defaultTerminalName: string;
 	customers: PosCustomer[];
 	selectedCustomerId: string;
 	onCustomerChange: (customerId: string) => void;
@@ -32,6 +33,7 @@ interface PosHeaderProps {
 
 export function PosHeader({
 	activeShift,
+	defaultTerminalName,
 	customers,
 	selectedCustomerId,
 	onCustomerChange,
@@ -65,7 +67,7 @@ export function PosHeader({
 						}`}
 					/>
 					<span className="font-semibold text-white">
-						{activeShift?.terminalName || "Caja Principal"}
+						{activeShift?.terminalName || defaultTerminalName}
 					</span>
 					<span className="text-gray-400 text-xs px-1.5 py-0.5 bg-gray-800 rounded-md">
 						{activeShift ? "Abierta" : "Cerrada"}

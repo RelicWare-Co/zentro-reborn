@@ -192,14 +192,28 @@ export function SaleDetailSheet({
 											>
 												<div className="flex items-center justify-between gap-3">
 													<div>
-														<p className="font-medium text-white">
-															{formatPaymentMethodLabel(payment.method)}
-														</p>
+														<div className="flex items-center gap-2">
+															<p className="font-medium text-white">
+																{formatPaymentMethodLabel(payment.method)}
+															</p>
+															<Badge
+																className={getPaymentKindBadgeClass(
+																	payment.kind,
+																)}
+															>
+																{formatPaymentKind(payment.kind)}
+															</Badge>
+														</div>
 														<p className="text-sm text-gray-400">
 															{payment.reference?.trim()
 																? `Ref. ${payment.reference}`
 																: "Sin referencia"}
 														</p>
+														{payment.notes ? (
+															<p className="mt-1 text-xs text-gray-500">
+																{payment.notes}
+															</p>
+														) : null}
 													</div>
 													<div className="flex items-center gap-3">
 														<p className="font-medium text-white">
@@ -634,6 +648,22 @@ function getSaleStatusBadgeClass(status: string) {
 	return "border-gray-700 bg-gray-800/80 text-gray-300 hover:bg-gray-800/80";
 }
 
+function formatPaymentKind(kind: string) {
+	if (kind === "debt_payment") {
+		return "Abono";
+	}
+
+	return "Pago inicial";
+}
+
+function getPaymentKindBadgeClass(kind: string) {
+	if (kind === "debt_payment") {
+		return "border-sky-500/20 bg-sky-500/10 text-sky-300 hover:bg-sky-500/10";
+	}
+
+	return "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/10";
+}
+
 function formatCustomerMeta(sale: NonNullable<SaleDetail>) {
 	if (!sale.customer) {
 		return "Sin cliente registrado";
@@ -707,6 +737,11 @@ function buildPaymentReceiptPayload({
 		method: payment.method,
 		amount: payment.amount,
 		reference: payment.reference,
+		notes: payment.notes,
 		remainingSaleBalance: Math.max(sale.totalAmount - paidUntilThisPayment, 0),
+		title:
+			payment.kind === "debt_payment"
+				? "Comprobante de abono"
+				: "Comprobante de pago",
 	};
 }

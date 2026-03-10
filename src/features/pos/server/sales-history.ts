@@ -1,7 +1,17 @@
 import "@tanstack/react-start/server-only";
 import { and, desc, eq, gte, inArray, like, lt, or, sql } from "drizzle-orm";
 import { db } from "#/db";
-import { customer, payment, product, sale, saleItem, saleItemModifier, shift, user } from "#/db/schema";
+import {
+	creditTransaction,
+	customer,
+	payment,
+	product,
+	sale,
+	saleItem,
+	saleItemModifier,
+	shift,
+	user,
+} from "#/db/schema";
 import { requireAuthContext } from "./auth-context";
 import type { GetSaleByIdInput, ListSalesInput } from "./types";
 
@@ -39,7 +49,9 @@ function parseDateBoundary(value: string | null | undefined) {
 	return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.getTime();
 }
 
-export async function listSalesForCurrentOrganization(input: ListSalesInput = {}) {
+export async function listSalesForCurrentOrganization(
+	input: ListSalesInput = {},
+) {
 	const { organizationId } = await requireAuthContext();
 	const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
 	const cursor = Math.max(input.cursor ?? 0, 0);
@@ -65,7 +77,11 @@ export async function listSalesForCurrentOrganization(input: ListSalesInput = {}
 				.filter((saleId): saleId is string => Boolean(saleId))
 		: null;
 
-	if (input.paymentMethod && (!filteredSaleIdsByPaymentMethod || filteredSaleIdsByPaymentMethod.length === 0)) {
+	if (
+		input.paymentMethod &&
+		(!filteredSaleIdsByPaymentMethod ||
+			filteredSaleIdsByPaymentMethod.length === 0)
+	) {
 		return {
 			data: [],
 			total: 0,
@@ -120,7 +136,10 @@ export async function listSalesForCurrentOrganization(input: ListSalesInput = {}
 			.leftJoin(user, eq(user.id, sale.userId))
 			.leftJoin(
 				shift,
-				and(eq(shift.id, sale.shiftId), eq(shift.organizationId, organizationId)),
+				and(
+					eq(shift.id, sale.shiftId),
+					eq(shift.organizationId, organizationId),
+				),
 			)
 			.where(and(...whereConditions))
 			.orderBy(desc(sale.createdAt), desc(sale.id))
@@ -239,7 +258,9 @@ export async function listSalesForCurrentOrganization(input: ListSalesInput = {}
 	};
 }
 
-export async function getSaleByIdForCurrentOrganization(input: GetSaleByIdInput) {
+export async function getSaleByIdForCurrentOrganization(
+	input: GetSaleByIdInput,
+) {
 	const { organizationId } = await requireAuthContext();
 
 	const saleRows = await db
@@ -270,15 +291,14 @@ export async function getSaleByIdForCurrentOrganization(input: GetSaleByIdInput)
 				eq(customer.organizationId, organizationId),
 			),
 		)
-		.leftJoin(
-			user,
-			eq(user.id, sale.userId),
-		)
+		.leftJoin(user, eq(user.id, sale.userId))
 		.leftJoin(
 			shift,
 			and(eq(shift.id, sale.shiftId), eq(shift.organizationId, organizationId)),
 		)
-		.where(and(eq(sale.id, input.saleId), eq(sale.organizationId, organizationId)))
+		.where(
+			and(eq(sale.id, input.saleId), eq(sale.organizationId, organizationId)),
+		)
 		.limit(1);
 
 	const saleRow = saleRows[0];
@@ -294,8 +314,17 @@ export async function getSaleByIdForCurrentOrganization(input: GetSaleByIdInput)
 				reference: payment.reference,
 				amount: payment.amount,
 				createdAt: payment.createdAt,
+				creditTransactionType: creditTransaction.type,
+				creditTransactionNotes: creditTransaction.notes,
 			})
 			.from(payment)
+			.leftJoin(
+				creditTransaction,
+				and(
+					eq(creditTransaction.paymentId, payment.id),
+					eq(creditTransaction.organizationId, organizationId),
+				),
+			)
 			.where(
 				and(
 					eq(payment.organizationId, organizationId),
@@ -392,6 +421,11 @@ export async function getSaleByIdForCurrentOrganization(input: GetSaleByIdInput)
 		reference: paymentRow.reference,
 		amount: normalizeNumber(paymentRow.amount),
 		createdAt: normalizeTimestamp(paymentRow.createdAt),
+		kind:
+			paymentRow.creditTransactionType === "payment"
+				? "debt_payment"
+				: "sale_payment",
+		notes: paymentRow.creditTransactionNotes,
 	}));
 	const paidAmount = payments.reduce(
 		(total, currentPayment) => total + currentPayment.amount,

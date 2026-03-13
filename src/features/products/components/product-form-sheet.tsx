@@ -35,13 +35,13 @@ export const EMPTY_PRODUCT_FORM = {
 	isModifier: false,
 };
 
-type Categoría = Awaited<ReturnType<typeof getCategories>>[number];
+type Category = Awaited<ReturnType<typeof getCategories>>[number];
 
 interface ProductFormSheetProps {
 	isOpen: boolean;
 	onOpenChange: (open: boolean) => void;
 	editingProduct: Product | null;
-	categories: Categoría[];
+	categories: Category[];
 	onSave: (payload: {
 		id?: string;
 		name: string;

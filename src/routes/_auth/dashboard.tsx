@@ -92,7 +92,7 @@ function DashboardPage() {
 						Resumen operativo
 					</Badge>
 					<div className="space-y-2">
-						<h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+						<h1 className="text-3xl font-bold tracking-tight">Panel de control</h1>
 						<p className="max-w-2xl text-sm text-gray-400 md:text-base">
 							Ventas, clientes, crédito e inventario en una sola vista para
 							tomar decisiones rápidas durante el día.
@@ -395,7 +395,7 @@ function DashboardPage() {
 			<section className="grid gap-6 xl:grid-cols-2">
 				<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
 					<CardHeader>
-						<CardTitle>Productos mas vendidos</CardTitle>
+						<CardTitle>Productos más vendidos</CardTitle>
 						<CardDescription className="text-gray-400">
 							Top de los ultimos 30 dias para vigilar rotacion y stock.
 						</CardDescription>

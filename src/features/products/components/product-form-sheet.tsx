@@ -1,5 +1,4 @@
 import { useEffect, useId, useState } from "react";
-import { formatMoneyInput, parseMoneyInput, sanitizeMoneyInput } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +20,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import type { Product } from "@/features/products/hooks/use-products";
 import type { getCategories } from "@/features/products/products.functions";
+import { formatMoneyInput, parseMoneyInput, sanitizeMoneyInput } from "@/lib/utils";
 
 export const EMPTY_PRODUCT_FORM = {
 	name: "",
@@ -35,13 +35,13 @@ export const EMPTY_PRODUCT_FORM = {
 	isModifier: false,
 };
 
-type Category = Awaited<ReturnType<typeof getCategories>>[number];
+type Categoría = Awaited<ReturnType<typeof getCategories>>[number];
 
 interface ProductFormSheetProps {
 	isOpen: boolean;
 	onOpenChange: (open: boolean) => void;
 	editingProduct: Product | null;
-	categories: Category[];
+	categories: Categoría[];
 	onSave: (payload: {
 		id?: string;
 		name: string;
@@ -125,25 +125,25 @@ export function ProductFormSheet({
 				<form onSubmit={handleSave} className="flex flex-col h-full">
 					<SheetHeader className="p-6 border-b border-gray-800">
 						<SheetTitle className="text-xl">
-							{editingProduct ? "Edit Product" : "Create Product"}
+							{editingProduct ? "Editar Producto" : "Crear Producto"}
 						</SheetTitle>
 						<SheetDescription className="text-gray-400">
 							{editingProduct
-								? "Update the details of this product."
-								: "Add a new product to your inventory."}
+							? "Actualiza los detalles de este producto."
+							: "Agrega un nuevo producto a tu inventario."}
 						</SheetDescription>
 					</SheetHeader>
 
 					<div className="flex-1 p-6 space-y-8 overflow-y-auto">
-						{/* Basic Information */}
+						{/* Información Básica */}
 						<div className="space-y-4">
 							<h3 className="text-sm font-semibold text-[var(--color-voltage)] uppercase tracking-wider">
-								Basic Information
+								Información Básica
 							</h3>
 
 							<div className="space-y-2">
 								<Label htmlFor={nameId} className="text-gray-300">
-									Name <span className="text-red-500">*</span>
+									Nombre <span className="text-red-500">*</span>
 								</Label>
 								<Input
 									id={nameId}
@@ -154,7 +154,7 @@ export function ProductFormSheet({
 											name: e.target.value,
 										}))
 									}
-									placeholder="e.g., Capuccino"
+									placeholder="ej., Capuccino"
 									className="bg-black/20 border-gray-700 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20"
 									required
 								/>
@@ -162,7 +162,7 @@ export function ProductFormSheet({
 
 							<div className="space-y-2">
 								<Label htmlFor={categoryId} className="text-gray-300">
-									Category
+									Categoría
 								</Label>
 								<Select
 									value={productForm.categoryId || "none"}
@@ -204,13 +204,13 @@ export function ProductFormSheet({
 												sku: e.target.value,
 											}))
 										}
-										placeholder="e.g., COF-CAP-001"
+										placeholder="ej., COF-CAP-001"
 										className="bg-black/20 border-gray-700 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20"
 									/>
 								</div>
 								<div className="space-y-2">
 									<Label htmlFor={barcodeId} className="text-gray-300">
-										Barcode
+										Código de barras
 									</Label>
 									<Input
 										id={barcodeId}
@@ -221,23 +221,23 @@ export function ProductFormSheet({
 												barcode: e.target.value,
 											}))
 										}
-										placeholder="Scan or enter barcode"
+										placeholder="Escanear o ingresar código de barras"
 										className="bg-black/20 border-gray-700 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20"
 									/>
 								</div>
 							</div>
 						</div>
 
-						{/* Pricing */}
+						{/* Precios */}
 						<div className="space-y-4">
 							<h3 className="text-sm font-semibold text-[var(--color-voltage)] uppercase tracking-wider">
-								Pricing
+								Precios
 							</h3>
 
 							<div className="grid grid-cols-2 gap-4">
 								<div className="space-y-2">
 									<Label htmlFor={priceId} className="text-gray-300">
-										Unit Price (COP) <span className="text-red-500">*</span>
+										Precio unitario (COP) <span className="text-red-500">*</span>
 									</Label>
 									<Input
 										id={priceId}
@@ -257,7 +257,7 @@ export function ProductFormSheet({
 								</div>
 								<div className="space-y-2">
 									<Label htmlFor={costId} className="text-gray-300">
-										Cost (COP)
+										Costo (COP)
 									</Label>
 									<Input
 										id={costId}
@@ -278,7 +278,7 @@ export function ProductFormSheet({
 
 							<div className="space-y-2">
 								<Label htmlFor={taxRateId} className="text-gray-300">
-									Tax Rate (%)
+									Tasa de impuesto (%)
 								</Label>
 								<Input
 									id={taxRateId}

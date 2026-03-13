@@ -462,9 +462,9 @@ function ProductsPage() {
 	return (
 		<main className="flex-1 p-6 md:p-8 lg:p-12 space-y-6 bg-[var(--color-void)] text-[var(--color-photon)] font-sans">
 			<div className="flex items-baseline gap-3">
-				<h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
+				<h1 className="text-3xl font-bold tracking-tight">Inventario</h1>
 				<span className="text-gray-400 text-sm">
-					({products.length} products, {categories.length} categories)
+					({products.length} productos, {categories.length} categorías)
 				</span>
 			</div>
 
@@ -474,13 +474,13 @@ function ProductsPage() {
 						value="products"
 						className="data-[state=active]:bg-[#c9e605] data-[state=active]:text-black"
 					>
-						Products
+						Productos
 					</TabsTrigger>
 					<TabsTrigger
 						value="categories"
 						className="data-[state=active]:bg-[#c9e605] data-[state=active]:text-black"
 					>
-						Categories
+						Categorías
 					</TabsTrigger>
 				</TabsList>
 
@@ -490,7 +490,7 @@ function ProductsPage() {
 							<div className="relative">
 								<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
 								<Input
-									placeholder="Search for inventory"
+									placeholder="Buscar en inventario"
 									value={globalFilter}
 									onChange={(e) => setGlobalFilter(e.target.value)}
 									className="pl-9 bg-[var(--color-carbon)] border-gray-800 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20 w-full sm:w-[250px] rounded-lg"
@@ -502,7 +502,7 @@ function ProductsPage() {
 								className="bg-[var(--color-carbon)] border-gray-800 text-gray-300 hover:bg-white/5 hover:text-white rounded-lg"
 							>
 								<Filter className="h-4 w-4 mr-2" />
-								Filter
+								Filtrar
 							</Button>
 
 							<Select
@@ -518,10 +518,10 @@ function ProductsPage() {
 								}}
 							>
 								<SelectTrigger className="w-[160px] bg-[var(--color-carbon)] border-gray-800 text-gray-300 rounded-lg hidden sm:flex">
-									<SelectValue placeholder="Category" />
+									<SelectValue placeholder="Categoría" />
 								</SelectTrigger>
 								<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
-									<SelectItem value="all">All</SelectItem>
+									<SelectItem value="all">Todas</SelectItem>
 									{categories.map((item) => (
 										<SelectItem key={item.id} value={item.name}>
 											{item.name}
@@ -546,7 +546,7 @@ function ProductsPage() {
 								onClick={() => setIsSheetOpen(true)}
 							>
 								<Plus className="w-4 h-4 mr-2" />
-								Add Product
+							Agregar Producto
 							</Button>
 						</div>
 
@@ -615,7 +615,7 @@ function ProductsPage() {
 											colSpan={columns.length}
 											className="h-32 text-center text-gray-500"
 										>
-											No products found.
+											No se encontraron productos.
 										</TableCell>
 									</TableRow>
 								)}
@@ -625,7 +625,7 @@ function ProductsPage() {
 						<div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-gray-800 text-sm text-gray-400 bg-black/10 gap-4 sm:gap-0">
 							<div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
 								<div className="flex items-center gap-2">
-									<span>Show</span>
+									<span>Mostrar</span>
 									<Select
 										value={`${table.getState().pagination.pageSize}`}
 										onValueChange={(value) => table.setPageSize(Number(value))}
@@ -643,7 +643,7 @@ function ProductsPage() {
 											))}
 										</SelectContent>
 									</Select>
-									<span>row</span>
+									<span>filas</span>
 								</div>
 
 								<div className="hidden sm:block">
@@ -656,7 +656,7 @@ function ProductsPage() {
 											table.getState().pagination.pageSize,
 										table.getFilteredRowModel().rows.length,
 									)}{" "}
-									of {table.getFilteredRowModel().rows.length} results
+									de {table.getFilteredRowModel().rows.length} resultados
 								</div>
 							</div>
 
@@ -668,7 +668,7 @@ function ProductsPage() {
 									onClick={() => table.previousPage()}
 									disabled={!table.getCanPreviousPage()}
 								>
-									Previous
+									Anterior
 								</Button>
 								<Button
 									variant="default"
@@ -677,7 +677,7 @@ function ProductsPage() {
 									onClick={() => table.nextPage()}
 									disabled={!table.getCanNextPage()}
 								>
-									Next
+									Siguiente
 								</Button>
 							</div>
 						</div>
@@ -686,13 +686,13 @@ function ProductsPage() {
 
 				<TabsContent value="categories" className="space-y-6 mt-0">
 					<div className="flex justify-between items-center">
-						<h2 className="text-xl font-semibold">Categories</h2>
+						<h2 className="text-xl font-semibold">Categorías</h2>
 						<Button
 							className="bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-semibold rounded-lg px-4 py-2 h-10 w-full sm:w-auto shrink-0"
 							onClick={openCreateCategoryDialog}
 						>
 							<Plus className="w-4 h-4 mr-2" />
-							Add Category
+							Agregar Categoría
 						</Button>
 					</div>
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -726,7 +726,7 @@ function ProductsPage() {
 						))}
 						{categories.length === 0 && (
 							<div className="col-span-full h-32 flex items-center justify-center text-gray-500 border border-dashed border-gray-800 rounded-xl">
-								No categories found. Click "Add Category" to create one.
+								No se encontraron categorías. Haz clic en "Agregar Categoría" para crear una.
 							</div>
 						)}
 					</div>
@@ -749,27 +749,27 @@ function ProductsPage() {
 				<DialogContent className="bg-[var(--color-carbon)] border-gray-800 text-white sm:max-w-[480px]">
 					<DialogHeader>
 						<DialogTitle>
-							{selectedCategory ? "Edit Category" : "Create Category"}
+							{selectedCategory ? "Editar Categoría" : "Crear Categoría"}
 						</DialogTitle>
 					</DialogHeader>
 					<div className="space-y-4 py-2">
 						<div className="grid gap-2">
-							<Label htmlFor={categoryNameId}>Name</Label>
+							<Label htmlFor={categoryNameId}>Nombre</Label>
 							<Input
 								id={categoryNameId}
 								value={categoryName}
 								onChange={(event) => setCategoryName(event.target.value)}
-								placeholder="Category name"
+								placeholder="Nombre de la categoría"
 								className="bg-black/20 border-gray-700"
 							/>
 						</div>
 						<div className="grid gap-2">
-							<Label htmlFor={categoryDescriptionId}>Description</Label>
+							<Label htmlFor={categoryDescriptionId}>Descripción</Label>
 							<Textarea
 								id={categoryDescriptionId}
 								value={categoryDescription}
 								onChange={(event) => setCategoryDescription(event.target.value)}
-								placeholder="Optional"
+								placeholder="Opcional"
 								className="min-h-[72px] bg-black/20 border-gray-700"
 							/>
 						</div>
@@ -786,7 +786,7 @@ function ProductsPage() {
 								className="border-red-900/40 text-red-400 hover:bg-red-900/20"
 							>
 								<Trash2 className="w-4 h-4 mr-2" />
-								Delete
+								Eliminar
 							</Button>
 						) : (
 							<span />
@@ -795,8 +795,8 @@ function ProductsPage() {
 							<Button
 								variant="ghost"
 								onClick={() => setIsCategoryDialogOpen(false)}
-							>
-								Cancel
+						>
+							Cancelar
 							</Button>
 							<Button
 								onClick={
@@ -1109,7 +1109,7 @@ function ProductsPage() {
 								onChange={(event) =>
 									setInventoryMovementNotes(event.target.value)
 								}
-								placeholder="Optional"
+								placeholder="Opcional"
 								className="min-h-[72px] bg-black/20 border-gray-700"
 							/>
 						</div>

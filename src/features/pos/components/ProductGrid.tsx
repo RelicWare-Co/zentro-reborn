@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import type { Category, Product } from "../types";
 import { CategoryTabs } from "./CategoryTabs";
 import { ProductCard } from "./ProductCard";
@@ -16,6 +17,7 @@ interface ProductGridProps {
 	onCategoryChange: (categoryId: string) => void;
 	onSearchChange: (query: string) => void;
 	onProductSelect: (product: Product) => void;
+	className?: string;
 }
 
 export function ProductGrid({
@@ -29,11 +31,17 @@ export function ProductGrid({
 	onCategoryChange,
 	onSearchChange,
 	onProductSelect,
+	className,
 }: ProductGridProps) {
 	const regularProducts = products.filter((product) => !product.isModifier);
 
 	return (
-		<div className="flex-1 flex flex-col min-w-0 border-r border-gray-800 h-full">
+		<div
+			className={cn(
+				"flex-1 flex flex-col min-w-0 border-r border-gray-800 h-full",
+				className,
+			)}
+		>
 			<div className="p-4 space-y-4 shrink-0 border-b border-gray-800/50 bg-[#0a0a0a]">
 				<div className="flex items-center gap-4">
 					<div className="relative flex-1 max-w-md">
@@ -58,8 +66,7 @@ export function ProductGrid({
 				<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 pb-6">
 					{regularProducts.map((product) => {
 						const qty = getProductQuantity(product.id);
-						const isOutOfStock =
-							product.trackInventory && product.stock <= 0;
+						const isOutOfStock = product.trackInventory && product.stock <= 0;
 
 						return (
 							<ProductCard

@@ -1,5 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { ShoppingCart } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	Drawer,
+	DrawerContent,
+	DrawerDescription,
+	DrawerHeader,
+	DrawerTitle,
+} from "@/components/ui/drawer";
 import { CartPanel } from "@/features/pos/components/CartPanel";
 import { CashMovementModal } from "@/features/pos/components/modals/CashMovementModal";
 import { CheckoutModal } from "@/features/pos/components/modals/CheckoutModal";
@@ -24,8 +33,9 @@ import { usePosShift } from "@/features/pos/hooks/usePosShift";
 import { getPosBootstrap } from "@/features/pos/pos.functions";
 import { printThermalReceipt } from "@/features/pos/printing/printThermalReceipt";
 import { buildSaleReceiptDocument } from "@/features/pos/printing/receiptDocuments";
-
 import type { Category, Product } from "@/features/pos/types";
+import { formatCurrency } from "@/features/pos/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export const Route = createFileRoute("/_auth/pos")({
 	loader: () => getPosBootstrap(),
@@ -41,6 +51,7 @@ function PosPage() {
 	const [selectedCustomerId, setSelectedCustomerId] = useState("");
 	const [isShiftRequiredDialogOpen, setIsShiftRequiredDialogOpen] =
 		useState(false);
+	const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
 	// Data queries
 	const { data: bootstrap = bootstrapData } = usePosBootstrap(bootstrapData);
@@ -51,6 +62,7 @@ function PosPage() {
 
 	// Derived data
 	const activeShift = bootstrap.activeShift;
+	const isMobile = useIsMobile();
 	const categories = useMemo<Category[]>(
 		() => [{ id: "all", name: "Todos" }, ...bootstrap.categories],
 		[bootstrap.categories],
@@ -172,6 +184,17 @@ function PosPage() {
 	const projectedCreditBalance =
 		(selectedCustomerCreditAccount?.balance ?? 0) +
 		checkout.remainingCreditAmount;
+	const cartItemLabel = cart.totalItems === 1 ? "articulo" : "articulos";
+	const mobileCartDescription =
+		cart.totalItems > 0
+			? "Revisa la orden y continua con el cobro"
+			: "Agrega productos para empezar una venta";
+
+	useEffect(() => {
+		if (!isMobile) {
+			setIsMobileCartOpen(false);
+		}
+	}, [isMobile]);
 
 	const handleOpenShift = useCallback(() => {
 		shift.setStartingCash(String(posSettings.defaultStartingCash));
@@ -207,6 +230,11 @@ function PosPage() {
 		handleOpenShift();
 	}, [handleOpenShift]);
 
+	const handleCheckout = useCallback(() => {
+		setIsMobileCartOpen(false);
+		checkout.setIsCheckoutModalOpen(true);
+	}, [checkout.setIsCheckoutModalOpen]);
+
 	return (
 		<div className="flex flex-col h-full w-full bg-[var(--color-void)] text-[var(--color-photon)] overflow-hidden">
 			{/* Header */}
@@ -225,8 +253,9 @@ function PosPage() {
 			/>
 
 			{/* Main Content */}
-			<div className="flex flex-1 min-h-0">
+			<div className="flex flex-1 min-h-0 flex-col md:flex-row">
 				<ProductGrid
+					className="border-r-0 md:border-r"
 					categories={categories}
 					activeCategoryId={activeCategoryId}
 					searchQuery={searchQuery}
@@ -240,6 +269,7 @@ function PosPage() {
 				/>
 
 				<CartPanel
+					className="hidden md:flex"
 					cart={cart.cart}
 					totalItems={cart.totalItems}
 					totals={cart.totals}
@@ -248,9 +278,71 @@ function PosPage() {
 					onRemoveItem={cart.removeFromCart}
 					onUpdateItemDiscount={cart.updateItemDiscount}
 					onClearCart={cart.clearCart}
-					onCheckout={() => checkout.setIsCheckoutModalOpen(true)}
+					onCheckout={handleCheckout}
 				/>
 			</div>
+
+			<div className="border-t border-gray-800 bg-[var(--color-carbon)] p-3 md:hidden">
+				<Button
+					type="button"
+					variant="outline"
+					onClick={() => setIsMobileCartOpen(true)}
+					className="h-auto w-full justify-between border-gray-700 bg-[#0f0f0f] px-4 py-3 text-left text-white hover:border-gray-600 hover:bg-[#151515] hover:text-white"
+				>
+					<div className="flex min-w-0 items-center gap-3">
+						<div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]">
+							<ShoppingCart className="h-5 w-5" />
+						</div>
+						<div className="min-w-0">
+							<p className="truncate text-sm font-semibold text-white">
+								{cart.totalItems > 0
+									? `${cart.totalItems} ${cartItemLabel}`
+									: "Orden vacia"}
+							</p>
+							<p className="truncate text-xs text-gray-400">
+								{mobileCartDescription}
+							</p>
+						</div>
+					</div>
+					<div className="shrink-0 text-right">
+						<p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+							Total
+						</p>
+						<p className="text-lg font-bold text-[var(--color-voltage)]">
+							{formatCurrency(cart.totals.totalAmount)}
+						</p>
+					</div>
+				</Button>
+			</div>
+
+			<Drawer
+				open={isMobileCartOpen}
+				onOpenChange={setIsMobileCartOpen}
+				direction="bottom"
+			>
+				<DrawerContent className="max-h-[85vh] border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)]">
+					<DrawerHeader className="sr-only">
+						<DrawerTitle className="text-white">Orden actual</DrawerTitle>
+						<DrawerDescription className="text-gray-400">
+							{cart.totalItems > 0
+								? `${cart.totalItems} ${cartItemLabel} en la venta`
+								: "Tu carrito esta vacio"}
+						</DrawerDescription>
+					</DrawerHeader>
+					<CartPanel
+						className="h-[75vh] w-full border-l-0"
+						cart={cart.cart}
+						totalItems={cart.totalItems}
+						totals={cart.totals}
+						isActiveShift={Boolean(activeShift)}
+						onUpdateQuantity={cart.updateQuantity}
+						onRemoveItem={cart.removeFromCart}
+						onUpdateItemDiscount={cart.updateItemDiscount}
+						onClearCart={cart.clearCart}
+						onCheckout={handleCheckout}
+					/>
+				</DrawerContent>
+			</Drawer>
 
 			{/* Modals */}
 			<OpenShiftModal

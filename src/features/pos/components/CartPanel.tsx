@@ -1,6 +1,7 @@
 import { Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import type { CartItem, CartTotals } from "../types";
 import { formatCurrency } from "../utils";
 import { CartItemCard } from "./CartItemCard";
@@ -15,6 +16,7 @@ interface CartPanelProps {
 	onUpdateItemDiscount: (cartItemId: string, value: string) => void;
 	onClearCart: () => void;
 	onCheckout: () => void;
+	className?: string;
 }
 
 export function CartPanel({
@@ -27,12 +29,18 @@ export function CartPanel({
 	onUpdateItemDiscount,
 	onClearCart,
 	onCheckout,
+	className,
 }: CartPanelProps) {
 	const { subTotal, tax, discountAmount, totalAmount } = totals;
 	const hasDiscount = discountAmount > 0;
 
 	return (
-		<div className="w-[380px] bg-[var(--color-carbon)] flex flex-col shrink-0 h-full border-l border-gray-800">
+		<div
+			className={cn(
+				"w-[380px] bg-[var(--color-carbon)] flex flex-col shrink-0 h-full border-l border-gray-800",
+				className,
+			)}
+		>
 			{/* Header */}
 			<div className="p-4 border-b border-gray-800 flex items-center justify-between shrink-0 bg-[#0f0f0f]">
 				<div>

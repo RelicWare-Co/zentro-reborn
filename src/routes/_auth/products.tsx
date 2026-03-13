@@ -8,18 +8,32 @@ import {
 	getSortedRowModel,
 	useReactTable,
 } from "@tanstack/react-table";
-import { Edit3, Filter, Plus, Search, Trash2 } from "lucide-react";
+import {
+	ChevronsUpDown,
+	Edit3,
+	Filter,
+	PackagePlus,
+	Plus,
+	Search,
+	Trash2,
+} from "lucide-react";
 import { useCallback, useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import {
 	Select,
 	SelectContent,
@@ -46,11 +60,18 @@ import {
 	useProductsQueries,
 } from "@/features/products/hooks/use-products";
 import { getProducts } from "@/features/products/products.functions";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_auth/products")({
 	loader: () => getProducts(),
 	component: ProductsPage,
 });
+
+const currencyFormatter = new Intl.NumberFormat("es-CO", {
+	maximumFractionDigits: 0,
+});
+
+const normalizeSearchTerm = (value: string) => value.trim().toLowerCase();
 
 function ProductsPage() {
 	const loaderProducts = Route.useLoaderData();
@@ -73,14 +94,54 @@ function ProductsPage() {
 	const [inventoryMovementQuantity, setInventoryMovementQuantity] =
 		useState("");
 	const [inventoryMovementNotes, setInventoryMovementNotes] = useState("");
+	const [isInventoryEntryDialogOpen, setIsInventoryEntryDialogOpen] =
+		useState(false);
+	const [isInventoryEntryPickerOpen, setIsInventoryEntryPickerOpen] =
+		useState(false);
+	const [inventoryEntrySearch, setInventoryEntrySearch] = useState("");
+	const [
+		selectedProductForInventoryEntry,
+		setSelectedProductForInventoryEntry,
+	] = useState<Product | null>(null);
+	const [inventoryEntryQuantity, setInventoryEntryQuantity] = useState("");
+	const [inventoryEntryCost, setInventoryEntryCost] = useState("");
+	const [inventoryEntryPrice, setInventoryEntryPrice] = useState("");
+	const [inventoryEntryError, setInventoryEntryError] = useState<string | null>(
+		null,
+	);
 
 	const categoryNameId = useId();
 	const categoryDescriptionId = useId();
 	const inventoryTypeId = useId();
 	const inventoryQuantityId = useId();
 	const inventoryNotesId = useId();
+	const inventoryEntrySearchId = useId();
+	const inventoryEntryQuantityId = useId();
+	const inventoryEntryCostId = useId();
+	const inventoryEntryPriceId = useId();
 
 	const { products, categories } = useProductsQueries(loaderProducts);
+	const trackedProducts = useMemo(
+		() => products.filter((product) => product.trackInventory),
+		[products],
+	);
+
+	const filteredInventoryEntryProducts = useMemo(() => {
+		const query = normalizeSearchTerm(inventoryEntrySearch);
+		if (!query) {
+			return trackedProducts.slice(0, 8);
+		}
+
+		return trackedProducts
+			.filter((product) =>
+				[product.name, product.sku, product.barcode]
+					.filter(Boolean)
+					.some((field) =>
+						field ? field.toLowerCase().includes(query) : false,
+					),
+			)
+			.slice(0, 8);
+	}, [inventoryEntrySearch, trackedProducts]);
 
 	const closeSheet = useCallback(() => {
 		setIsSheetOpen(false);
@@ -105,6 +166,39 @@ function ProductsPage() {
 	const openEditSheet = useCallback((product: Product) => {
 		setEditingProduct(product);
 		setIsSheetOpen(true);
+	}, []);
+
+	const resetInventoryEntryForm = useCallback(() => {
+		setInventoryEntrySearch("");
+		setSelectedProductForInventoryEntry(null);
+		setInventoryEntryQuantity("");
+		setInventoryEntryCost("");
+		setInventoryEntryPrice("");
+		setInventoryEntryError(null);
+		setIsInventoryEntryPickerOpen(false);
+	}, []);
+
+	const openInventoryEntryDialog = useCallback(
+		(product?: Product) => {
+			resetInventoryEntryForm();
+			if (product) {
+				setSelectedProductForInventoryEntry(product);
+				setInventoryEntrySearch(product.name);
+				setInventoryEntryCost(String(product.cost ?? 0));
+				setInventoryEntryPrice(String(product.price ?? 0));
+			}
+			setIsInventoryEntryDialogOpen(true);
+		},
+		[resetInventoryEntryForm],
+	);
+
+	const selectInventoryEntryProduct = useCallback((product: Product) => {
+		setSelectedProductForInventoryEntry(product);
+		setInventoryEntrySearch(product.name);
+		setInventoryEntryCost(String(product.cost ?? 0));
+		setInventoryEntryPrice(String(product.price ?? 0));
+		setInventoryEntryError(null);
+		setIsInventoryEntryPickerOpen(false);
 	}, []);
 
 	const columns = useMemo(
@@ -203,6 +297,18 @@ function ProductsPage() {
 		[categories, selectedCategoryId],
 	);
 
+	const inventoryEntryQuantityValue = Number(inventoryEntryQuantity);
+	const nextInventoryStockTotal =
+		selectedProductForInventoryEntry &&
+		Number.isFinite(inventoryEntryQuantityValue) &&
+		inventoryEntryQuantityValue > 0
+			? selectedProductForInventoryEntry.stock +
+				Math.trunc(inventoryEntryQuantityValue)
+			: (selectedProductForInventoryEntry?.stock ?? 0);
+	const isInventoryEntryPending =
+		registerInventoryMovementMutation.isPending ||
+		updateProductMutation.isPending;
+
 	const openCreateCategoryDialog = () => {
 		setSelectedCategoryId("");
 		setCategoryName("");
@@ -274,6 +380,83 @@ function ProductsPage() {
 		setSelectedProductForInventory(null);
 		setInventoryMovementQuantity("");
 		setInventoryMovementNotes("");
+	};
+
+	const handleSaveInventoryEntry = async () => {
+		if (!selectedProductForInventoryEntry) {
+			setInventoryEntryError(
+				"Selecciona un producto para registrar la entrada.",
+			);
+			return;
+		}
+
+		const parsedQuantity = Number(inventoryEntryQuantity);
+		if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+			setInventoryEntryError("Ingresa una cantidad entrante mayor a cero.");
+			return;
+		}
+
+		const normalizedQuantity = Math.trunc(parsedQuantity);
+		const parsedCost = Number(inventoryEntryCost);
+		if (!Number.isFinite(parsedCost) || parsedCost < 0) {
+			setInventoryEntryError("Ingresa un costo valido.");
+			return;
+		}
+
+		let nextPrice: number | undefined;
+		const parsedPrice = Number(inventoryEntryPrice);
+		if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+			setInventoryEntryError("Ingresa un precio de venta valido.");
+			return;
+		}
+		nextPrice = parsedPrice;
+
+		setInventoryEntryError(null);
+
+		try {
+			const shouldUpdateCost =
+				parsedCost !== selectedProductForInventoryEntry.cost;
+			const shouldPersistPrice =
+				nextPrice !== undefined &&
+				nextPrice !== selectedProductForInventoryEntry.price;
+			const resolvedPrice = shouldPersistPrice
+				? (nextPrice ?? selectedProductForInventoryEntry.price)
+				: selectedProductForInventoryEntry.price;
+
+			if (shouldUpdateCost || shouldPersistPrice) {
+				await updateProductMutation.mutateAsync({
+					id: selectedProductForInventoryEntry.id,
+					name: selectedProductForInventoryEntry.name,
+					categoryId: selectedProductForInventoryEntry.categoryId,
+					sku: selectedProductForInventoryEntry.sku,
+					barcode: selectedProductForInventoryEntry.barcode,
+					price: resolvedPrice,
+					cost: shouldUpdateCost
+						? parsedCost
+						: selectedProductForInventoryEntry.cost,
+					taxRate: selectedProductForInventoryEntry.taxRate,
+					stock: selectedProductForInventoryEntry.stock,
+					trackInventory: selectedProductForInventoryEntry.trackInventory,
+					isModifier: selectedProductForInventoryEntry.isModifier,
+				});
+			}
+
+			await registerInventoryMovementMutation.mutateAsync({
+				productId: selectedProductForInventoryEntry.id,
+				type: "restock",
+				quantity: normalizedQuantity,
+				notes: null,
+			});
+
+			setIsInventoryEntryDialogOpen(false);
+			resetInventoryEntryForm();
+		} catch (error) {
+			setInventoryEntryError(
+				error instanceof Error
+					? error.message
+					: "No fue posible guardar la entrada de inventario.",
+			);
+		}
 	};
 
 	return (
@@ -348,13 +531,24 @@ function ProductsPage() {
 							</Select>
 						</div>
 
-						<Button
-							className="bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-semibold rounded-lg px-4 py-2 h-10 w-full sm:w-auto shrink-0"
-							onClick={() => setIsSheetOpen(true)}
-						>
-							<Plus className="w-4 h-4 mr-2" />
-							Add Product
-						</Button>
+						<div className="flex w-full sm:w-auto sm:ml-auto items-center gap-3">
+							<Button
+								variant="outline"
+								className="bg-[var(--color-carbon)] border-gray-800 text-gray-300 hover:bg-white/5 hover:text-white rounded-lg px-4 py-2 h-10 w-full sm:w-auto shrink-0"
+								onClick={() => openInventoryEntryDialog()}
+							>
+								<PackagePlus className="w-4 h-4 mr-2" />
+								Entrada de inventario
+							</Button>
+
+							<Button
+								className="bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-semibold rounded-lg px-4 py-2 h-10 w-full sm:w-auto shrink-0"
+								onClick={() => setIsSheetOpen(true)}
+							>
+								<Plus className="w-4 h-4 mr-2" />
+								Add Product
+							</Button>
+						</div>
 
 						<ProductFormSheet
 							isOpen={isSheetOpen}
@@ -618,6 +812,235 @@ function ProductsPage() {
 								{selectedCategory ? "Save" : "Create"}
 							</Button>
 						</div>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog
+				open={isInventoryEntryDialogOpen}
+				onOpenChange={(open) => {
+					setIsInventoryEntryDialogOpen(open);
+					if (!open) {
+						resetInventoryEntryForm();
+					}
+				}}
+			>
+				<DialogContent className="bg-[var(--color-carbon)] border-gray-800 text-white sm:max-w-[640px]">
+					<DialogHeader className="space-y-2">
+						<DialogTitle className="text-2xl font-semibold">
+							Entrada de inventario
+						</DialogTitle>
+						<DialogDescription className="text-gray-400">
+							Registrar nuevo stock para items existentes.
+						</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-5 py-2">
+						<div className="grid gap-2">
+							<Label htmlFor={inventoryEntrySearchId}>Buscar producto</Label>
+							<Popover
+								open={isInventoryEntryPickerOpen}
+								onOpenChange={setIsInventoryEntryPickerOpen}
+							>
+								<PopoverTrigger asChild>
+									<button
+										id={inventoryEntrySearchId}
+										type="button"
+										className={cn(
+											"flex h-11 w-full items-center justify-between rounded-lg border border-gray-700 bg-black/20 px-3 text-left transition-colors",
+											"focus-visible:border-[var(--color-voltage)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-voltage)]/20",
+										)}
+									>
+										<div className="flex min-w-0 items-center gap-3">
+											<Search className="h-4 w-4 shrink-0 text-gray-500" />
+											<span
+												className={cn(
+													"truncate",
+													selectedProductForInventoryEntry
+														? "text-white"
+														: "text-gray-500",
+												)}
+											>
+												{selectedProductForInventoryEntry
+													? `${selectedProductForInventoryEntry.name}${selectedProductForInventoryEntry.sku ? ` · ${selectedProductForInventoryEntry.sku}` : ""}`
+													: "Buscar por nombre, SKU o codigo de barras"}
+											</span>
+										</div>
+										<ChevronsUpDown className="h-4 w-4 shrink-0 text-gray-500" />
+									</button>
+								</PopoverTrigger>
+								<PopoverContent
+									align="start"
+									className="w-[var(--radix-popover-trigger-width)] border-gray-800 bg-[var(--color-carbon)] p-3 text-white"
+								>
+									<div className="space-y-3">
+										<div className="relative">
+											<Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+											<Input
+												autoFocus
+												value={inventoryEntrySearch}
+												onChange={(event) =>
+													setInventoryEntrySearch(event.target.value)
+												}
+												placeholder="Buscar por nombre, SKU o codigo de barras"
+												className="h-10 border-gray-700 bg-black/20 pl-9"
+											/>
+										</div>
+										<div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+											{filteredInventoryEntryProducts.length > 0 ? (
+												filteredInventoryEntryProducts.map((product) => (
+													<button
+														key={product.id}
+														type="button"
+														onClick={() => selectInventoryEntryProduct(product)}
+														className={cn(
+															"flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left transition-colors",
+															selectedProductForInventoryEntry?.id ===
+																product.id
+																? "border-[var(--color-voltage)] bg-[var(--color-voltage)]/10"
+																: "border-gray-800 bg-black/10 hover:border-gray-700 hover:bg-white/5",
+														)}
+													>
+														<div className="min-w-0">
+															<p className="truncate font-medium text-white">
+																{product.name}
+															</p>
+															<p className="truncate text-xs text-gray-400">
+																{product.sku ||
+																	product.barcode ||
+																	"Sin identificador"}
+															</p>
+														</div>
+														<div className="ml-3 text-right">
+															<p className="text-sm font-medium text-[var(--color-voltage)]">
+																COP {currencyFormatter.format(product.price)}
+															</p>
+															<p className="text-xs text-gray-400">
+																Stock: {product.stock}
+															</p>
+														</div>
+													</button>
+												))
+											) : (
+												<div className="rounded-lg border border-dashed border-gray-700 px-3 py-6 text-center text-sm text-gray-500">
+													No encontramos productos con ese criterio.
+												</div>
+											)}
+										</div>
+									</div>
+								</PopoverContent>
+							</Popover>
+						</div>
+
+						{selectedProductForInventoryEntry ? (
+							<div className="space-y-4 rounded-xl border border-gray-800 bg-black/10 p-4">
+								<div className="space-y-1">
+									<p className="text-sm font-semibold uppercase tracking-wide text-[var(--color-voltage)]">
+										Producto
+									</p>
+									<p className="text-lg font-semibold text-white">
+										{selectedProductForInventoryEntry.name}
+									</p>
+									<p className="text-sm text-gray-400">
+										{selectedProductForInventoryEntry.sku ||
+											selectedProductForInventoryEntry.barcode ||
+											"Sin SKU"}
+									</p>
+								</div>
+
+								<div className="grid gap-4 sm:grid-cols-2">
+									<div className="grid gap-2">
+										<Label>Stock actual</Label>
+										<Input
+											readOnly
+											value={selectedProductForInventoryEntry.stock}
+											className="h-11 border-gray-700 bg-black/20 text-white"
+										/>
+									</div>
+									<div className="grid gap-2">
+										<Label htmlFor={inventoryEntryQuantityId}>
+											Cantidad entrante
+										</Label>
+										<Input
+											id={inventoryEntryQuantityId}
+											type="number"
+											min="1"
+											step="1"
+											value={inventoryEntryQuantity}
+											onChange={(event) =>
+												setInventoryEntryQuantity(event.target.value)
+											}
+											placeholder="Ej: 25"
+											className="h-11 border-gray-700 bg-black/20 text-white"
+										/>
+									</div>
+								</div>
+
+								<div className="grid gap-2">
+									<Label>Nuevo total de stock</Label>
+									<Input
+										readOnly
+										value={nextInventoryStockTotal}
+										className="h-11 border-gray-700 bg-black/20 text-white"
+									/>
+								</div>
+
+								<div className="grid gap-4 sm:grid-cols-2">
+									<div className="grid gap-2">
+										<Label htmlFor={inventoryEntryCostId}>Costo (COP)</Label>
+										<Input
+											id={inventoryEntryCostId}
+											type="number"
+											min="0"
+											step="1"
+											value={inventoryEntryCost}
+											onChange={(event) =>
+												setInventoryEntryCost(event.target.value)
+											}
+											placeholder="Ej: 4000"
+											className="h-11 border-gray-700 bg-black/20 text-white"
+										/>
+									</div>
+									<div className="grid gap-2">
+										<Label htmlFor={inventoryEntryPriceId}>
+											Precio de venta (COP)
+										</Label>
+										<Input
+											id={inventoryEntryPriceId}
+											type="number"
+											min="0"
+											step="1"
+											value={inventoryEntryPrice}
+											onChange={(event) =>
+												setInventoryEntryPrice(event.target.value)
+											}
+											placeholder="Ej: 6000"
+											className="h-11 border-gray-700 bg-black/20 text-white"
+										/>
+									</div>
+								</div>
+							</div>
+						) : null}
+
+						{inventoryEntryError ? (
+							<p className="text-sm text-red-400">{inventoryEntryError}</p>
+						) : null}
+					</div>
+					<DialogFooter>
+						<Button
+							variant="ghost"
+							onClick={() => setIsInventoryEntryDialogOpen(false)}
+						>
+							Cancelar
+						</Button>
+						<Button
+							onClick={handleSaveInventoryEntry}
+							disabled={
+								!selectedProductForInventoryEntry || isInventoryEntryPending
+							}
+							className="bg-[var(--color-voltage)] text-black hover:bg-[#c9e605]"
+						>
+							{isInventoryEntryPending ? "Guardando..." : "Guardar entrada"}
+						</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>

@@ -62,6 +62,16 @@ export type ListSalesInput = {
 	endDate?: string | null;
 };
 
+export type ListShiftsInput = {
+	limit?: number;
+	cursor?: number;
+	status?: string | null;
+	searchQuery?: string | null;
+	cashierId?: string | null;
+	startDate?: string | null;
+	endDate?: string | null;
+};
+
 export type GetSaleByIdInput = {
 	saleId: string;
 };

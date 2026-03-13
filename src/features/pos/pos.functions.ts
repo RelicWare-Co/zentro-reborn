@@ -7,6 +7,7 @@ import {
 	getSaleByIdForCurrentOrganization,
 	getShiftCloseSummaryForCurrentOrganization,
 	listSalesForCurrentOrganization,
+	listShiftsForCurrentOrganization,
 	openShiftForCurrentOrganization,
 	registerCashMovementForCurrentOrganization,
 	searchPosCustomersForCurrentOrganization,
@@ -34,6 +35,16 @@ const listSalesInputSchema = z.object({
 	status: nullableString,
 	searchQuery: nullableString,
 	paymentMethod: nullableString,
+	startDate: nullableString,
+	endDate: nullableString,
+});
+
+const listShiftsInputSchema = z.object({
+	limit: z.coerce.number().int().min(1).max(50).optional(),
+	cursor: z.coerce.number().int().min(0).optional(),
+	status: nullableString,
+	searchQuery: nullableString,
+	cashierId: nullableString,
 	startDate: nullableString,
 	endDate: nullableString,
 });
@@ -165,6 +176,20 @@ export const listSales = createServerFn({ method: "GET" })
 			status: data.status ?? undefined,
 			searchQuery: data.searchQuery ?? undefined,
 			paymentMethod: data.paymentMethod ?? undefined,
+			startDate: data.startDate ?? undefined,
+			endDate: data.endDate ?? undefined,
+		});
+	});
+
+export const listShifts = createServerFn({ method: "GET" })
+	.inputValidator(listShiftsInputSchema)
+	.handler(async ({ data }) => {
+		return listShiftsForCurrentOrganization({
+			limit: data.limit,
+			cursor: data.cursor,
+			status: data.status ?? undefined,
+			searchQuery: data.searchQuery ?? undefined,
+			cashierId: data.cashierId ?? undefined,
 			startDate: data.startDate ?? undefined,
 			endDate: data.endDate ?? undefined,
 		});

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthShiftsRouteImport } from './routes/_auth/shifts'
 import { Route as AuthSettingsRouteImport } from './routes/_auth/settings'
 import { Route as AuthSalesRouteImport } from './routes/_auth/sales'
 import { Route as AuthProductsRouteImport } from './routes/_auth/products'
@@ -32,6 +33,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthShiftsRoute = AuthShiftsRouteImport.update({
+  id: '/shifts',
+  path: '/shifts',
+  getParentRoute: () => AuthRoute,
 } as any)
 const AuthSettingsRoute = AuthSettingsRouteImport.update({
   id: '/settings',
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/products': typeof AuthProductsRoute
   '/sales': typeof AuthSalesRoute
   '/settings': typeof AuthSettingsRoute
+  '/shifts': typeof AuthShiftsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/products': typeof AuthProductsRoute
   '/sales': typeof AuthSalesRoute
   '/settings': typeof AuthSettingsRoute
+  '/shifts': typeof AuthShiftsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/_auth/products': typeof AuthProductsRoute
   '/_auth/sales': typeof AuthSalesRoute
   '/_auth/settings': typeof AuthSettingsRoute
+  '/_auth/shifts': typeof AuthShiftsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/sales'
     | '/settings'
+    | '/shifts'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/sales'
     | '/settings'
+    | '/shifts'
     | '/api/auth/$'
   id:
     | '__root__'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/_auth/products'
     | '/_auth/sales'
     | '/_auth/settings'
+    | '/_auth/shifts'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
@@ -159,6 +171,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_auth/shifts': {
+      id: '/_auth/shifts'
+      path: '/shifts'
+      fullPath: '/shifts'
+      preLoaderRoute: typeof AuthShiftsRouteImport
+      parentRoute: typeof AuthRoute
     }
     '/_auth/settings': {
       id: '/_auth/settings'
@@ -211,6 +230,7 @@ interface AuthRouteChildren {
   AuthProductsRoute: typeof AuthProductsRoute
   AuthSalesRoute: typeof AuthSalesRoute
   AuthSettingsRoute: typeof AuthSettingsRoute
+  AuthShiftsRoute: typeof AuthShiftsRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
@@ -219,6 +239,7 @@ const AuthRouteChildren: AuthRouteChildren = {
   AuthProductsRoute: AuthProductsRoute,
   AuthSalesRoute: AuthSalesRoute,
   AuthSettingsRoute: AuthSettingsRoute,
+  AuthShiftsRoute: AuthShiftsRoute,
 }
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)

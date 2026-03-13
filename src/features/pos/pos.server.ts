@@ -14,6 +14,7 @@ export {
 	closeShiftForCurrentOrganization,
 	getPosBootstrapForCurrentOrganization,
 	getShiftCloseSummaryForCurrentOrganization,
+	listShiftsForCurrentOrganization,
 	openShiftForCurrentOrganization,
 	registerCashMovementForCurrentOrganization,
 } from "./server/shifts";
@@ -24,6 +25,7 @@ export {
 	type CreatePosSaleInput,
 	type GetSaleByIdInput,
 	type ListSalesInput,
+	type ListShiftsInput,
 	type OpenShiftInput,
 	type RegisterCashMovementInput,
 } from "./server/types";

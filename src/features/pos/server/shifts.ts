@@ -1,5 +1,5 @@
 import "@tanstack/react-start/server-only";
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
 	cashMovement,
@@ -7,17 +7,20 @@ import {
 	organization,
 	payment,
 	product,
+	sale,
 	shift,
 	shiftClosure,
+	user,
 } from "#/db/schema";
-import { requireAuthContext } from "./auth-context";
 import {
 	getEnabledPaymentMethods,
 	parseOrganizationSettingsMetadata,
 } from "#/features/settings/settings.shared";
+import { requireAuthContext } from "./auth-context";
 import {
 	CASH_MOVEMENT_TYPES,
 	type CloseShiftInput,
+	type ListShiftsInput,
 	type OpenShiftInput,
 	type RegisterCashMovementInput,
 } from "./types";
@@ -29,6 +32,28 @@ import {
 	toPositiveInteger,
 	toTimestamp,
 } from "./utils";
+
+function normalizeNumber(value: number | string | null | undefined) {
+	if (typeof value === "number") {
+		return Number.isFinite(value) ? value : 0;
+	}
+
+	if (typeof value === "string") {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : 0;
+	}
+
+	return 0;
+}
+
+function parseDateBoundary(value: string | null | undefined) {
+	if (!value) {
+		return null;
+	}
+
+	const parsedDate = new Date(`${value}T00:00:00`);
+	return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.getTime();
+}
 
 function buildExpectedAmountsByMethod(
 	startingCash: number,
@@ -66,15 +91,49 @@ function buildExpectedAmountsByMethod(
 	return expectedByMethod;
 }
 
-export async function getPosBootstrapForCurrentOrganization() {
-	const { session, organizationId } = await requireAuthContext();
+export async function listShiftsForCurrentOrganization(
+	input: ListShiftsInput = {},
+) {
+	const { organizationId } = await requireAuthContext();
+	const limit = Math.min(Math.max(input.limit ?? 10, 1), 50);
+	const cursor = Math.max(input.cursor ?? 0, 0);
+	const trimmedSearchQuery = input.searchQuery?.trim();
+	const startDateMs = parseDateBoundary(input.startDate);
+	const endDateMs = parseDateBoundary(input.endDate);
+	const endDateExclusiveMs =
+		endDateMs === null ? null : endDateMs + 24 * 60 * 60 * 1000;
 
-	const [activeShiftRows, categories, modifierProducts, organizationRows] =
-		await Promise.all([
+	const whereConditions = [eq(shift.organizationId, organizationId)];
+	if (input.status) {
+		whereConditions.push(eq(shift.status, input.status));
+	}
+	if (input.cashierId) {
+		whereConditions.push(eq(shift.userId, input.cashierId));
+	}
+	if (trimmedSearchQuery) {
+		const searchPattern = `%${trimmedSearchQuery}%`;
+		whereConditions.push(
+			sql`(
+				${shift.id} like ${searchPattern}
+				or ${user.name} like ${searchPattern}
+				or coalesce(${shift.terminalName}, '') like ${searchPattern}
+				or coalesce(${shift.notes}, '') like ${searchPattern}
+			)`,
+		);
+	}
+	if (startDateMs !== null) {
+		whereConditions.push(gte(shift.openedAt, new Date(startDateMs)));
+	}
+	if (endDateExclusiveMs !== null) {
+		whereConditions.push(lt(shift.openedAt, new Date(endDateExclusiveMs)));
+	}
+
+	const [shiftRows, totalRows, cashierRows] = await Promise.all([
 		db
 			.select({
 				id: shift.id,
-				terminalId: shift.terminalId,
+				userId: shift.userId,
+				cashierName: user.name,
 				terminalName: shift.terminalName,
 				status: shift.status,
 				startingCash: shift.startingCash,
@@ -83,62 +142,368 @@ export async function getPosBootstrapForCurrentOrganization() {
 				notes: shift.notes,
 			})
 			.from(shift)
-			.where(
-				and(
-					eq(shift.organizationId, organizationId),
-					eq(shift.userId, session.user.id),
-					eq(shift.status, "open"),
-				),
-			)
-			.orderBy(desc(shift.openedAt))
-			.limit(1),
+			.innerJoin(user, eq(user.id, shift.userId))
+			.where(and(...whereConditions))
+			.orderBy(desc(shift.openedAt), desc(shift.id))
+			.limit(limit + 1)
+			.offset(cursor),
 		db
 			.select({
-				id: category.id,
-				name: category.name,
-				description: category.description,
+				total: sql<number>`count(*)`,
 			})
-			.from(category)
-			.where(eq(category.organizationId, organizationId))
-			.orderBy(asc(category.name)),
+			.from(shift)
+			.innerJoin(user, eq(user.id, shift.userId))
+			.where(and(...whereConditions)),
 		db
-			.select({
-				id: product.id,
-				name: product.name,
-				categoryId: product.categoryId,
-				categoryName: category.name,
-				sku: product.sku,
-				barcode: product.barcode,
-				price: product.price,
-				taxRate: product.taxRate,
-				trackInventory: product.trackInventory,
-				stock: product.stock,
-				isModifier: product.isModifier,
+			.selectDistinct({
+				id: user.id,
+				name: user.name,
 			})
-			.from(product)
-			.leftJoin(
-				category,
-				and(
-					eq(product.categoryId, category.id),
-					eq(category.organizationId, organizationId),
-				),
-			)
-			.where(
-				and(
-					eq(product.organizationId, organizationId),
-					eq(product.isModifier, true),
-					isNull(product.deletedAt),
-				),
-			)
-			.orderBy(asc(product.name)),
-		db
-			.select({
-				metadata: organization.metadata,
-			})
-			.from(organization)
-			.where(eq(organization.id, organizationId))
-			.limit(1),
+			.from(shift)
+			.innerJoin(user, eq(user.id, shift.userId))
+			.where(eq(shift.organizationId, organizationId))
+			.orderBy(asc(user.name)),
 	]);
+
+	const pageRows = shiftRows.slice(0, limit);
+	const hasMore = shiftRows.length > limit;
+	const nextCursor = hasMore ? cursor + limit : null;
+	const shiftIds = pageRows.map((currentShift) => currentShift.id);
+
+	if (shiftIds.length === 0) {
+		return {
+			data: [],
+			total: normalizeNumber(totalRows[0]?.total),
+			hasMore,
+			nextCursor,
+			filterOptions: {
+				cashiers: cashierRows,
+			},
+		};
+	}
+
+	const [saleRows, paymentRows, movementRows, closureRows] = await Promise.all([
+		db
+			.select({
+				shiftId: sale.shiftId,
+				status: sale.status,
+				salesCount: sql<number>`count(*)`,
+				totalAmount: sql<number>`coalesce(sum(${sale.totalAmount}), 0)`,
+			})
+			.from(sale)
+			.where(
+				and(
+					eq(sale.organizationId, organizationId),
+					inArray(sale.shiftId, shiftIds),
+				),
+			)
+			.groupBy(sale.shiftId, sale.status),
+		db
+			.select({
+				shiftId: payment.shiftId,
+				method: payment.method,
+				amount: payment.amount,
+				createdAt: payment.createdAt,
+			})
+			.from(payment)
+			.where(
+				and(
+					eq(payment.organizationId, organizationId),
+					inArray(payment.shiftId, shiftIds),
+				),
+			)
+			.orderBy(desc(payment.createdAt)),
+		db
+			.select({
+				id: cashMovement.id,
+				shiftId: cashMovement.shiftId,
+				type: cashMovement.type,
+				amount: cashMovement.amount,
+				description: cashMovement.description,
+				createdAt: cashMovement.createdAt,
+			})
+			.from(cashMovement)
+			.where(
+				and(
+					eq(cashMovement.organizationId, organizationId),
+					inArray(cashMovement.shiftId, shiftIds),
+				),
+			)
+			.orderBy(desc(cashMovement.createdAt)),
+		db
+			.select({
+				shiftId: shiftClosure.shiftId,
+				paymentMethod: shiftClosure.paymentMethod,
+				expectedAmount: shiftClosure.expectedAmount,
+				actualAmount: shiftClosure.actualAmount,
+				difference: shiftClosure.difference,
+			})
+			.from(shiftClosure)
+			.where(inArray(shiftClosure.shiftId, shiftIds)),
+	]);
+
+	const operationsByShift = new Map<
+		string,
+		{
+			paidSalesCount: number;
+			paidSalesAmount: number;
+			cancelledSalesCount: number;
+			cancelledSalesAmount: number;
+			creditSalesCount: number;
+			creditSalesAmount: number;
+		}
+	>();
+
+	for (const row of saleRows) {
+		const current = operationsByShift.get(row.shiftId) ?? {
+			paidSalesCount: 0,
+			paidSalesAmount: 0,
+			cancelledSalesCount: 0,
+			cancelledSalesAmount: 0,
+			creditSalesCount: 0,
+			creditSalesAmount: 0,
+		};
+
+		switch (row.status) {
+			case "completed":
+				current.paidSalesCount += normalizeNumber(row.salesCount);
+				current.paidSalesAmount += normalizeNumber(row.totalAmount);
+				break;
+			case "cancelled":
+				current.cancelledSalesCount += normalizeNumber(row.salesCount);
+				current.cancelledSalesAmount += normalizeNumber(row.totalAmount);
+				break;
+			case "credit":
+				current.creditSalesCount += normalizeNumber(row.salesCount);
+				current.creditSalesAmount += normalizeNumber(row.totalAmount);
+				break;
+			default:
+				break;
+		}
+
+		operationsByShift.set(row.shiftId, current);
+	}
+
+	const paymentsByShift = new Map<
+		string,
+		Array<{ method: string; amount: number; createdAt: number }>
+	>();
+	for (const row of paymentRows) {
+		const current = paymentsByShift.get(row.shiftId) ?? [];
+		current.push({
+			method: row.method,
+			amount: normalizeNumber(row.amount),
+			createdAt: toTimestamp(row.createdAt) ?? 0,
+		});
+		paymentsByShift.set(row.shiftId, current);
+	}
+
+	const movementsByShift = new Map<
+		string,
+		Array<{
+			id: string;
+			type: string;
+			amount: number;
+			description: string;
+			createdAt: number;
+		}>
+	>();
+	for (const row of movementRows) {
+		const current = movementsByShift.get(row.shiftId) ?? [];
+		current.push({
+			id: row.id,
+			type: row.type,
+			amount: normalizeNumber(row.amount),
+			description: row.description,
+			createdAt: toTimestamp(row.createdAt) ?? 0,
+		});
+		movementsByShift.set(row.shiftId, current);
+	}
+
+	const closuresByShift = new Map<
+		string,
+		Array<{
+			paymentMethod: string;
+			expectedAmount: number;
+			actualAmount: number;
+			difference: number;
+		}>
+	>();
+	for (const row of closureRows) {
+		const current = closuresByShift.get(row.shiftId) ?? [];
+		current.push({
+			paymentMethod: row.paymentMethod,
+			expectedAmount: normalizeNumber(row.expectedAmount),
+			actualAmount: normalizeNumber(row.actualAmount),
+			difference: normalizeNumber(row.difference),
+		});
+		closuresByShift.set(row.shiftId, current);
+	}
+
+	return {
+		data: pageRows.map((row) => {
+			const payments = paymentsByShift.get(row.id) ?? [];
+			const movements = movementsByShift.get(row.id) ?? [];
+			const closures = [...(closuresByShift.get(row.id) ?? [])].sort(
+				(left, right) => {
+					if (left.paymentMethod === "cash") return -1;
+					if (right.paymentMethod === "cash") return 1;
+					return left.paymentMethod.localeCompare(right.paymentMethod);
+				},
+			);
+			const expectedByMethod = buildExpectedAmountsByMethod(
+				normalizeNumber(row.startingCash),
+				payments.map((paymentRow) => ({
+					method: paymentRow.method,
+					amount: paymentRow.amount,
+				})),
+				movements.map((movementRow) => ({
+					type: movementRow.type,
+					amount: movementRow.amount,
+				})),
+			);
+			const paymentBreakdown = [...expectedByMethod.entries()]
+				.map(([method, amount]) => ({
+					method,
+					amount,
+				}))
+				.sort((left, right) => {
+					if (left.method === "cash") return -1;
+					if (right.method === "cash") return 1;
+					return right.amount - left.amount;
+				});
+			const operations = operationsByShift.get(row.id) ?? {
+				paidSalesCount: 0,
+				paidSalesAmount: 0,
+				cancelledSalesCount: 0,
+				cancelledSalesAmount: 0,
+				creditSalesCount: 0,
+				creditSalesAmount: 0,
+			};
+			const totalPayments = payments.reduce(
+				(total, paymentRow) => total + paymentRow.amount,
+				0,
+			);
+			const totalExpected = paymentBreakdown.reduce(
+				(total, current) => total + current.amount,
+				0,
+			);
+			const totalActual = closures.reduce(
+				(total, current) => total + current.actualAmount,
+				0,
+			);
+			const totalDifference = closures.reduce(
+				(total, current) => total + current.difference,
+				0,
+			);
+
+			return {
+				id: row.id,
+				userId: row.userId,
+				cashierName: row.cashierName,
+				terminalName: row.terminalName,
+				status: row.status,
+				startingCash: normalizeNumber(row.startingCash),
+				openedAt: toTimestamp(row.openedAt) ?? 0,
+				closedAt: toTimestamp(row.closedAt),
+				notes: row.notes,
+				operations,
+				paymentBreakdown,
+				payments,
+				movements,
+				closures,
+				totals: {
+					totalPayments,
+					expectedCash:
+						expectedByMethod.get("cash") ?? normalizeNumber(row.startingCash),
+					totalExpected,
+					totalActual,
+					totalDifference,
+				},
+			};
+		}),
+		total: normalizeNumber(totalRows[0]?.total),
+		hasMore,
+		nextCursor,
+		filterOptions: {
+			cashiers: cashierRows,
+		},
+	};
+}
+
+export async function getPosBootstrapForCurrentOrganization() {
+	const { session, organizationId } = await requireAuthContext();
+
+	const [activeShiftRows, categories, modifierProducts, organizationRows] =
+		await Promise.all([
+			db
+				.select({
+					id: shift.id,
+					terminalId: shift.terminalId,
+					terminalName: shift.terminalName,
+					status: shift.status,
+					startingCash: shift.startingCash,
+					openedAt: shift.openedAt,
+					closedAt: shift.closedAt,
+					notes: shift.notes,
+				})
+				.from(shift)
+				.where(
+					and(
+						eq(shift.organizationId, organizationId),
+						eq(shift.userId, session.user.id),
+						eq(shift.status, "open"),
+					),
+				)
+				.orderBy(desc(shift.openedAt))
+				.limit(1),
+			db
+				.select({
+					id: category.id,
+					name: category.name,
+					description: category.description,
+				})
+				.from(category)
+				.where(eq(category.organizationId, organizationId))
+				.orderBy(asc(category.name)),
+			db
+				.select({
+					id: product.id,
+					name: product.name,
+					categoryId: product.categoryId,
+					categoryName: category.name,
+					sku: product.sku,
+					barcode: product.barcode,
+					price: product.price,
+					taxRate: product.taxRate,
+					trackInventory: product.trackInventory,
+					stock: product.stock,
+					isModifier: product.isModifier,
+				})
+				.from(product)
+				.leftJoin(
+					category,
+					and(
+						eq(product.categoryId, category.id),
+						eq(category.organizationId, organizationId),
+					),
+				)
+				.where(
+					and(
+						eq(product.organizationId, organizationId),
+						eq(product.isModifier, true),
+						isNull(product.deletedAt),
+					),
+				)
+				.orderBy(asc(product.name)),
+			db
+				.select({
+					metadata: organization.metadata,
+				})
+				.from(organization)
+				.where(eq(organization.id, organizationId))
+				.limit(1),
+		]);
 
 	const activeShift = activeShiftRows[0] ?? null;
 	const organizationSettings = parseOrganizationSettingsMetadata(

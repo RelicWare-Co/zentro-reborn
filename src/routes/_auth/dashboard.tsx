@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
 	AlertTriangle,
 	ArrowRight,
@@ -73,8 +73,9 @@ function DashboardPage() {
 	);
 	const hasTrendData = weeklyRevenue > 0 || weeklySales > 0;
 	const bestDay =
-		[...data.salesTrend].sort((left, right) => right.revenue - left.revenue)[0] ??
-		null;
+		[...data.salesTrend].sort(
+			(left, right) => right.revenue - left.revenue,
+		)[0] ?? null;
 	const paymentTotal = data.paymentMix.reduce(
 		(total, payment) => total + payment.amount,
 		0,
@@ -376,6 +377,17 @@ function DashboardPage() {
 								description="Catalogo habilitado"
 							/>
 						</div>
+
+						<Button
+							asChild
+							variant="outline"
+							className="w-full border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+						>
+							<Link to="/shifts">
+								Ver turnos y cierres
+								<ArrowRight className="h-4 w-4" />
+							</Link>
+						</Button>
 					</CardContent>
 				</Card>
 			</section>
@@ -441,8 +453,8 @@ function DashboardPage() {
 										Inventario bajo
 									</p>
 									<p className="mt-1 text-sm text-amber-200/80">
-										{formatCount(data.stats.lowStockCount)} productos con stock en
-										riesgo.
+										{formatCount(data.stats.lowStockCount)} productos con stock
+										en riesgo.
 									</p>
 								</div>
 								<AlertTriangle className="h-5 w-5 text-amber-300" />
@@ -456,8 +468,8 @@ function DashboardPage() {
 										Cartera pendiente
 									</p>
 									<p className="mt-1 text-sm text-sky-200/80">
-										{formatCurrency(data.stats.pendingCreditBalance)} por cobrar en{" "}
-										{formatCount(data.stats.creditAccountsCount)} cuentas.
+										{formatCurrency(data.stats.pendingCreditBalance)} por cobrar
+										en {formatCount(data.stats.creditAccountsCount)} cuentas.
 									</p>
 								</div>
 								<CreditCard className="h-5 w-5 text-sky-300" />
@@ -572,7 +584,9 @@ function StatCard({
 				<p className="break-words text-sm leading-6 text-gray-400">
 					{description}
 				</p>
-				<p className="mt-2 break-words text-xs leading-5 text-gray-500">{highlight}</p>
+				<p className="mt-2 break-words text-xs leading-5 text-gray-500">
+					{highlight}
+				</p>
 			</CardContent>
 		</Card>
 	);
@@ -677,6 +691,10 @@ function getSaleStatusBadgeClass(status: string) {
 
 	if (status === "completed") {
 		return "border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10";
+	}
+
+	if (status === "cancelled") {
+		return "border-rose-500/20 bg-rose-500/10 text-rose-300 hover:bg-rose-500/10";
 	}
 
 	return "border-gray-700 bg-gray-800/80 text-gray-300 hover:bg-gray-800/80";

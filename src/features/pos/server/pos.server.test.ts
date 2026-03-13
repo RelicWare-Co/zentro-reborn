@@ -194,7 +194,75 @@ describe("pos server modules", () => {
 					payments: [{ method: "cash", amount: 1000 }],
 				}),
 			).rejects.toThrow(
-				"La suma de los pagos debe ser igual al total de la venta",
+				"La suma de los pagos debe ser igual al total de la venta, salvo excedente en efectivo para devolver cambio",
+			);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("allows completed sales with cash overpayment and zero balance due", async () => {
+		const { ctx, shiftsServer, salesServer } = await setupPosServers();
+		try {
+			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 5000,
+				terminalId: "terminal-1",
+				terminalName: "Caja 1",
+			});
+
+			const productId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Producto con vuelto",
+				price: 22000,
+				trackInventory: false,
+				stock: 0,
+			});
+
+			const sale = await salesServer.createPosSaleForCurrentOrganization({
+				shiftId: openedShift.id,
+				items: [{ productId, quantity: 1 }],
+				payments: [{ method: "cash", amount: 23000 }],
+			});
+
+			expect(sale.status).toBe("completed");
+			expect(sale.totalAmount).toBe(22000);
+			expect(sale.paidAmount).toBe(23000);
+			expect(sale.balanceDue).toBe(0);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("rejects completed sales with overpayment when cash cannot cover the change", async () => {
+		const { ctx, shiftsServer, salesServer } = await setupPosServers();
+		try {
+			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 5000,
+				terminalId: "terminal-1",
+				terminalName: "Caja 1",
+			});
+
+			const productId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Producto sobrepago tarjeta",
+				price: 22000,
+				trackInventory: false,
+				stock: 0,
+			});
+
+			await expect(
+				salesServer.createPosSaleForCurrentOrganization({
+					shiftId: openedShift.id,
+					items: [{ productId, quantity: 1 }],
+					payments: [
+						{ method: "card", amount: 23000 },
+						{ method: "cash", amount: 1000 },
+					],
+				}),
+			).rejects.toThrow(
+				"La suma de los pagos debe ser igual al total de la venta, salvo excedente en efectivo para devolver cambio",
 			);
 		} finally {
 			ctx.cleanup();
@@ -250,7 +318,10 @@ describe("pos server modules", () => {
 			expect(accountRow?.balance).toBe(4000);
 
 			const createdPayments = await ctx.db
-				.select({ saleId: schema.payment.saleId, amount: schema.payment.amount })
+				.select({
+					saleId: schema.payment.saleId,
+					amount: schema.payment.amount,
+				})
 				.from(schema.payment)
 				.where(eq(schema.payment.shiftId, openedShift.id));
 			expect(createdPayments).toHaveLength(1);
@@ -294,9 +365,10 @@ describe("pos server modules", () => {
 				description: "Compra insumos",
 			});
 
-			const summary = await shiftsServer.getShiftCloseSummaryForCurrentOrganization(
-				openedShift.id,
-			);
+			const summary =
+				await shiftsServer.getShiftCloseSummaryForCurrentOrganization(
+					openedShift.id,
+				);
 			const cashSummary = summary.summaryByMethod.find(
 				(row: { paymentMethod: string }) => row.paymentMethod === "cash",
 			);
@@ -523,23 +595,25 @@ describe("pos server modules", () => {
 				trackInventory: false,
 			});
 
-			const pageOne = await catalogServer.searchPosProductsForCurrentOrganization({
-				searchQuery: "a",
-				categoryId: bebidasId,
-				limit: 1,
-				cursor: 0,
-			});
+			const pageOne =
+				await catalogServer.searchPosProductsForCurrentOrganization({
+					searchQuery: "a",
+					categoryId: bebidasId,
+					limit: 1,
+					cursor: 0,
+				});
 
 			expect(pageOne.data).toHaveLength(1);
 			expect(pageOne.hasMore).toBe(true);
 			expect(pageOne.data[0]?.name).toBe("Agua");
 
-			const pageTwo = await catalogServer.searchPosProductsForCurrentOrganization({
-				searchQuery: "a",
-				categoryId: bebidasId,
-				limit: 1,
-				cursor: pageOne.nextCursor,
-			});
+			const pageTwo =
+				await catalogServer.searchPosProductsForCurrentOrganization({
+					searchQuery: "a",
+					categoryId: bebidasId,
+					limit: 1,
+					cursor: pageOne.nextCursor,
+				});
 
 			expect(pageTwo.data).toHaveLength(1);
 			expect(pageTwo.hasMore).toBe(false);
@@ -572,19 +646,21 @@ describe("pos server modules", () => {
 				deletedAt: new Date(),
 			});
 
-			const pageOne = await catalogServer.searchPosCustomersForCurrentOrganization({
-				searchQuery: "an",
-				limit: 1,
-				cursor: 0,
-			});
+			const pageOne =
+				await catalogServer.searchPosCustomersForCurrentOrganization({
+					searchQuery: "an",
+					limit: 1,
+					cursor: 0,
+				});
 			expect(pageOne.data).toHaveLength(1);
 			expect(pageOne.hasMore).toBe(true);
 
-			const pageTwo = await catalogServer.searchPosCustomersForCurrentOrganization({
-				searchQuery: "an",
-				limit: 1,
-				cursor: pageOne.nextCursor,
-			});
+			const pageTwo =
+				await catalogServer.searchPosCustomersForCurrentOrganization({
+					searchQuery: "an",
+					limit: 1,
+					cursor: pageOne.nextCursor,
+				});
 			expect(pageTwo.data).toHaveLength(1);
 			expect(pageTwo.hasMore).toBe(false);
 			expect(pageOne.data[0]?.name).toBe("Ana Diaz");
@@ -625,14 +701,15 @@ describe("pos server modules", () => {
 				description: "Fondo adicional",
 			});
 
-			const summary = await shiftsServer.getShiftCloseSummaryForCurrentOrganization(
-				openedShift.id,
-			);
-			expect(summary.summaryByMethod.map((row: { paymentMethod: string }) => row.paymentMethod)).toEqual([
-				"cash",
-				"card",
-				"zelle",
-			]);
+			const summary =
+				await shiftsServer.getShiftCloseSummaryForCurrentOrganization(
+					openedShift.id,
+				);
+			expect(
+				summary.summaryByMethod.map(
+					(row: { paymentMethod: string }) => row.paymentMethod,
+				),
+			).toEqual(["cash", "card", "zelle"]);
 			expect(summary.summaryByMethod[0]?.expectedAmount).toBe(1200);
 			expect(summary.totalExpected).toBe(2200);
 		} finally {

@@ -1,5 +1,15 @@
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Clock3, Filter, Receipt, Search, Store, UserRound, Wallet, X } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import {
+	ArrowRight,
+	Clock3,
+	Filter,
+	Receipt,
+	Search,
+	Store,
+	UserRound,
+	Wallet,
+	X,
+} from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
@@ -12,10 +22,6 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-	NativeSelect,
-	NativeSelectOption,
-} from "@/components/ui/native-select";
 import {
 	Select,
 	SelectContent,
@@ -38,6 +44,15 @@ const DEFAULT_LIST_PARAMS = {
 	limit: 10,
 	cursor: 0,
 };
+
+const ALL_FILTER_VALUE = "all";
+const SALE_STATUS_VALUES = ["completed", "credit", "cancelled"] as const;
+const SALE_PAYMENT_METHOD_VALUES = [
+	"cash",
+	"card",
+	"transfer_nequi",
+	"transfer_bancolombia",
+] as const;
 
 const salesSearchSchema = z.object({
 	q: z.string().optional(),
@@ -135,7 +150,13 @@ function SalesPage() {
 			startDate: search.startDate ?? "",
 			endDate: search.endDate ?? "",
 		});
-	}, [search.endDate, search.paymentMethod, search.q, search.startDate, search.status]);
+	}, [
+		search.endDate,
+		search.paymentMethod,
+		search.q,
+		search.startDate,
+		search.status,
+	]);
 
 	const selectedSaleSummary = useMemo(
 		() => sales.find((sale) => sale.id === selectedSaleId) ?? null,
@@ -156,9 +177,16 @@ function SalesPage() {
 	const selectedSaleCreditAccount = saleDetailQuery.data?.customer?.id
 		? (creditAccountByCustomerId.get(saleDetailQuery.data.customer.id) ?? null)
 		: null;
-	const totalRevenue = sales.reduce((total, sale) => total + sale.totalAmount, 0);
-	const totalPending = sales.reduce((total, sale) => total + sale.balanceDue, 0);
+	const totalRevenue = sales.reduce(
+		(total, sale) => total + sale.totalAmount,
+		0,
+	);
+	const totalPending = sales.reduce(
+		(total, sale) => total + sale.balanceDue,
+		0,
+	);
 	const totalResults = salesQuery.data?.total ?? sales.length;
+	const nextCursor = salesQuery.data?.nextCursor ?? null;
 	const rangeStart = totalResults === 0 ? 0 : cursor + 1;
 	const rangeEnd = totalResults === 0 ? 0 : cursor + sales.length;
 	const activeFilterCount = [
@@ -173,8 +201,14 @@ function SalesPage() {
 		void navigate({
 			search: {
 				q: normalizeFilterValue(draftFilters.q),
-				status: normalizeFilterValue(draftFilters.status),
-				paymentMethod: normalizeFilterValue(draftFilters.paymentMethod),
+				status: normalizeEnumFilterValue(
+					draftFilters.status,
+					SALE_STATUS_VALUES,
+				),
+				paymentMethod: normalizeEnumFilterValue(
+					draftFilters.paymentMethod,
+					SALE_PAYMENT_METHOD_VALUES,
+				),
 				startDate: normalizeFilterValue(draftFilters.startDate),
 				endDate: normalizeFilterValue(draftFilters.endDate),
 				cursor: undefined,
@@ -205,7 +239,8 @@ function SalesPage() {
 			search: {
 				...search,
 				cursor: nextCursor > 0 ? nextCursor : undefined,
-				pageSize: nextPageSize !== DEFAULT_LIST_PARAMS.limit ? nextPageSize : undefined,
+				pageSize:
+					nextPageSize !== DEFAULT_LIST_PARAMS.limit ? nextPageSize : undefined,
 			},
 			replace: true,
 		});
@@ -292,7 +327,8 @@ function SalesPage() {
 								</div>
 								{activeFilterCount > 0 ? (
 									<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-										{activeFilterCount} filtro{activeFilterCount === 1 ? "" : "s"} activo
+										{activeFilterCount} filtro
+										{activeFilterCount === 1 ? "" : "s"} activo
 										{activeFilterCount === 1 ? "" : "s"}
 									</Badge>
 								) : null}
@@ -308,7 +344,10 @@ function SalesPage() {
 							>
 								<div className="grid gap-4 xl:grid-cols-[1.3fr_repeat(4,minmax(0,1fr))]">
 									<div className="space-y-2">
-										<label className="text-sm text-gray-400" htmlFor={salesSearchId}>
+										<label
+											className="text-sm text-gray-400"
+											htmlFor={salesSearchId}
+										>
 											Busqueda
 										</label>
 										<div className="relative">
@@ -329,44 +368,60 @@ function SalesPage() {
 									</div>
 
 									<FilterField label="Estado" htmlFor={salesStatusId}>
-										<NativeSelect
-											id={salesStatusId}
-											value={draftFilters.status}
-											onChange={(event) =>
+										<Select
+											value={draftFilters.status || ALL_FILTER_VALUE}
+											onValueChange={(value) =>
 												setDraftFilters((current) => ({
 													...current,
-													status: event.target.value,
+													status: value === ALL_FILTER_VALUE ? "" : value,
 												}))
 											}
-											className="w-full"
 										>
-											<NativeSelectOption value="">Todos</NativeSelectOption>
-											<NativeSelectOption value="completed">Pagada</NativeSelectOption>
-											<NativeSelectOption value="credit">Credito</NativeSelectOption>
-											<NativeSelectOption value="cancelled">Cancelada</NativeSelectOption>
-										</NativeSelect>
+											<SelectTrigger
+												id={salesStatusId}
+												className="h-8 w-full border-gray-700 bg-black/20 text-white"
+											>
+												<SelectValue placeholder="Todos" />
+											</SelectTrigger>
+											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+												<SelectItem value="completed">Pagada</SelectItem>
+												<SelectItem value="credit">Credito</SelectItem>
+												<SelectItem value="cancelled">Cancelada</SelectItem>
+											</SelectContent>
+										</Select>
 									</FilterField>
 
-									<FilterField label="Medio de pago" htmlFor={salesPaymentMethodId}>
-										<NativeSelect
-											id={salesPaymentMethodId}
-											value={draftFilters.paymentMethod}
-											onChange={(event) =>
+									<FilterField
+										label="Medio de pago"
+										htmlFor={salesPaymentMethodId}
+									>
+										<Select
+											value={draftFilters.paymentMethod || ALL_FILTER_VALUE}
+											onValueChange={(value) =>
 												setDraftFilters((current) => ({
 													...current,
-													paymentMethod: event.target.value,
+													paymentMethod:
+														value === ALL_FILTER_VALUE ? "" : value,
 												}))
 											}
-											className="w-full"
 										>
-											<NativeSelectOption value="">Todos</NativeSelectOption>
-											<NativeSelectOption value="cash">Efectivo</NativeSelectOption>
-											<NativeSelectOption value="card">Tarjeta</NativeSelectOption>
-											<NativeSelectOption value="transfer_nequi">Nequi</NativeSelectOption>
-											<NativeSelectOption value="transfer_bancolombia">
-												Bancolombia
-											</NativeSelectOption>
-										</NativeSelect>
+											<SelectTrigger
+												id={salesPaymentMethodId}
+												className="h-8 w-full border-gray-700 bg-black/20 text-white"
+											>
+												<SelectValue placeholder="Todos" />
+											</SelectTrigger>
+											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+												<SelectItem value="cash">Efectivo</SelectItem>
+												<SelectItem value="card">Tarjeta</SelectItem>
+												<SelectItem value="transfer_nequi">Nequi</SelectItem>
+												<SelectItem value="transfer_bancolombia">
+													Bancolombia
+												</SelectItem>
+											</SelectContent>
+										</Select>
 									</FilterField>
 
 									<FilterField label="Desde" htmlFor={salesStartDateId}>
@@ -453,7 +508,9 @@ function SalesPage() {
 													<p className="truncate font-medium text-white">
 														{sale.customerName ?? "Cliente mostrador"}
 													</p>
-													<Badge className={getSaleStatusBadgeClass(sale.status)}>
+													<Badge
+														className={getSaleStatusBadgeClass(sale.status)}
+													>
 														{formatSaleStatus(sale.status)}
 													</Badge>
 												</div>
@@ -533,11 +590,11 @@ function SalesPage() {
 												size="sm"
 												className="bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-medium border-none rounded-md h-8 px-4"
 												onClick={() => {
-													if (salesQuery.data?.nextCursor !== null) {
-														updatePagination(salesQuery.data.nextCursor);
+													if (nextCursor !== null) {
+														updatePagination(nextCursor);
 													}
 												}}
-												disabled={salesQuery.data?.nextCursor === null}
+												disabled={nextCursor === null}
 											>
 												Next
 											</Button>
@@ -651,6 +708,20 @@ function formatPaymentSummary(sale: SaleListItem) {
 function normalizeFilterValue(value: string) {
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeEnumFilterValue<T extends readonly string[]>(
+	value: string,
+	options: T,
+): T[number] | undefined {
+	const normalizedValue = normalizeFilterValue(value);
+	if (!normalizedValue) {
+		return undefined;
+	}
+
+	return options.includes(normalizedValue as T[number])
+		? (normalizedValue as T[number])
+		: undefined;
 }
 
 function FilterField({

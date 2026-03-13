@@ -1,6 +1,7 @@
 import { Plus, XIcon } from "lucide-react";
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Dialog,
 	DialogContent,
@@ -16,9 +17,9 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { formatMoneyInput, sanitizeMoneyInput } from "@/lib/utils";
 import type { CreditAccount, PaymentMethod } from "../../types";
 import { formatCurrency } from "../../utils";
-import { formatMoneyInput, sanitizeMoneyInput } from "@/lib/utils";
 
 interface CheckoutModalProps {
 	isOpen: boolean;
@@ -44,6 +45,8 @@ interface CheckoutModalProps {
 	isProcessing: boolean;
 	paymentDifference: number;
 	hasPaymentDifference: boolean;
+	canReturnCashChange: boolean;
+	cashChangeDue: number;
 	error: Error | null;
 	onAddPaymentMethod: () => void;
 	onRemovePaymentMethod: (index: number) => void;
@@ -54,6 +57,11 @@ interface CheckoutModalProps {
 	) => void;
 	onConfirm: () => void;
 }
+
+const paymentFieldClassName =
+	"h-10 rounded-lg border-gray-700 bg-[#151515] py-0 text-base text-white md:text-sm";
+const paymentSelectFieldClassName =
+	"data-[size=default]:h-10 data-[size=default]:rounded-lg";
 
 export function CheckoutModal({
 	isOpen,
@@ -74,17 +82,53 @@ export function CheckoutModal({
 	canFinalize,
 	isProcessing,
 	paymentDifference,
+	hasPaymentDifference,
+	canReturnCashChange,
+	cashChangeDue,
 	error,
 	onAddPaymentMethod,
 	onRemovePaymentMethod,
 	onUpdatePayment,
 	onConfirm,
 }: CheckoutModalProps) {
+	const paymentAmountInputRef = useRef<HTMLInputElement | null>(null);
+	const discountInputRef = useRef<HTMLInputElement | null>(null);
 	const discountInputId = useId();
+	const discountEnabledId = useId();
 	const creditSaleId = useId();
-	const paymentMethodById = new Map(
-		paymentMethodOptions.map((paymentMethod) => [paymentMethod.id, paymentMethod]),
+	const [isDiscountEnabled, setIsDiscountEnabled] = useState(
+		Number(discountInput) > 0,
 	);
+	const paymentMethodById = new Map(
+		paymentMethodOptions.map((paymentMethod) => [
+			paymentMethod.id,
+			paymentMethod,
+		]),
+	);
+	const footerLabel = isCreditSale
+		? "Saldo que quedará a crédito:"
+		: canReturnCashChange
+			? "Cambio a devolver:"
+			: "Diferencia de pago:";
+	const footerValue = isCreditSale
+		? Math.abs(paymentDifference)
+		: canReturnCashChange
+			? cashChangeDue
+			: Math.abs(paymentDifference);
+
+	useEffect(() => {
+		if (!isOpen) {
+			return;
+		}
+
+		setIsDiscountEnabled(Number(discountInput) > 0);
+		const focusTimeout = window.setTimeout(() => {
+			paymentAmountInputRef.current?.focus();
+			paymentAmountInputRef.current?.select();
+		}, 0);
+
+		return () => window.clearTimeout(focusTimeout);
+	}, [discountInput, isOpen]);
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
@@ -102,28 +146,61 @@ export function CheckoutModal({
 					</div>
 
 					<div className="space-y-4">
-						<div className="bg-[#0a0a0a] p-3 rounded-lg border border-gray-800 space-y-2">
-							<label
-								className="text-sm font-medium text-gray-300"
-								htmlFor={discountInputId}
-							>
-								Descuento total
-							</label>
-							<div className="relative">
-								<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-									$
-								</span>
-								<Input
-									id={discountInputId}
-									type="text"
-									inputMode="numeric"
-									value={formatMoneyInput(discountInput)}
-									onChange={(event) =>
-										setDiscountInput(sanitizeMoneyInput(event.target.value))
-									}
-									className="pl-7 h-10 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)]"
-								/>
+						<div className="rounded-lg border border-gray-800 bg-[#0a0a0a] p-3">
+							<div className="flex items-center justify-between gap-3">
+								<div>
+									<p className="text-sm font-medium text-gray-200">
+										Aplicar descuento
+									</p>
+									<p className="text-xs text-gray-500">
+										Actívalo solo cuando la orden lo necesite.
+									</p>
+								</div>
+								<div className="flex items-center gap-2">
+									<Checkbox
+										id={discountEnabledId}
+										checked={isDiscountEnabled}
+										onCheckedChange={(checked) => {
+											const nextValue = checked === true;
+											setIsDiscountEnabled(nextValue);
+											if (!nextValue) {
+												setDiscountInput("0");
+												return;
+											}
+											window.setTimeout(() => {
+												discountInputRef.current?.focus();
+												discountInputRef.current?.select();
+											}, 0);
+										}}
+										className="border-gray-600 data-[state=checked]:border-[var(--color-voltage)] data-[state=checked]:bg-[var(--color-voltage)] data-[state=checked]:text-black"
+									/>
+									<label
+										htmlFor={discountEnabledId}
+										className="cursor-pointer text-sm text-gray-300"
+									>
+										Agregar
+									</label>
+								</div>
 							</div>
+
+							{isDiscountEnabled ? (
+								<div className="relative mt-3">
+									<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+										$
+									</span>
+									<Input
+										ref={discountInputRef}
+										id={discountInputId}
+										type="text"
+										inputMode="numeric"
+										value={formatMoneyInput(discountInput)}
+										onChange={(event) =>
+											setDiscountInput(sanitizeMoneyInput(event.target.value))
+										}
+										className="h-10 border-gray-700 bg-[#151515] pl-7 focus-visible:border-[var(--color-voltage)] focus-visible:ring-0"
+									/>
+								</div>
+							) : null}
 						</div>
 
 						<div className="flex items-center justify-between">
@@ -162,10 +239,10 @@ export function CheckoutModal({
 						{shouldCreateCreditBalance &&
 							selectedCustomerId &&
 							!selectedCustomerCreditAccount && (
-							<p className="text-sm text-amber-300">
-								Se creará la cuenta de crédito del cliente con el saldo pendiente de esta
-								venta.
-							</p>
+								<p className="text-sm text-amber-300">
+									Se creará la cuenta de crédito del cliente con el saldo
+									pendiente de esta venta.
+								</p>
 							)}
 
 						{isCreditSale && (
@@ -203,77 +280,82 @@ export function CheckoutModal({
 
 						<div className="space-y-3">
 							{payments.map((payment, index) => {
-								const selectedPaymentMethod = paymentMethodById.get(payment.method);
+								const selectedPaymentMethod = paymentMethodById.get(
+									payment.method,
+								);
 
 								return (
 									<div
 										key={payment.id}
 										className="flex flex-col gap-2 p-3 bg-[#0a0a0a] rounded-lg border border-gray-800 relative group"
 									>
-									{payments.length > 1 && (
-										<button
-											type="button"
-											onClick={() => onRemovePaymentMethod(index)}
-											className="absolute -top-2 -right-2 bg-red-500/20 text-red-400 hover:bg-red-500/40 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-											aria-label="Eliminar método de pago"
-										>
-											<XIcon className="w-3 h-3" />
-										</button>
-									)}
+										{payments.length > 1 && (
+											<button
+												type="button"
+												onClick={() => onRemovePaymentMethod(index)}
+												className="absolute -top-2 -right-2 bg-red-500/20 text-red-400 hover:bg-red-500/40 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+												aria-label="Eliminar método de pago"
+											>
+												<XIcon className="w-3 h-3" />
+											</button>
+										)}
 
-									<div className="flex gap-2">
-										<Select
-											value={payment.method}
-											onValueChange={(value) =>
-												onUpdatePayment(index, "method", value)
-											}
-										>
-											<SelectTrigger className="flex-1 h-10 rounded-md border border-gray-700 bg-[#151515] px-3 text-sm text-white focus:outline-none focus:border-[var(--color-voltage)] focus:ring-0">
-												<SelectValue placeholder="Método" />
-											</SelectTrigger>
-											<SelectContent className="bg-[#151515] border-gray-700 text-white">
-												{paymentMethodOptions.map((paymentMethodOption) => (
-													<SelectItem
-														key={paymentMethodOption.id}
-														value={paymentMethodOption.id}
-													>
-														{paymentMethodOption.label}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
-
-										<div className="relative flex-1">
-											<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-												$
-											</span>
-											<Input
-												type="text"
-												inputMode="numeric"
-												placeholder="Monto"
-												value={formatMoneyInput(payment.amount)}
-												onChange={(e) =>
-													onUpdatePayment(
-														index,
-														"amount",
-														sanitizeMoneyInput(e.target.value),
-													)
+										<div className="flex gap-2">
+											<Select
+												value={payment.method}
+												onValueChange={(value) =>
+													onUpdatePayment(index, "method", value)
 												}
-												className="pl-7 h-10 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)]"
-											/>
-										</div>
-									</div>
+											>
+												<SelectTrigger
+													className={`${paymentFieldClassName} ${paymentSelectFieldClassName} flex-1 px-3 [&_[data-slot=select-value]]:leading-none`}
+												>
+													<SelectValue placeholder="Método" />
+												</SelectTrigger>
+												<SelectContent className="bg-[#151515] border-gray-700 text-white">
+													{paymentMethodOptions.map((paymentMethodOption) => (
+														<SelectItem
+															key={paymentMethodOption.id}
+															value={paymentMethodOption.id}
+														>
+															{paymentMethodOption.label}
+														</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
 
-									{selectedPaymentMethod?.requiresReference ? (
-										<Input
-											placeholder="Referencia (Ej. últimos 4 dígitos o voucher)"
-											value={payment.reference}
-											onChange={(e) =>
-												onUpdatePayment(index, "reference", e.target.value)
-											}
-											className="h-9 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)] text-sm"
-										/>
-									) : null}
+											<div className="relative flex-1">
+												<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+													$
+												</span>
+												<Input
+													ref={index === 0 ? paymentAmountInputRef : undefined}
+													type="text"
+													inputMode="numeric"
+													placeholder="Monto"
+													value={formatMoneyInput(payment.amount)}
+													onChange={(e) =>
+														onUpdatePayment(
+															index,
+															"amount",
+															sanitizeMoneyInput(e.target.value),
+														)
+													}
+													className={`${paymentFieldClassName} pl-7`}
+												/>
+											</div>
+										</div>
+
+										{selectedPaymentMethod?.requiresReference ? (
+											<Input
+												placeholder="Referencia (Ej. últimos 4 dígitos o voucher)"
+												value={payment.reference}
+												onChange={(e) =>
+													onUpdatePayment(index, "reference", e.target.value)
+												}
+												className="h-9 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)] text-sm"
+											/>
+										) : null}
 									</div>
 								);
 							})}
@@ -290,29 +372,32 @@ export function CheckoutModal({
 					</div>
 
 					<div className="flex justify-between items-center text-sm pt-2 border-t border-gray-800">
-						<span className="text-gray-400">
-							{isCreditSale
-								? shouldCreateCreditBalance
-									? "Saldo que quedará a crédito:"
-									: "Saldo que quedará a crédito:"
-								: "Diferencia de pago:"}
-						</span>
+						<span className="text-gray-400">{footerLabel}</span>
 						<span
 							className={`font-semibold ${
 								isCreditSale
 									? shouldCreateCreditBalance
 										? "text-[var(--color-voltage)]"
 										: "text-green-400"
-									: paymentDifference === 0
-										? "text-green-400"
-										: paymentDifference > 0
-											? "text-red-400"
-											: "text-amber-400"
+									: canReturnCashChange
+										? "text-[var(--color-voltage)]"
+										: paymentDifference === 0
+											? "text-green-400"
+											: paymentDifference > 0
+												? "text-red-400"
+												: "text-amber-400"
 							}`}
 						>
-							{formatCurrency(Math.abs(paymentDifference))}
+							{formatCurrency(footerValue)}
 						</span>
 					</div>
+
+					{!isCreditSale && canReturnCashChange && hasPaymentDifference ? (
+						<p className="text-sm text-gray-400">
+							El sistema registrará el valor recibido y mostrará este monto como
+							vuelto para el cajero.
+						</p>
+					) : null}
 
 					{error instanceof Error && (
 						<p className="text-sm text-red-400">{error.message}</p>

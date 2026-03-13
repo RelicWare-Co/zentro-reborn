@@ -9,6 +9,31 @@ function getDefaultPaymentMethodId(
 	return paymentMethodOptions[0]?.id ?? "cash";
 }
 
+function canCompleteSaleWithCashChange(
+	payments: Array<{ method: string; amount: number }>,
+	totalAmount: number,
+) {
+	const paidAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
+	if (paidAmount <= totalAmount) {
+		return false;
+	}
+
+	const hasCashPayment = payments.some(
+		(payment) => payment.method.toLowerCase() === "cash" && payment.amount > 0,
+	);
+	if (!hasCashPayment) {
+		return false;
+	}
+
+	const nonCashPaid = payments.reduce(
+		(sum, payment) =>
+			payment.method.toLowerCase() === "cash" ? sum : sum + payment.amount,
+		0,
+	);
+
+	return nonCashPaid <= totalAmount;
+}
+
 export function usePosCheckout(
 	activeShiftId: string | undefined,
 	cart: CartItem[],
@@ -237,19 +262,38 @@ export function usePosCheckout(
 	const hasPaymentDifference = paymentDifference !== 0;
 	const remainingCreditAmount = Math.max(paymentDifference, 0);
 	const shouldCreateCreditBalance = isCreditSale && remainingCreditAmount > 0;
+	const canReturnCashChange = useMemo(
+		() =>
+			canCompleteSaleWithCashChange(
+				payments.map((payment) => ({
+					method: payment.method,
+					amount: parseMoneyInput(payment.amount),
+				})),
+				totalAmount,
+			),
+		[payments, totalAmount],
+	);
+	const cashChangeDue = canReturnCashChange ? Math.abs(paymentDifference) : 0;
 
 	const canFinalizeSale = useMemo(() => {
 		if (!activeShiftId || cart.length === 0) return false;
 		if (createPosSaleMutation.isPending) return false;
-		if (paymentDifference < 0) return false;
+		if (paymentDifference < 0 && !canReturnCashChange) return false;
 		if (shouldCreateCreditBalance && !selectedCustomerId) return false;
-		if (!shouldCreateCreditBalance && hasPaymentDifference) return false;
+		if (
+			!shouldCreateCreditBalance &&
+			hasPaymentDifference &&
+			!(paymentDifference < 0 && canReturnCashChange)
+		) {
+			return false;
+		}
 		return true;
 	}, [
 		activeShiftId,
 		cart.length,
 		createPosSaleMutation.isPending,
 		paymentDifference,
+		canReturnCashChange,
 		shouldCreateCreditBalance,
 		selectedCustomerId,
 		hasPaymentDifference,
@@ -275,6 +319,8 @@ export function usePosCheckout(
 		hasPaymentDifference,
 		remainingCreditAmount,
 		shouldCreateCreditBalance,
+		canReturnCashChange,
+		cashChangeDue,
 		canFinalizeSale,
 		isProcessing: createPosSaleMutation.isPending,
 		error: createPosSaleMutation.error,

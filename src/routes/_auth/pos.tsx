@@ -444,6 +444,8 @@ function PosPage() {
 				isProcessing={checkout.isProcessing}
 				paymentDifference={checkout.paymentDifference}
 				hasPaymentDifference={checkout.hasPaymentDifference}
+				canReturnCashChange={checkout.canReturnCashChange}
+				cashChangeDue={checkout.cashChangeDue}
 				error={checkout.error}
 				onAddPaymentMethod={checkout.addPaymentMethod}
 				onRemovePaymentMethod={checkout.removePaymentMethod}

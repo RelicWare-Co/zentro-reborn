@@ -23,6 +23,30 @@ import {
 	toPositiveInteger,
 } from "./utils";
 
+function canSettleCompletedSaleWithCashChange(
+	payments: Array<{ method: string; amount: number }>,
+	totalAmount: number,
+) {
+	const paidAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
+	if (paidAmount <= totalAmount) {
+		return false;
+	}
+
+	const hasCashPayment = payments.some(
+		(payment) => payment.method === "cash" && payment.amount > 0,
+	);
+	if (!hasCashPayment) {
+		return false;
+	}
+
+	const nonCashPaid = payments.reduce(
+		(sum, payment) => (payment.method === "cash" ? sum : sum + payment.amount),
+		0,
+	);
+
+	return nonCashPaid <= totalAmount;
+}
+
 export async function createPosSaleForCurrentOrganization(
 	input: CreatePosSaleInput,
 ) {
@@ -286,6 +310,10 @@ export async function createPosSaleForCurrentOrganization(
 			(total, registeredPayment) => total + registeredPayment.amount,
 			0,
 		);
+		const allowsCashChange = canSettleCompletedSaleWithCashChange(
+			normalizedPayments,
+			totalAmount,
+		);
 
 		if (isCreditSale) {
 			if (!customerId) {
@@ -316,9 +344,9 @@ export async function createPosSaleForCurrentOrganization(
 						"Debes registrar al menos un pago para finalizar la venta",
 					);
 				}
-				if (paidAmount !== totalAmount) {
+				if (paidAmount !== totalAmount && !allowsCashChange) {
 					throw new Error(
-						"La suma de los pagos debe ser igual al total de la venta",
+						"La suma de los pagos debe ser igual al total de la venta, salvo excedente en efectivo para devolver cambio",
 					);
 				}
 			}
@@ -441,7 +469,7 @@ export async function createPosSaleForCurrentOrganization(
 			await tx.insert(inventoryMovement).values(inventoryRows);
 		}
 
-		const balanceDue = totalAmount - paidAmount;
+		const balanceDue = Math.max(totalAmount - paidAmount, 0);
 		if (isCreditSale && customerId) {
 			const [existingCreditAccount] = await tx
 				.select({ id: creditAccount.id, balance: creditAccount.balance })

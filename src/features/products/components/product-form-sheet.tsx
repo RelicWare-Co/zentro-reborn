@@ -298,10 +298,10 @@ export function ProductFormSheet({
 							</div>
 						</div>
 
-						{/* Inventory */}
+						{/* Inventario */}
 						<div className="space-y-4">
 							<h3 className="text-sm font-semibold text-[var(--color-voltage)] uppercase tracking-wider">
-								Inventory Management
+								Gestión de Inventario
 							</h3>
 
 							<div className="flex items-center justify-between p-4 bg-black/20 border border-gray-800 rounded-lg">
@@ -310,10 +310,10 @@ export function ProductFormSheet({
 										htmlFor={trackInventoryId}
 										className="text-gray-200 font-medium"
 									>
-										Track Inventory
+										Controlar Inventario
 									</Label>
 									<p className="text-xs text-gray-500">
-										Monitor stock levels for this product
+										Monitorear niveles de stock para este producto
 									</p>
 								</div>
 								<Switch
@@ -334,10 +334,10 @@ export function ProductFormSheet({
 										htmlFor={isModifierId}
 										className="text-gray-200 font-medium"
 									>
-										Modifier Product
+										Producto Modificador
 									</Label>
 									<p className="text-xs text-gray-500">
-										Use this item as POS modifier/add-on
+										Usar este ítem como modificador/adicional en el POS
 									</p>
 								</div>
 								<Switch
@@ -355,7 +355,7 @@ export function ProductFormSheet({
 							{productForm.trackInventory && (
 								<div className="space-y-2 animate-in fade-in slide-in-from-top-2">
 									<Label htmlFor={stockId} className="text-gray-300">
-										Initial Stock
+										Stock Inicial
 									</Label>
 									<Input
 										id={stockId}
@@ -388,7 +388,7 @@ export function ProductFormSheet({
 							disabled={isPending}
 							className="w-full sm:w-auto bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-semibold rounded-lg"
 						>
-							{isPending ? "Saving..." : "Save Product"}
+							{isPending ? "Guardando..." : "Guardar Producto"}
 						</Button>
 					</SheetFooter>
 				</form>

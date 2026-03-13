@@ -75,7 +75,7 @@ export function PosHeader({
 							{activeShift?.terminalName || defaultTerminalName}
 						</span>
 						<span className="text-gray-400 text-xs px-1.5 py-0.5 bg-gray-800 rounded-md">
-							{activeShift ? "Abierta" : "Cerrada"}
+							{activeShift ? "Abierto" : "Cerrado"}
 						</span>
 					</div>
 

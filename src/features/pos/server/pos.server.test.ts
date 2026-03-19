@@ -15,7 +15,8 @@ async function setupPosServers() {
 	const shiftsServer = await import("./shifts");
 	const salesServer = await import("./sales");
 	const catalogServer = await import("./catalog");
-	return { ctx, shiftsServer, salesServer, catalogServer };
+	const salesHistoryServer = await import("./sales-history");
+	return { ctx, shiftsServer, salesServer, catalogServer, salesHistoryServer };
 }
 
 async function insertProduct(input: {
@@ -797,6 +798,227 @@ describe("pos server modules", () => {
 					closures: [{ paymentMethod: "cash", actualAmount: 4000 }],
 				}),
 			).rejects.toThrow("El turno ya está cerrado");
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("lists sales with payment filters and balance summaries", async () => {
+		const { ctx, shiftsServer, salesServer, salesHistoryServer } =
+			await setupPosServers();
+		try {
+			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 5000,
+				terminalId: "terminal-1",
+				terminalName: "Caja Historial",
+			});
+			const customerId = await insertCustomer({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Cliente Historial",
+				documentNumber: "500",
+			});
+			const firstProductId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Producto Card",
+				price: 4000,
+				trackInventory: false,
+				stock: 0,
+			});
+			const secondProductId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Producto Credito",
+				price: 3000,
+				trackInventory: false,
+				stock: 0,
+			});
+
+			await salesServer.createPosSaleForCurrentOrganization({
+				shiftId: openedShift.id,
+				items: [{ productId: firstProductId, quantity: 2 }],
+				payments: [
+					{ method: "card", amount: 5000 },
+					{ method: "cash", amount: 3000 },
+				],
+			});
+			await salesServer.createPosSaleForCurrentOrganization({
+				shiftId: openedShift.id,
+				customerId,
+				items: [{ productId: secondProductId, quantity: 2 }],
+				payments: [{ method: "cash", amount: 1000 }],
+				isCreditSale: true,
+			});
+
+			const cardSales =
+				await salesHistoryServer.listSalesForCurrentOrganization({
+					paymentMethod: "card",
+				});
+			expect(cardSales.data).toHaveLength(1);
+			expect(cardSales.data[0]).toEqual(
+				expect.objectContaining({
+					status: "completed",
+					totalAmount: 8000,
+					paidAmount: 8000,
+					balanceDue: 0,
+					itemCount: 2,
+					paymentMethods: ["card", "cash"],
+				}),
+			);
+
+			const creditSales =
+				await salesHistoryServer.listSalesForCurrentOrganization({
+					status: "credit",
+					searchQuery: "Cliente Historial",
+				});
+			expect(creditSales.data).toHaveLength(1);
+			expect(creditSales.data[0]).toEqual(
+				expect.objectContaining({
+					status: "credit",
+					totalAmount: 6000,
+					paidAmount: 1000,
+					balanceDue: 5000,
+					customerName: "Cliente Historial",
+				}),
+			);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("returns sale details including modifiers and debt payments", async () => {
+		const { ctx, shiftsServer, salesServer, salesHistoryServer } =
+			await setupPosServers();
+		try {
+			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 5000,
+				terminalId: "terminal-1",
+				terminalName: "Caja Detalle",
+			});
+			const customerId = await insertCustomer({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Cliente Detalle",
+				documentNumber: "501",
+			});
+			const productId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Hamburguesa",
+				price: 5000,
+				trackInventory: false,
+				stock: 0,
+			});
+			const modifierId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Extra Queso",
+				price: 1000,
+				isModifier: true,
+				trackInventory: false,
+				stock: 0,
+			});
+
+			const createdSale = await salesServer.createPosSaleForCurrentOrganization({
+				shiftId: openedShift.id,
+				customerId,
+				items: [
+					{
+						productId,
+						quantity: 2,
+						modifiers: [{ modifierProductId: modifierId, quantity: 1 }],
+					},
+				],
+				payments: [{ method: "cash", amount: 4000 }],
+				isCreditSale: true,
+			});
+
+			const [creditAccountRow] = await ctx.db
+				.select({ id: schema.creditAccount.id })
+				.from(schema.creditAccount)
+				.where(
+					and(
+						eq(schema.creditAccount.organizationId, ctx.organizationId),
+						eq(schema.creditAccount.customerId, customerId),
+					),
+				)
+				.limit(1);
+
+			expect(creditAccountRow?.id).toBeDefined();
+
+			const debtPaymentId = crypto.randomUUID();
+			await ctx.db.insert(schema.payment).values({
+				id: debtPaymentId,
+				organizationId: ctx.organizationId,
+				saleId: createdSale.saleId,
+				shiftId: openedShift.id,
+				method: "card",
+				reference: "ABONO-1",
+				amount: createdSale.balanceDue,
+				createdAt: new Date(Date.now() + 1_000),
+			});
+			await ctx.db.insert(schema.creditTransaction).values({
+				id: crypto.randomUUID(),
+				organizationId: ctx.organizationId,
+				creditAccountId: creditAccountRow?.id ?? "",
+				saleId: createdSale.saleId,
+				paymentId: debtPaymentId,
+				type: "payment",
+				amount: createdSale.balanceDue,
+				notes: "Abono final",
+				createdAt: new Date(Date.now() + 1_000),
+			});
+
+			const detail = await salesHistoryServer.getSaleByIdForCurrentOrganization({
+				saleId: createdSale.saleId,
+			});
+
+			expect(detail).toEqual(
+				expect.objectContaining({
+					id: createdSale.saleId,
+					status: "credit",
+					totalAmount: 12000,
+					paidAmount: 12000,
+					balanceDue: 0,
+					customer: expect.objectContaining({
+						id: customerId,
+						name: "Cliente Detalle",
+					}),
+					shift: expect.objectContaining({
+						id: openedShift.id,
+						terminalName: "Caja Detalle",
+					}),
+				}),
+			);
+			expect(detail?.payments.map((payment) => payment.kind)).toEqual([
+				"debt_payment",
+				"sale_payment",
+			]);
+			expect(detail?.payments[0]).toEqual(
+				expect.objectContaining({
+					method: "card",
+					amount: 8000,
+					notes: "Abono final",
+				}),
+			);
+			expect(detail?.items).toHaveLength(1);
+			expect(detail?.items[0]).toEqual(
+				expect.objectContaining({
+					name: "Hamburguesa",
+					quantity: 2,
+					totalAmount: 12000,
+					modifiers: [
+						expect.objectContaining({
+							modifierProductId: modifierId,
+							name: "Extra Queso",
+							quantity: 1,
+							unitPrice: 1000,
+							subtotal: 2000,
+						}),
+					],
+				}),
+			);
 		} finally {
 			ctx.cleanup();
 		}

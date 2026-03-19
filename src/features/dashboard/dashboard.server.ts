@@ -1,5 +1,5 @@
 import "@tanstack/react-start/server-only";
-import { and, asc, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
 	category,
@@ -347,11 +347,19 @@ export async function getDashboardOverviewForCurrentOrganization(): Promise<Dash
 				amount: sql<number>`coalesce(sum(${payment.amount}), 0)`,
 			})
 			.from(payment)
+			.leftJoin(
+				sale,
+				and(
+					eq(sale.id, payment.saleId),
+					eq(sale.organizationId, organizationId),
+				),
+			)
 			.where(
 				and(
 					eq(payment.organizationId, organizationId),
 					sql`${payment.createdAt} >= ${todayStart.getTime()}`,
 					sql`${payment.createdAt} < ${tomorrowStart.getTime()}`,
+					or(isNull(payment.saleId), ne(sale.status, "cancelled")),
 				),
 			)
 			.groupBy(payment.method)

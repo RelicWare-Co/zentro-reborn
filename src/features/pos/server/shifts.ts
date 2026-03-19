@@ -1,5 +1,17 @@
 import "@tanstack/react-start/server-only";
-import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	gte,
+	inArray,
+	isNull,
+	lt,
+	ne,
+	or,
+	sql,
+} from "drizzle-orm";
 import { db } from "#/db";
 import {
 	cashMovement,
@@ -261,6 +273,7 @@ export async function listShiftsForCurrentOrganization(
 				and(
 					eq(payment.organizationId, organizationId),
 					inArray(payment.shiftId, shiftIds),
+					or(isNull(payment.saleId), ne(sale.status, "cancelled")),
 				),
 			)
 			.orderBy(desc(payment.createdAt)),
@@ -765,6 +778,7 @@ export async function getShiftCloseSummaryForCurrentOrganization(
 					and(
 						eq(payment.organizationId, organizationId),
 						eq(payment.shiftId, shiftId),
+						or(isNull(payment.saleId), ne(sale.status, "cancelled")),
 					),
 				),
 			db
@@ -908,6 +922,7 @@ export async function closeShiftForCurrentOrganization(input: CloseShiftInput) {
 					and(
 						eq(payment.organizationId, organizationId),
 						eq(payment.shiftId, input.shiftId),
+						or(isNull(payment.saleId), ne(sale.status, "cancelled")),
 					),
 				),
 			tx

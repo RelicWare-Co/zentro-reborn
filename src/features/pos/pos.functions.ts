@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
+	cancelSaleForCurrentOrganization,
 	closeShiftForCurrentOrganization,
 	createPosSaleForCurrentOrganization,
 	getPosBootstrapForCurrentOrganization,
@@ -51,6 +52,11 @@ const listShiftsInputSchema = z.object({
 
 const getSaleByIdInputSchema = z.object({
 	saleId: z.string().trim().min(1),
+});
+
+const cancelSaleInputSchema = z.object({
+	saleId: z.string().trim().min(1),
+	cancelledAt: z.coerce.number().int().min(0).optional(),
 });
 
 const openShiftInputSchema = z.object({
@@ -200,6 +206,15 @@ export const getSaleById = createServerFn({ method: "GET" })
 	.handler(async ({ data }) => {
 		return getSaleByIdForCurrentOrganization({
 			saleId: data.saleId,
+		});
+	});
+
+export const cancelSale = createServerFn({ method: "POST" })
+	.inputValidator(cancelSaleInputSchema)
+	.handler(async ({ data }) => {
+		return cancelSaleForCurrentOrganization({
+			saleId: data.saleId,
+			cancelledAt: data.cancelledAt,
 		});
 	});
 

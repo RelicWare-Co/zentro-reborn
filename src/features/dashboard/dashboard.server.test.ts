@@ -409,6 +409,16 @@ describe("dashboard.server", () => {
 					amount: 8000,
 					createdAt: previousMonthAt,
 				},
+				{
+					id: crypto.randomUUID(),
+					organizationId: ctx.organizationId,
+					saleId: cancelledSaleId,
+					shiftId: activeShiftId,
+					method: "cash",
+					reference: null,
+					amount: 4000,
+					createdAt: todayLaterAt,
+				},
 			]);
 
 			const dashboard =

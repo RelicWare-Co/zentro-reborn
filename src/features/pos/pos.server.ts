@@ -4,7 +4,10 @@ export {
 	searchPosCustomersForCurrentOrganization,
 	searchPosProductsForCurrentOrganization,
 } from "./server/catalog";
-export { createPosSaleForCurrentOrganization } from "./server/sales";
+export {
+	cancelSaleForCurrentOrganization,
+	createPosSaleForCurrentOrganization,
+} from "./server/sales";
 export {
 	getSaleByIdForCurrentOrganization,
 	listSalesForCurrentOrganization,
@@ -21,6 +24,7 @@ export {
 export {
 	CASH_MOVEMENT_TYPES,
 	type CashMovementType,
+	type CancelSaleInput,
 	type CloseShiftInput,
 	type CreatePosSaleInput,
 	type GetSaleByIdInput,

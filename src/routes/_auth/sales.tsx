@@ -236,11 +236,13 @@ function SalesPage() {
 		? (creditAccountByCustomerId.get(saleDetailQuery.data.customer.id) ?? null)
 		: null;
 	const totalRevenue = sales.reduce(
-		(total, sale) => total + sale.totalAmount,
+		(total, sale) =>
+			sale.status === "cancelled" ? total : total + sale.totalAmount,
 		0,
 	);
 	const totalPending = sales.reduce(
-		(total, sale) => total + sale.balanceDue,
+		(total, sale) =>
+			sale.status === "cancelled" ? total : total + sale.balanceDue,
 		0,
 	);
 	const totalResults = salesQuery.data?.total ?? sales.length;
@@ -994,6 +996,10 @@ function getSaleStatusBadgeClass(status: string) {
 }
 
 function formatPaymentSummary(sale: SaleListItem) {
+	if (sale.status === "cancelled") {
+		return "Venta anulada";
+	}
+
 	if (sale.paymentMethods.length === 0) {
 		return sale.status === "credit" ? "Venta a credito" : "Sin pagos";
 	}

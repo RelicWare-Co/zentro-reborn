@@ -809,6 +809,197 @@ describe("pos server modules", () => {
 		}
 	});
 
+	test("cancels a paid sale, restores stock, and removes it from cash summary", async () => {
+		const { ctx, shiftsServer, salesServer, salesHistoryServer } =
+			await setupPosServers();
+		try {
+			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 1000,
+				terminalId: "terminal-1",
+				terminalName: "Caja 1",
+			});
+			const productId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Producto Anulable",
+				price: 2000,
+				stock: 10,
+				trackInventory: true,
+			});
+
+			const createdSale = await salesServer.createPosSaleForCurrentOrganization({
+				shiftId: openedShift.id,
+				items: [{ productId, quantity: 2 }],
+				payments: [{ method: "cash", amount: 4000 }],
+			});
+
+			await salesServer.cancelSaleForCurrentOrganization({
+				saleId: createdSale.saleId,
+			});
+
+			const [cancelledSale, restoredProduct] = await Promise.all([
+				ctx.db
+					.select({ status: schema.sale.status })
+					.from(schema.sale)
+					.where(eq(schema.sale.id, createdSale.saleId))
+					.limit(1),
+				ctx.db
+					.select({ stock: schema.product.stock })
+					.from(schema.product)
+					.where(eq(schema.product.id, productId))
+					.limit(1),
+			]);
+
+			expect(cancelledSale[0]?.status).toBe("cancelled");
+			expect(restoredProduct[0]?.stock).toBe(10);
+
+			const inventoryMovements = await ctx.db
+				.select({
+					type: schema.inventoryMovement.type,
+					quantity: schema.inventoryMovement.quantity,
+					notes: schema.inventoryMovement.notes,
+				})
+				.from(schema.inventoryMovement)
+				.where(eq(schema.inventoryMovement.productId, productId));
+
+			expect(inventoryMovements).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ type: "sale", quantity: -2 }),
+					expect.objectContaining({
+						type: "adjustment",
+						quantity: 2,
+						notes: expect.stringContaining(createdSale.saleId),
+					}),
+				]),
+			);
+
+			const summary =
+				await shiftsServer.getShiftCloseSummaryForCurrentOrganization(
+					openedShift.id,
+				);
+			expect(summary.summaryByMethod).toEqual([
+				{
+					paymentMethod: "cash",
+					expectedAmount: 1000,
+					actualAmount: null,
+					difference: null,
+				},
+			]);
+
+			const listedSales = await salesHistoryServer.listSalesForCurrentOrganization({
+				status: "cancelled",
+			});
+			expect(listedSales.data[0]).toEqual(
+				expect.objectContaining({
+					id: createdSale.saleId,
+					status: "cancelled",
+					totalAmount: 4000,
+					paidAmount: 0,
+					balanceDue: 0,
+				}),
+			);
+
+			const detail = await salesHistoryServer.getSaleByIdForCurrentOrganization({
+				saleId: createdSale.saleId,
+			});
+			expect(detail).toEqual(
+				expect.objectContaining({
+					id: createdSale.saleId,
+					status: "cancelled",
+					paidAmount: 0,
+					balanceDue: 0,
+				}),
+			);
+			expect(detail?.payments).toHaveLength(1);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("cancels a credit sale and reverts the credit account balance", async () => {
+		const { ctx, shiftsServer, salesServer } = await setupPosServers();
+		try {
+			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 0,
+				terminalId: "terminal-1",
+				terminalName: "Caja 1",
+			});
+			const customerId = await insertCustomer({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Cliente Credito",
+				documentNumber: "9001",
+			});
+			const productId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Producto Credito",
+				price: 3000,
+				trackInventory: false,
+				stock: 0,
+			});
+
+			const createdSale = await salesServer.createPosSaleForCurrentOrganization({
+				shiftId: openedShift.id,
+				customerId,
+				items: [{ productId, quantity: 1 }],
+				payments: [{ method: "cash", amount: 1000 }],
+				isCreditSale: true,
+			});
+
+			const [accountBeforeCancel] = await ctx.db
+				.select({
+					id: schema.creditAccount.id,
+					balance: schema.creditAccount.balance,
+				})
+				.from(schema.creditAccount)
+				.where(
+					and(
+						eq(schema.creditAccount.organizationId, ctx.organizationId),
+						eq(schema.creditAccount.customerId, customerId),
+					),
+				)
+				.limit(1);
+
+			expect(accountBeforeCancel?.balance).toBe(2000);
+
+			await salesServer.cancelSaleForCurrentOrganization({
+				saleId: createdSale.saleId,
+			});
+
+			const [accountAfterCancel, cancelledSale] = await Promise.all([
+				ctx.db
+					.select({ balance: schema.creditAccount.balance })
+					.from(schema.creditAccount)
+					.where(eq(schema.creditAccount.id, accountBeforeCancel?.id ?? ""))
+					.limit(1),
+				ctx.db
+					.select({ status: schema.sale.status })
+					.from(schema.sale)
+					.where(eq(schema.sale.id, createdSale.saleId))
+					.limit(1),
+			]);
+
+			expect(accountAfterCancel[0]?.balance).toBe(0);
+			expect(cancelledSale[0]?.status).toBe("cancelled");
+
+			const summary =
+				await shiftsServer.getShiftCloseSummaryForCurrentOrganization(
+					openedShift.id,
+				);
+			expect(summary.summaryByMethod).toEqual([
+				{
+					paymentMethod: "cash",
+					expectedAmount: 0,
+					actualAmount: null,
+					difference: null,
+				},
+			]);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
 	test("lists sales with payment filters and balance summaries", async () => {
 		const { ctx, shiftsServer, salesServer, salesHistoryServer } =
 			await setupPosServers();

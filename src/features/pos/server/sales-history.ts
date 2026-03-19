@@ -1,5 +1,5 @@
 import "@tanstack/react-start/server-only";
-import { and, desc, eq, gte, inArray, like, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
 	creditTransaction,
@@ -97,11 +97,11 @@ export async function listSalesForCurrentOrganization(
 	if (trimmedSearchQuery) {
 		const searchPattern = `%${trimmedSearchQuery}%`;
 		whereConditions.push(
-			or(
-				like(sale.id, searchPattern),
-				like(customer.name, searchPattern),
-				like(user.name, searchPattern),
-			),
+			sql`(
+				${sale.id} like ${searchPattern}
+				or coalesce(${customer.name}, '') like ${searchPattern}
+				or coalesce(${user.name}, '') like ${searchPattern}
+			)`,
 		);
 	}
 	if (startDateMs !== null) {
@@ -236,7 +236,7 @@ export async function listSalesForCurrentOrganization(
 		data: pageRows.map((row) => {
 			const paymentSummary = paymentsBySaleId.get(row.id);
 			const totalAmount = normalizeNumber(row.totalAmount);
-			const paidAmount = paymentSummary?.paidAmount ?? 0;
+			const paidAmount = row.status === "cancelled" ? 0 : (paymentSummary?.paidAmount ?? 0);
 
 			return {
 				id: row.id,
@@ -248,7 +248,7 @@ export async function listSalesForCurrentOrganization(
 				createdAt: normalizeTimestamp(row.createdAt),
 				itemCount: itemCountBySaleId.get(row.id) ?? 0,
 				paidAmount,
-				balanceDue: Math.max(totalAmount - paidAmount, 0),
+				balanceDue: row.status === "cancelled" ? 0 : Math.max(totalAmount - paidAmount, 0),
 				paymentMethods: paymentSummary?.paymentMethods ?? [],
 			};
 		}),
@@ -431,6 +431,7 @@ export async function getSaleByIdForCurrentOrganization(
 		(total, currentPayment) => total + currentPayment.amount,
 		0,
 	);
+	const effectivePaidAmount = saleRow.status === "cancelled" ? 0 : paidAmount;
 
 	return {
 		id: saleRow.id,
@@ -440,8 +441,11 @@ export async function getSaleByIdForCurrentOrganization(
 		taxAmount: normalizeNumber(saleRow.taxAmount),
 		discountAmount: normalizeNumber(saleRow.discountAmount),
 		totalAmount: normalizeNumber(saleRow.totalAmount),
-		paidAmount,
-		balanceDue: Math.max(normalizeNumber(saleRow.totalAmount) - paidAmount, 0),
+		paidAmount: effectivePaidAmount,
+		balanceDue:
+			saleRow.status === "cancelled"
+				? 0
+				: Math.max(normalizeNumber(saleRow.totalAmount) - effectivePaidAmount, 0),
 		customer: saleRow.customerId
 			? {
 					id: saleRow.customerId,

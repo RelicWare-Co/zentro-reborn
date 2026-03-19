@@ -22,7 +22,10 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { useRegisterCreditPaymentMutation } from "@/features/pos/hooks/usePosQueries";
+import {
+	useCancelPosSaleMutation,
+	useRegisterCreditPaymentMutation,
+} from "@/features/pos/hooks/usePosQueries";
 import { printThermalReceipt } from "@/features/pos/printing/printThermalReceipt";
 import {
 	buildPaymentReceiptDocument,
@@ -81,6 +84,27 @@ export function SaleDetailSheet({
 		},
 		[sale],
 	);
+	const cancelSaleMutation = useCancelPosSaleMutation();
+	const canCancelSale =
+		sale?.status !== "cancelled" &&
+		Boolean(activeShiftId) &&
+		sale?.shift?.id === activeShiftId &&
+		!cancelSaleMutation.isPending;
+
+	const handleCancelSale = useCallback(() => {
+		if (!sale || !canCancelSale) {
+			return;
+		}
+
+		const confirmed = window.confirm(
+			"Esta venta quedará anulada. Sus pagos dejarán de contar para caja y sus valores no sumarán en ventas. ¿Deseas continuar?",
+		);
+		if (!confirmed) {
+			return;
+		}
+
+		cancelSaleMutation.mutate({ saleId: sale.id });
+	}, [canCancelSale, cancelSaleMutation, sale]);
 
 	return (
 		<Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -124,6 +148,17 @@ export function SaleDetailSheet({
 										<Button
 											type="button"
 											variant="outline"
+											onClick={handleCancelSale}
+											disabled={!canCancelSale}
+											className="border-rose-500/40 bg-transparent text-rose-200 hover:bg-rose-500/10 hover:text-rose-100 disabled:border-gray-800 disabled:text-gray-500"
+										>
+											{cancelSaleMutation.isPending
+												? "Anulando..."
+												: "Anular venta"}
+										</Button>
+										<Button
+											type="button"
+											variant="outline"
 											onClick={handlePrintSale}
 											className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
 										>
@@ -144,6 +179,18 @@ export function SaleDetailSheet({
 										description={sale.shift?.terminalName ?? "Sin terminal"}
 									/>
 								</div>
+
+								{sale.status === "cancelled" ? (
+									<p className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+										Venta anulada. Sus pagos se conservan solo para trazabilidad y
+										ya no impactan ventas, saldo ni cuadre de caja.
+									</p>
+								) : null}
+								{cancelSaleMutation.error instanceof Error ? (
+									<p className="mt-3 text-sm text-red-400">
+										{cancelSaleMutation.error.message}
+									</p>
+								) : null}
 							</section>
 
 							<section className="rounded-2xl border border-gray-800 bg-black/20 p-4">

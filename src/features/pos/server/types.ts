@@ -52,6 +52,11 @@ export type CreatePosSaleInput = {
 	createdAt?: number;
 };
 
+export type CancelSaleInput = {
+	saleId: string;
+	cancelledAt?: number;
+};
+
 export type ListSalesInput = {
 	limit?: number;
 	cursor?: number;

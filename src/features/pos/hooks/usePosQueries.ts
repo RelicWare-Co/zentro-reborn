@@ -5,6 +5,7 @@ import {
 } from "@/features/credit/credit.functions";
 import { createCustomer } from "@/features/customers/customers.functions";
 import {
+	cancelSale,
 	closeShift,
 	createPosSale,
 	getSaleById,
@@ -266,6 +267,26 @@ export function useRegisterCreditPaymentMutation() {
 		onSuccess: async () => {
 			await Promise.all([
 				queryClient.invalidateQueries({ queryKey: ["credit-accounts-pos"] }),
+				queryClient.invalidateQueries({ queryKey: ["pos-shift-close-summary"] }),
+				queryClient.invalidateQueries({ queryKey: ["sales-list"] }),
+				queryClient.invalidateQueries({ queryKey: ["sales-detail"] }),
+			]);
+		},
+	});
+}
+
+export function useCancelPosSaleMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (payload: { saleId: string }) =>
+			cancelSale({
+				data: payload,
+			}),
+		onSuccess: async () => {
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ["credit-accounts-pos"] }),
+				queryClient.invalidateQueries({ queryKey: ["pos-products"] }),
 				queryClient.invalidateQueries({ queryKey: ["pos-shift-close-summary"] }),
 				queryClient.invalidateQueries({ queryKey: ["sales-list"] }),
 				queryClient.invalidateQueries({ queryKey: ["sales-detail"] }),

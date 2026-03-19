@@ -1,4 +1,4 @@
-import { useId, useEffect } from "react";
+import { useEffect, useId } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -106,7 +106,10 @@ export function CloseShiftModal({
 								{shiftCloseSummary.summaryByMethod
 									.filter((row) => row.paymentMethod !== "cash")
 									.map((row) => (
-										<div key={`expected-${row.paymentMethod}`} className="flex justify-between">
+										<div
+											key={`expected-${row.paymentMethod}`}
+											className="flex justify-between"
+										>
 											<span className="text-gray-300">
 												{formatPaymentMethodLabel(row.paymentMethod)}
 											</span>
@@ -117,7 +120,9 @@ export function CloseShiftModal({
 									))}
 								<Separator className="my-2 border-gray-700" />
 								<div className="flex justify-between text-base">
-									<span className="text-gray-200 font-semibold">Total Esperado</span>
+									<span className="text-gray-200 font-semibold">
+										Total Esperado
+									</span>
 									<span className="text-[var(--color-voltage)] font-bold tabular-nums">
 										{formatCurrency(shiftCloseSummary.totalExpected)}
 									</span>

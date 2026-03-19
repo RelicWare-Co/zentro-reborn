@@ -236,7 +236,8 @@ export async function listSalesForCurrentOrganization(
 		data: pageRows.map((row) => {
 			const paymentSummary = paymentsBySaleId.get(row.id);
 			const totalAmount = normalizeNumber(row.totalAmount);
-			const paidAmount = row.status === "cancelled" ? 0 : (paymentSummary?.paidAmount ?? 0);
+			const paidAmount =
+				row.status === "cancelled" ? 0 : (paymentSummary?.paidAmount ?? 0);
 
 			return {
 				id: row.id,
@@ -248,7 +249,10 @@ export async function listSalesForCurrentOrganization(
 				createdAt: normalizeTimestamp(row.createdAt),
 				itemCount: itemCountBySaleId.get(row.id) ?? 0,
 				paidAmount,
-				balanceDue: row.status === "cancelled" ? 0 : Math.max(totalAmount - paidAmount, 0),
+				balanceDue:
+					row.status === "cancelled"
+						? 0
+						: Math.max(totalAmount - paidAmount, 0),
 				paymentMethods: paymentSummary?.paymentMethods ?? [],
 			};
 		}),
@@ -445,7 +449,10 @@ export async function getSaleByIdForCurrentOrganization(
 		balanceDue:
 			saleRow.status === "cancelled"
 				? 0
-				: Math.max(normalizeNumber(saleRow.totalAmount) - effectivePaidAmount, 0),
+				: Math.max(
+						normalizeNumber(saleRow.totalAmount) - effectivePaidAmount,
+						0,
+					),
 		customer: saleRow.customerId
 			? {
 					id: saleRow.customerId,

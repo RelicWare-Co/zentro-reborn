@@ -23,8 +23,8 @@ export {
 } from "./server/shifts";
 export {
 	CASH_MOVEMENT_TYPES,
-	type CashMovementType,
 	type CancelSaleInput,
+	type CashMovementType,
 	type CloseShiftInput,
 	type CreatePosSaleInput,
 	type GetSaleByIdInput,

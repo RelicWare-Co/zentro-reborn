@@ -5,10 +5,7 @@ import {
 	createBackendTestContext,
 	mockBackendRuntime,
 } from "#/test/backend-test-utils";
-import {
-	parseOrganizationSettingsMetadata,
-	type OrganizationSettings,
-} from "./settings.shared";
+import { parseOrganizationSettingsMetadata } from "./settings.shared";
 
 async function setupSettingsServer() {
 	const ctx = await createBackendTestContext("settings");
@@ -35,7 +32,7 @@ describe("settings.server", () => {
 						inventory: {
 							lowStockThreshold: 3,
 						},
-					} satisfies Partial<OrganizationSettings>),
+					}),
 				})
 				.where(eq(schema.organization.id, ctx.organizationId));
 

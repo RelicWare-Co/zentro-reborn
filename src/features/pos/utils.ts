@@ -1,5 +1,5 @@
-import type { CartItem, CartTotals } from "./types";
 import { parseMoneyInput } from "@/lib/utils";
+import type { CartItem, CartTotals } from "./types";
 
 /**
  * Formatea un número como moneda colombiana (COP)
@@ -107,8 +107,7 @@ export function calculateCartTotals(
 export function calculateItemTotal(item: CartItem): number {
 	const basePrice = item.product.price * item.quantity;
 	const modifiersTotal = item.modifiers.reduce(
-		(sum, modifier) =>
-			sum + modifier.price * modifier.quantity * item.quantity,
+		(sum, modifier) => sum + modifier.price * modifier.quantity * item.quantity,
 		0,
 	);
 	return basePrice + modifiersTotal - item.discountAmount;
@@ -120,8 +119,7 @@ export function calculateItemTotal(item: CartItem): number {
 export function calculateItemBaseAmount(item: CartItem): number {
 	const basePrice = item.product.price * item.quantity;
 	const modifiersTotal = item.modifiers.reduce(
-		(sum, modifier) =>
-			sum + modifier.price * modifier.quantity * item.quantity,
+		(sum, modifier) => sum + modifier.price * modifier.quantity * item.quantity,
 		0,
 	);
 	return basePrice + modifiersTotal;

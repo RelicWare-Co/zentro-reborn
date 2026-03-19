@@ -92,7 +92,9 @@ function DashboardPage() {
 						Resumen operativo
 					</Badge>
 					<div className="space-y-2">
-						<h1 className="text-3xl font-bold tracking-tight">Panel de control</h1>
+						<h1 className="text-3xl font-bold tracking-tight">
+							Panel de control
+						</h1>
 						<p className="max-w-2xl text-sm text-gray-400 md:text-base">
 							Ventas, clientes, crédito e inventario en una sola vista para
 							tomar decisiones rápidas durante el día.

@@ -8,8 +8,8 @@ import {
 	cancelSale,
 	closeShift,
 	createPosSale,
-	getSaleById,
 	getPosBootstrap,
+	getSaleById,
 	getShiftCloseSummary,
 	listSales,
 	openShift,
@@ -17,7 +17,7 @@ import {
 	searchPosCustomers,
 	searchPosProducts,
 } from "../pos.functions";
-import type { PosBootstrap, SaleListResult, SaleDetail } from "../types";
+import type { PosBootstrap, SaleDetail, SaleListResult } from "../types";
 
 export function usePosBootstrap(initialData?: PosBootstrap) {
 	return useQuery({
@@ -27,10 +27,7 @@ export function usePosBootstrap(initialData?: PosBootstrap) {
 	});
 }
 
-export function usePosProducts(
-	activeCategoryId: string,
-	searchQuery: string,
-) {
+export function usePosProducts(activeCategoryId: string, searchQuery: string) {
 	return useQuery({
 		queryKey: ["pos-products", activeCategoryId, searchQuery],
 		queryFn: () =>
@@ -147,10 +144,7 @@ export function useOpenShiftMutation() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: (payload: {
-			startingCash: number;
-			notes: string | null;
-		}) =>
+		mutationFn: (payload: { startingCash: number; notes: string | null }) =>
 			openShift({
 				data: payload,
 			}),
@@ -267,7 +261,9 @@ export function useRegisterCreditPaymentMutation() {
 		onSuccess: async () => {
 			await Promise.all([
 				queryClient.invalidateQueries({ queryKey: ["credit-accounts-pos"] }),
-				queryClient.invalidateQueries({ queryKey: ["pos-shift-close-summary"] }),
+				queryClient.invalidateQueries({
+					queryKey: ["pos-shift-close-summary"],
+				}),
 				queryClient.invalidateQueries({ queryKey: ["sales-list"] }),
 				queryClient.invalidateQueries({ queryKey: ["sales-detail"] }),
 			]);
@@ -287,7 +283,9 @@ export function useCancelPosSaleMutation() {
 			await Promise.all([
 				queryClient.invalidateQueries({ queryKey: ["credit-accounts-pos"] }),
 				queryClient.invalidateQueries({ queryKey: ["pos-products"] }),
-				queryClient.invalidateQueries({ queryKey: ["pos-shift-close-summary"] }),
+				queryClient.invalidateQueries({
+					queryKey: ["pos-shift-close-summary"],
+				}),
 				queryClient.invalidateQueries({ queryKey: ["sales-list"] }),
 				queryClient.invalidateQueries({ queryKey: ["sales-detail"] }),
 			]);

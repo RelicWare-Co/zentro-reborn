@@ -84,8 +84,17 @@ export function ThermalReceipt({
 					<section style={styles.section}>
 						<p style={styles.sectionTitle}>DETALLE</p>
 						<div style={styles.stack}>
-							{items.map((item, index) => (
-								<div key={`${item.label}-${index}`} style={styles.itemBlock}>
+							{items.map((item) => (
+								<div
+									key={[
+										item.label,
+										item.quantity ?? "",
+										item.unitPriceLabel ?? "",
+										item.totalLabel,
+										item.secondaryLines?.join("|") ?? "",
+									].join("-")}
+									style={styles.itemBlock}
+								>
 									<div style={styles.itemHeader}>
 										<div style={styles.itemTitleBlock}>
 											<p style={styles.itemLabel}>
@@ -123,8 +132,15 @@ export function ThermalReceipt({
 					<section style={styles.section}>
 						<p style={styles.sectionTitle}>PAGOS</p>
 						<div style={styles.stack}>
-							{payments.map((payment, index) => (
-								<div key={`${payment.label}-${index}`} style={styles.itemBlock}>
+							{payments.map((payment) => (
+								<div
+									key={[
+										payment.label,
+										payment.amountLabel,
+										payment.secondaryLines?.join("|") ?? "",
+									].join("-")}
+									style={styles.itemBlock}
+								>
 									<div style={styles.itemHeader}>
 										<p style={styles.itemLabel}>{payment.label}</p>
 										<p style={styles.itemAmount}>{payment.amountLabel}</p>

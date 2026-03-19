@@ -11,9 +11,9 @@ import {
 import { requireAuthContext } from "#/features/pos/server/auth-context";
 import {
 	normalizeOrganizationSettings,
+	type OrganizationSettings,
 	parseOrganizationSettingsMetadata,
 	serializeOrganizationSettingsMetadata,
-	type OrganizationSettings,
 } from "./settings.shared";
 
 function normalizeCount(value: unknown) {

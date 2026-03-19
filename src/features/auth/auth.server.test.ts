@@ -1,11 +1,9 @@
 import { describe, expect, mock, test } from "bun:test";
 
-let currentSession:
-	| {
-			user: { id: string };
-			session: { activeOrganizationId: string | null };
-	  }
-	| null = null;
+let currentSession: {
+	user: { id: string };
+	session: { activeOrganizationId: string | null };
+} | null = null;
 
 mock.module("#/lib/auth", () => ({
 	auth: {

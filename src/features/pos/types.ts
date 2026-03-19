@@ -1,3 +1,4 @@
+import type { searchCreditAccounts } from "@/features/credit/credit.functions";
 import type {
 	getPosBootstrap,
 	getSaleById,
@@ -6,10 +7,11 @@ import type {
 	searchPosCustomers,
 	searchPosProducts,
 } from "./pos.functions";
-import type { searchCreditAccounts } from "@/features/credit/credit.functions";
 
 // Producto retornado por la búsqueda POS
-export type Product = Awaited<ReturnType<typeof searchPosProducts>>["data"][number];
+export type Product = Awaited<
+	ReturnType<typeof searchPosProducts>
+>["data"][number];
 
 // Cliente retornado por la búsqueda POS
 export type PosCustomer = Awaited<
@@ -28,7 +30,9 @@ export type PosBootstrap = Awaited<ReturnType<typeof getPosBootstrap>>;
 export type ActiveShift = PosBootstrap["activeShift"];
 
 // Resumen de cierre de turno
-export type ShiftCloseSummary = Awaited<ReturnType<typeof getShiftCloseSummary>>;
+export type ShiftCloseSummary = Awaited<
+	ReturnType<typeof getShiftCloseSummary>
+>;
 
 // Resultado del historial de ventas
 export type SaleListResult = Awaited<ReturnType<typeof listSales>>;

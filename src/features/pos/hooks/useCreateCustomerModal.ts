@@ -1,13 +1,16 @@
 import { useCallback, useState } from "react";
 import { useCreateCustomerMutation } from "./usePosQueries";
 
-export function useCreateCustomerModal(onCustomerCreated: (customerId: string) => void) {
+export function useCreateCustomerModal(
+	onCustomerCreated: (customerId: string) => void,
+) {
 	const [isCreateCustomerModalOpen, setIsCreateCustomerModalOpen] =
 		useState(false);
 	const [newCustomerName, setNewCustomerName] = useState("");
 	const [newCustomerPhone, setNewCustomerPhone] = useState("");
 	const [newCustomerDocumentType, setNewCustomerDocumentType] = useState("CC");
-	const [newCustomerDocumentNumber, setNewCustomerDocumentNumber] = useState("");
+	const [newCustomerDocumentNumber, setNewCustomerDocumentNumber] =
+		useState("");
 
 	const createCustomerMutation = useCreateCustomerMutation();
 

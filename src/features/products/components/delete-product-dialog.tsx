@@ -27,15 +27,15 @@ export function DeleteProductDialog({
 			<AlertDialogContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
 				<AlertDialogHeader>
 					<AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-				<AlertDialogDescription className="text-gray-400">
-					Esta acción no se puede deshacer. El producto será marcado como eliminado
-					y removido del inventario activo.
-				</AlertDialogDescription>
+					<AlertDialogDescription className="text-gray-400">
+						Esta acción no se puede deshacer. El producto será marcado como
+						eliminado y removido del inventario activo.
+					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>
 					<AlertDialogCancel className="bg-transparent border-gray-700 text-gray-300 hover:bg-white/5 hover:text-white">
-					Cancelar
-				</AlertDialogCancel>
+						Cancelar
+					</AlertDialogCancel>
 					<AlertDialogAction
 						className="bg-red-500 hover:bg-red-600 text-white border-none"
 						onClick={onConfirm}

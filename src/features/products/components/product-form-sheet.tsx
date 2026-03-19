@@ -20,7 +20,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import type { Product } from "@/features/products/hooks/use-products";
 import type { getCategories } from "@/features/products/products.functions";
-import { formatMoneyInput, parseMoneyInput, sanitizeMoneyInput } from "@/lib/utils";
+import {
+	formatMoneyInput,
+	parseMoneyInput,
+	sanitizeMoneyInput,
+} from "@/lib/utils";
 
 export const EMPTY_PRODUCT_FORM = {
 	name: "",
@@ -129,8 +133,8 @@ export function ProductFormSheet({
 						</SheetTitle>
 						<SheetDescription className="text-gray-400">
 							{editingProduct
-							? "Actualiza los detalles de este producto."
-							: "Agrega un nuevo producto a tu inventario."}
+								? "Actualiza los detalles de este producto."
+								: "Agrega un nuevo producto a tu inventario."}
 						</SheetDescription>
 					</SheetHeader>
 
@@ -237,7 +241,8 @@ export function ProductFormSheet({
 							<div className="grid grid-cols-2 gap-4">
 								<div className="space-y-2">
 									<Label htmlFor={priceId} className="text-gray-300">
-										Precio unitario (COP) <span className="text-red-500">*</span>
+										Precio unitario (COP){" "}
+										<span className="text-red-500">*</span>
 									</Label>
 									<Input
 										id={priceId}

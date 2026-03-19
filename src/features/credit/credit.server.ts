@@ -244,14 +244,12 @@ export async function registerCreditPaymentForCurrentOrganization(
 			throw new Error("El abono no puede superar el saldo pendiente");
 		}
 
-		let targetSale:
-			| {
-					id: string;
-					customerId: string | null;
-					status: string;
-					totalAmount: number;
-			  }
-			| null = null;
+		let targetSale: {
+			id: string;
+			customerId: string | null;
+			status: string;
+			totalAmount: number;
+		} | null = null;
 		let saleBalanceDue: number | null = null;
 		if (saleId) {
 			const [saleRow] = await tx
@@ -263,10 +261,7 @@ export async function registerCreditPaymentForCurrentOrganization(
 				})
 				.from(sale)
 				.where(
-					and(
-						eq(sale.id, saleId),
-						eq(sale.organizationId, organizationId),
-					),
+					and(eq(sale.id, saleId), eq(sale.organizationId, organizationId)),
 				)
 				.limit(1);
 
@@ -279,7 +274,9 @@ export async function registerCreditPaymentForCurrentOrganization(
 				);
 			}
 			if (saleRow.status === "cancelled") {
-				throw new Error("No se puede registrar un abono sobre una venta cancelada");
+				throw new Error(
+					"No se puede registrar un abono sobre una venta cancelada",
+				);
 			}
 
 			const salePaymentRows = await tx
@@ -294,12 +291,17 @@ export async function registerCreditPaymentForCurrentOrganization(
 
 			saleBalanceDue =
 				saleRow.totalAmount -
-				salePaymentRows.reduce((total, currentPayment) => total + currentPayment.amount, 0);
+				salePaymentRows.reduce(
+					(total, currentPayment) => total + currentPayment.amount,
+					0,
+				);
 			if (saleBalanceDue <= 0) {
 				throw new Error("La venta seleccionada ya no tiene saldo pendiente");
 			}
 			if (amount > saleBalanceDue) {
-				throw new Error("El abono no puede superar el saldo pendiente de la venta");
+				throw new Error(
+					"El abono no puede superar el saldo pendiente de la venta",
+				);
 			}
 
 			targetSale = saleRow;

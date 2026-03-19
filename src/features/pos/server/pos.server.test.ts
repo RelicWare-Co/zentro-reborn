@@ -827,11 +827,13 @@ describe("pos server modules", () => {
 				trackInventory: true,
 			});
 
-			const createdSale = await salesServer.createPosSaleForCurrentOrganization({
-				shiftId: openedShift.id,
-				items: [{ productId, quantity: 2 }],
-				payments: [{ method: "cash", amount: 4000 }],
-			});
+			const createdSale = await salesServer.createPosSaleForCurrentOrganization(
+				{
+					shiftId: openedShift.id,
+					items: [{ productId, quantity: 2 }],
+					payments: [{ method: "cash", amount: 4000 }],
+				},
+			);
 
 			await salesServer.cancelSaleForCurrentOrganization({
 				saleId: createdSale.saleId,
@@ -886,9 +888,10 @@ describe("pos server modules", () => {
 				},
 			]);
 
-			const listedSales = await salesHistoryServer.listSalesForCurrentOrganization({
-				status: "cancelled",
-			});
+			const listedSales =
+				await salesHistoryServer.listSalesForCurrentOrganization({
+					status: "cancelled",
+				});
 			expect(listedSales.data[0]).toEqual(
 				expect.objectContaining({
 					id: createdSale.saleId,
@@ -899,9 +902,11 @@ describe("pos server modules", () => {
 				}),
 			);
 
-			const detail = await salesHistoryServer.getSaleByIdForCurrentOrganization({
-				saleId: createdSale.saleId,
-			});
+			const detail = await salesHistoryServer.getSaleByIdForCurrentOrganization(
+				{
+					saleId: createdSale.saleId,
+				},
+			);
 			expect(detail).toEqual(
 				expect.objectContaining({
 					id: createdSale.saleId,
@@ -939,13 +944,15 @@ describe("pos server modules", () => {
 				stock: 0,
 			});
 
-			const createdSale = await salesServer.createPosSaleForCurrentOrganization({
-				shiftId: openedShift.id,
-				customerId,
-				items: [{ productId, quantity: 1 }],
-				payments: [{ method: "cash", amount: 1000 }],
-				isCreditSale: true,
-			});
+			const createdSale = await salesServer.createPosSaleForCurrentOrganization(
+				{
+					shiftId: openedShift.id,
+					customerId,
+					items: [{ productId, quantity: 1 }],
+					payments: [{ method: "cash", amount: 1000 }],
+					isCreditSale: true,
+				},
+			);
 
 			const [accountBeforeCancel] = await ctx.db
 				.select({

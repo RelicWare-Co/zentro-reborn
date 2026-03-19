@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getSettings, updateSettings } from "@/features/settings/settings.functions";
+import {
+	getSettings,
+	updateSettings,
+} from "@/features/settings/settings.functions";
 
 export const SETTINGS_QUERY_KEY = ["organization-settings"];
 

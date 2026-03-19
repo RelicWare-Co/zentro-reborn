@@ -143,8 +143,7 @@ export function usePosShift(activeShift: ActiveShift | null) {
 
 	// Computed values
 	const canOpenShift =
-		startingCash.trim().length > 0 &&
-		parseMoneyInput(startingCash) >= 0;
+		startingCash.trim().length > 0 && parseMoneyInput(startingCash) >= 0;
 
 	const canRegisterCashMovement =
 		Boolean(activeShift) &&

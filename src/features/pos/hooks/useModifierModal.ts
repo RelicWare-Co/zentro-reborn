@@ -58,7 +58,12 @@ export function useModifierModal(
 		setIsModifierModalOpen(false);
 		setSelectedProductForModifiers(null);
 		setModifierQuantities({});
-	}, [modifierProducts, modifierQuantities, onAddToCart, selectedProductForModifiers]);
+	}, [
+		modifierProducts,
+		modifierQuantities,
+		onAddToCart,
+		selectedProductForModifiers,
+	]);
 
 	const handleQuickAddWithoutModifiers = useCallback(() => {
 		if (!selectedProductForModifiers) {

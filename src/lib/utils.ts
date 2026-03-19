@@ -28,7 +28,11 @@ export function formatMoneyInput(value: string | number | null | undefined) {
 	}
 
 	const normalizedValue =
-		typeof value === "number" ? String(Math.max(0, Math.trunc(value))) : sanitizeMoneyInput(value);
+		typeof value === "number"
+			? String(Math.max(0, Math.trunc(value)))
+			: sanitizeMoneyInput(value);
 
-	return normalizedValue ? moneyInputFormatter.format(Number(normalizedValue)) : "";
+	return normalizedValue
+		? moneyInputFormatter.format(Number(normalizedValue))
+		: "";
 }

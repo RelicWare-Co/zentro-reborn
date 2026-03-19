@@ -3,11 +3,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-	formatMoneyInput,
-	parseMoneyInput,
-	sanitizeMoneyInput,
-} from "@/lib/utils";
-import {
 	Select,
 	SelectContent,
 	SelectItem,
@@ -33,6 +28,11 @@ import {
 } from "@/features/pos/printing/receiptDocuments";
 import type { CreditAccount, SaleDetail } from "@/features/pos/types";
 import { formatCurrency, formatPaymentMethodLabel } from "@/features/pos/utils";
+import {
+	formatMoneyInput,
+	parseMoneyInput,
+	sanitizeMoneyInput,
+} from "@/lib/utils";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("es-CO", {
 	day: "numeric",
@@ -182,8 +182,8 @@ export function SaleDetailSheet({
 
 								{sale.status === "cancelled" ? (
 									<p className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
-										Venta anulada. Sus pagos se conservan solo para trazabilidad y
-										ya no impactan ventas, saldo ni cuadre de caja.
+										Venta anulada. Sus pagos se conservan solo para trazabilidad
+										y ya no impactan ventas, saldo ni cuadre de caja.
 									</p>
 								) : null}
 								{cancelSaleMutation.error instanceof Error ? (

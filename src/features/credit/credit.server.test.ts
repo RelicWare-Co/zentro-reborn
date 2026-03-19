@@ -215,7 +215,10 @@ describe("credit.server", () => {
 			expect(updatedAccount?.balance).toBe(10000);
 
 			const [createdPayment] = await ctx.db
-				.select({ method: schema.payment.method, amount: schema.payment.amount })
+				.select({
+					method: schema.payment.method,
+					amount: schema.payment.amount,
+				})
 				.from(schema.payment)
 				.where(eq(schema.payment.id, paymentResult.paymentId))
 				.limit(1);
@@ -297,7 +300,10 @@ describe("credit.server", () => {
 			expect(updatedSale?.status).toBe("completed");
 
 			const [linkedPayment] = await ctx.db
-				.select({ saleId: schema.payment.saleId, amount: schema.payment.amount })
+				.select({
+					saleId: schema.payment.saleId,
+					amount: schema.payment.amount,
+				})
 				.from(schema.payment)
 				.where(eq(schema.payment.id, paymentResult.paymentId))
 				.limit(1);

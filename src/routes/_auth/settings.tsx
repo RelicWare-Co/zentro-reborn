@@ -1,5 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, CreditCard, Package, Save, Settings2, Store, Users } from "lucide-react";
+import {
+	Building2,
+	CreditCard,
+	Package,
+	Save,
+	Settings2,
+	Store,
+	Users,
+} from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { formatMoneyInput, parseMoneyInput } from "@/lib/utils";
 import {
 	useSettings,
 	useUpdateSettingsMutation,
@@ -26,6 +33,7 @@ import {
 	type OrganizationPaymentMethodSettings,
 	type OrganizationSettings,
 } from "@/features/settings/settings.shared";
+import { formatMoneyInput, parseMoneyInput } from "@/lib/utils";
 
 export const Route = createFileRoute("/_auth/settings")({
 	loader: () => getSettings(),
@@ -114,7 +122,9 @@ function SettingsPage() {
 						Configuración
 					</Badge>
 					<div className="space-y-2">
-						<h1 className="text-3xl font-bold tracking-tight">Ajustes del negocio</h1>
+						<h1 className="text-3xl font-bold tracking-tight">
+							Ajustes del negocio
+						</h1>
 						<p className="max-w-2xl text-sm text-gray-400 md:text-base">
 							Administra las reglas operativas que hoy ya afectan caja, POS y
 							alertas de inventario.
@@ -137,7 +147,9 @@ function SettingsPage() {
 						className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
 					>
 						<Save className="h-4 w-4" />
-						{updateSettingsMutation.isPending ? "Guardando..." : "Guardar cambios"}
+						{updateSettingsMutation.isPending
+							? "Guardando..."
+							: "Guardar cambios"}
 					</Button>
 				</div>
 			</section>
@@ -238,9 +250,7 @@ function SettingsPage() {
 										...currentValue,
 										pos: {
 											...currentValue.pos,
-											defaultStartingCash: parseMoneyInput(
-												event.target.value,
-											),
+											defaultStartingCash: parseMoneyInput(event.target.value),
 										},
 									}))
 								}
@@ -327,7 +337,9 @@ function SettingsPage() {
 						<CardContent className="space-y-6">
 							<div className="flex items-center justify-between rounded-2xl border border-gray-800 bg-black/20 p-4">
 								<div>
-									<p className="font-medium text-white">Permitir ventas a crédito</p>
+									<p className="font-medium text-white">
+										Permitir ventas a crédito
+									</p>
 									<p className="text-sm text-gray-400">
 										Controla si el checkout puede dejar saldo pendiente.
 									</p>

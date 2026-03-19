@@ -542,10 +542,7 @@ export async function cancelSaleForCurrentOrganization(input: CancelSaleInput) {
 			})
 			.from(sale)
 			.where(
-				and(
-					eq(sale.id, input.saleId),
-					eq(sale.organizationId, organizationId),
-				),
+				and(eq(sale.id, input.saleId), eq(sale.organizationId, organizationId)),
 			)
 			.limit(1);
 

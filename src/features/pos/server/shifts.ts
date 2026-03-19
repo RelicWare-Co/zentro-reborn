@@ -365,7 +365,9 @@ export async function listShiftsForCurrentOrganization(
 			amount: normalizeNumber(row.amount),
 			saleId: row.saleId,
 			saleTotalAmount:
-				row.saleTotalAmount === null ? null : normalizeNumber(row.saleTotalAmount),
+				row.saleTotalAmount === null
+					? null
+					: normalizeNumber(row.saleTotalAmount),
 			createdAt: toTimestamp(row.createdAt) ?? 0,
 		});
 		paymentsByShift.set(row.shiftId, current);

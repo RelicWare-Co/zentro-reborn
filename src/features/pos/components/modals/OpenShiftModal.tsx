@@ -48,7 +48,8 @@ export function OpenShiftModal({
 
 				<div className="py-4">
 					<p className="text-sm text-gray-400 mb-4">
-						Ingresa la base de efectivo inicial en la caja para comenzar a operar.
+						Ingresa la base de efectivo inicial en la caja para comenzar a
+						operar.
 					</p>
 
 					<div className="grid gap-2">

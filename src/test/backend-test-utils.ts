@@ -22,7 +22,10 @@ export async function createBackendTestContext(prefix: string) {
 	);
 	const orgContext = createOrgContext();
 	await seedOrganizationWithMember(testDatabase.db, orgContext);
-	const session = createAuthSession(orgContext.userId, orgContext.organizationId);
+	const session = createAuthSession(
+		orgContext.userId,
+		orgContext.organizationId,
+	);
 
 	return {
 		...testDatabase,

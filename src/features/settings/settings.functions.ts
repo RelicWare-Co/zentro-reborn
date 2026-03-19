@@ -1,19 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
-	PAYMENT_METHOD_IDS,
-	type PaymentMethodCatalogId,
-} from "./settings.shared";
-import {
 	getSettingsForCurrentOrganization,
 	updateSettingsForCurrentOrganization,
 } from "./settings.server";
+import {
+	PAYMENT_METHOD_IDS,
+	type PaymentMethodCatalogId,
+} from "./settings.shared";
 
 const paymentMethodIdSchema = z.enum(
-	PAYMENT_METHOD_IDS as [
-		PaymentMethodCatalogId,
-		...PaymentMethodCatalogId[],
-	],
+	PAYMENT_METHOD_IDS as [PaymentMethodCatalogId, ...PaymentMethodCatalogId[]],
 );
 
 const settingsSchema = z.object({

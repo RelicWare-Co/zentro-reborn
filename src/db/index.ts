@@ -11,4 +11,7 @@ if (!authToken) {
 	throw new Error("DATABASE_AUTH_TOKEN environment variable is not set");
 }
 
-export const db = drizzle({ connection: { url: databaseUrl, authToken }, schema});
+export const db = drizzle({
+	connection: { url: databaseUrl, authToken },
+	schema,
+});

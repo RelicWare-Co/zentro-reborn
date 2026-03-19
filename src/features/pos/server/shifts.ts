@@ -57,16 +57,64 @@ function parseDateBoundary(value: string | null | undefined) {
 
 function buildExpectedAmountsByMethod(
 	startingCash: number,
-	payments: Array<{ method: string; amount: number }>,
+	payments: Array<{
+		method: string;
+		amount: number;
+		saleId?: string | null;
+		saleTotalAmount?: number | null;
+	}>,
 	movements: Array<{ type: string; amount: number }>,
 ) {
 	const expectedByMethod = new Map<string, number>();
+	const salePaymentStats = new Map<
+		string,
+		{ saleTotalAmount: number; totalPaid: number; cashPaid: number }
+	>();
 
 	for (const registeredPayment of payments) {
 		expectedByMethod.set(
 			registeredPayment.method,
 			(expectedByMethod.get(registeredPayment.method) ?? 0) +
 				registeredPayment.amount,
+		);
+
+		if (
+			!registeredPayment.saleId ||
+			registeredPayment.saleTotalAmount === null ||
+			registeredPayment.saleTotalAmount === undefined
+		) {
+			continue;
+		}
+
+		const paymentStats = salePaymentStats.get(registeredPayment.saleId) ?? {
+			saleTotalAmount: normalizeNumber(registeredPayment.saleTotalAmount),
+			totalPaid: 0,
+			cashPaid: 0,
+		};
+		paymentStats.totalPaid += registeredPayment.amount;
+		if (registeredPayment.method === "cash") {
+			paymentStats.cashPaid += registeredPayment.amount;
+		}
+		salePaymentStats.set(registeredPayment.saleId, paymentStats);
+	}
+
+	let changeReturnedInCash = 0;
+	for (const paymentStats of salePaymentStats.values()) {
+		const overpayment = Math.max(
+			paymentStats.totalPaid - paymentStats.saleTotalAmount,
+			0,
+		);
+		if (overpayment <= 0 || paymentStats.cashPaid <= 0) {
+			continue;
+		}
+
+		changeReturnedInCash += Math.min(overpayment, paymentStats.cashPaid);
+	}
+
+	if (changeReturnedInCash > 0) {
+		expectedByMethod.set(
+			"cash",
+			Math.max((expectedByMethod.get("cash") ?? 0) - changeReturnedInCash, 0),
 		);
 	}
 
@@ -203,9 +251,12 @@ export async function listShiftsForCurrentOrganization(
 				shiftId: payment.shiftId,
 				method: payment.method,
 				amount: payment.amount,
+				saleId: payment.saleId,
+				saleTotalAmount: sale.totalAmount,
 				createdAt: payment.createdAt,
 			})
 			.from(payment)
+			.leftJoin(sale, eq(sale.id, payment.saleId))
 			.where(
 				and(
 					eq(payment.organizationId, organizationId),
@@ -286,13 +337,22 @@ export async function listShiftsForCurrentOrganization(
 
 	const paymentsByShift = new Map<
 		string,
-		Array<{ method: string; amount: number; createdAt: number }>
+		Array<{
+			method: string;
+			amount: number;
+			saleId: string | null;
+			saleTotalAmount: number | null;
+			createdAt: number;
+		}>
 	>();
 	for (const row of paymentRows) {
 		const current = paymentsByShift.get(row.shiftId) ?? [];
 		current.push({
 			method: row.method,
 			amount: normalizeNumber(row.amount),
+			saleId: row.saleId,
+			saleTotalAmount:
+				row.saleTotalAmount === null ? null : normalizeNumber(row.saleTotalAmount),
 			createdAt: toTimestamp(row.createdAt) ?? 0,
 		});
 		paymentsByShift.set(row.shiftId, current);
@@ -356,6 +416,8 @@ export async function listShiftsForCurrentOrganization(
 				payments.map((paymentRow) => ({
 					method: paymentRow.method,
 					amount: paymentRow.amount,
+					saleId: paymentRow.saleId,
+					saleTotalAmount: paymentRow.saleTotalAmount,
 				})),
 				movements.map((movementRow) => ({
 					type: movementRow.type,
@@ -691,8 +753,14 @@ export async function getShiftCloseSummaryForCurrentOrganization(
 	const [registeredPayments, registeredMovements, registeredClosures] =
 		await Promise.all([
 			db
-				.select({ method: payment.method, amount: payment.amount })
+				.select({
+					method: payment.method,
+					amount: payment.amount,
+					saleId: payment.saleId,
+					saleTotalAmount: sale.totalAmount,
+				})
 				.from(payment)
+				.leftJoin(sale, eq(sale.id, payment.saleId))
 				.where(
 					and(
 						eq(payment.organizationId, organizationId),
@@ -828,8 +896,14 @@ export async function closeShiftForCurrentOrganization(input: CloseShiftInput) {
 
 		const [registeredPayments, registeredMovements] = await Promise.all([
 			tx
-				.select({ method: payment.method, amount: payment.amount })
+				.select({
+					method: payment.method,
+					amount: payment.amount,
+					saleId: payment.saleId,
+					saleTotalAmount: sale.totalAmount,
+				})
 				.from(payment)
+				.leftJoin(sale, eq(sale.id, payment.saleId))
 				.where(
 					and(
 						eq(payment.organizationId, organizationId),

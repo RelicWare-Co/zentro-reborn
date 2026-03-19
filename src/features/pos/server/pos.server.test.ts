@@ -234,6 +234,43 @@ describe("pos server modules", () => {
 		}
 	});
 
+	test("calculates expected cash using net sale amount when there is change", async () => {
+		const { ctx, shiftsServer, salesServer } = await setupPosServers();
+		try {
+			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 200000,
+				terminalId: "terminal-1",
+				terminalName: "Caja 1",
+			});
+
+			const productId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Producto con devuelta",
+				price: 22000,
+				trackInventory: false,
+				stock: 0,
+			});
+
+			await salesServer.createPosSaleForCurrentOrganization({
+				shiftId: openedShift.id,
+				items: [{ productId, quantity: 1 }],
+				payments: [{ method: "cash", amount: 25000 }],
+			});
+
+			const summary =
+				await shiftsServer.getShiftCloseSummaryForCurrentOrganization(
+					openedShift.id,
+				);
+			const cashSummary = summary.summaryByMethod.find(
+				(row: { paymentMethod: string }) => row.paymentMethod === "cash",
+			);
+			expect(cashSummary?.expectedAmount).toBe(222000);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
 	test("rejects completed sales with overpayment when cash cannot cover the change", async () => {
 		const { ctx, shiftsServer, salesServer } = await setupPosServers();
 		try {

@@ -3,7 +3,6 @@ import {
 	ArrowRight,
 	CalendarDays,
 	Clock3,
-	Filter,
 	History,
 	Receipt,
 	Search,
@@ -12,7 +11,14 @@ import {
 	Wallet,
 	X,
 } from "lucide-react";
-import { useEffect, useId, useMemo, useState, useTransition } from "react";
+import {
+	useDeferredValue,
+	useEffect,
+	useId,
+	useMemo,
+	useState,
+	useTransition,
+} from "react";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -160,6 +166,7 @@ function SalesPage() {
 		startDate: search.startDate ?? "",
 		endDate: search.endDate ?? "",
 	}));
+	const deferredDraftFilters = useDeferredValue(draftFilters);
 
 	useEffect(() => {
 		if (sales.length === 0) {
@@ -188,6 +195,26 @@ function SalesPage() {
 		search.startDate,
 		search.status,
 	]);
+
+	useEffect(() => {
+		const nextSearch = buildSearchFromDraftFilters({
+			draftFilters: deferredDraftFilters,
+			activeView,
+			pageSize,
+			search,
+		});
+
+		if (areSalesSearchValuesEqual(search, nextSearch)) {
+			return;
+		}
+
+		startViewTransition(() => {
+			void navigate({
+				search: nextSearch,
+				replace: true,
+			});
+		});
+	}, [activeView, deferredDraftFilters, navigate, pageSize, search]);
 
 	const selectedSaleSummary = useMemo(
 		() => sales.find((sale) => sale.id === selectedSaleId) ?? null,
@@ -232,29 +259,23 @@ function SalesPage() {
 				kicker: `Solo ${todayLabel}`,
 				title: "Ventas de hoy",
 				description:
-					"El día actual queda separado del histórico para que caja y administración lean la operación sin ruido de ventas pasadas.",
+					"Consulta lo que pasó hoy sin mezclar operaciones anteriores.",
 				resultsTitle: "Ventas del dia",
-				resultsDescription:
-					activeFilterCount > 0
-						? "Resultados del filtro aplicado sobre hoy"
-						: "Registros creados durante el dia actual",
+				resultsDescription: "Registros creados durante el dia actual",
 				revenueTitle: "Ingreso del dia",
-				revenueDescription: "Total de ventas registradas hoy",
+				revenueDescription: "Total facturado hoy",
 				pendingTitle: "Saldo pendiente hoy",
-				pendingDescription: "Pendientes abiertos dentro del dia actual",
-				filterTitle: "Filtros rapidos de hoy",
-				filterDescription:
-					"Busca por cliente, cajero o id, y filtra por estado o medio de pago. La fecha queda fijada al dia actual.",
+				pendingDescription: "Pendientes abiertos del dia actual",
 				listTitle: "Ventas de hoy",
 				listDescription:
-					"Abre cualquier venta de hoy para revisar items, cliente y pagos sin mezclar operaciones pasadas.",
+					"Vista operativa del día con acceso rápido al detalle de cada venta.",
 				emptyTitle: "No hay ventas registradas hoy.",
 			}
 		: {
 				kicker: "Consulta completa",
 				title: "Historial de ventas",
 				description:
-					"Usa el historial cuando necesites revisar cierres, seguimientos o ventas anteriores con filtros por fecha.",
+					"Consulta ventas pasadas con filtros por fecha, estado y medio de pago.",
 				resultsTitle: "Ventas cargadas",
 				resultsDescription:
 					activeFilterCount > 0
@@ -264,40 +285,11 @@ function SalesPage() {
 				revenueDescription: "Suma de las ventas listadas",
 				pendingTitle: "Saldo pendiente",
 				pendingDescription: "Principalmente ventas a credito",
-				filterTitle: "Filtros del historial",
-				filterDescription:
-					"Busca por cliente, cajero o id, y combina estado, fechas y medio de pago.",
 				listTitle: "Historial de ventas",
 				listDescription:
-					"Selecciona una venta para revisar items, cliente y pagos.",
+					"Usa esta vista para revisar ventas anteriores, pagos y saldos.",
 				emptyTitle: "No se han registrado ventas todavia.",
 			};
-
-	const applyFilters = () => {
-		void navigate({
-			search: {
-				view: activeView !== DEFAULT_SALES_VIEW ? activeView : undefined,
-				q: normalizeFilterValue(draftFilters.q),
-				status: normalizeEnumFilterValue(
-					draftFilters.status,
-					SALE_STATUS_VALUES,
-				),
-				paymentMethod: normalizeEnumFilterValue(
-					draftFilters.paymentMethod,
-					SALE_PAYMENT_METHOD_VALUES,
-				),
-				startDate: isTodayView
-					? search.startDate
-					: normalizeFilterValue(draftFilters.startDate),
-				endDate: isTodayView
-					? search.endDate
-					: normalizeFilterValue(draftFilters.endDate),
-				cursor: undefined,
-				pageSize: pageSize !== DEFAULT_LIST_PARAMS.limit ? pageSize : undefined,
-			},
-			replace: true,
-		});
-	};
 
 	const clearFilters = () => {
 		setDraftFilters({
@@ -306,18 +298,6 @@ function SalesPage() {
 			paymentMethod: "",
 			startDate: "",
 			endDate: "",
-		});
-		void navigate({
-			search: {
-				view: activeView !== DEFAULT_SALES_VIEW ? activeView : undefined,
-				q: undefined,
-				status: undefined,
-				paymentMethod: undefined,
-				startDate: isTodayView ? search.startDate : undefined,
-				endDate: isTodayView ? search.endDate : undefined,
-				pageSize: pageSize !== DEFAULT_LIST_PARAMS.limit ? pageSize : undefined,
-			},
-			replace: true,
 		});
 	};
 
@@ -361,79 +341,68 @@ function SalesPage() {
 
 	return (
 		<>
-			<main className="flex-1 space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12">
-				<section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-					<div className="space-y-3">
-						<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-							Historial operativo
-						</Badge>
+			<main className="flex-1 space-y-5 bg-[var(--color-void)] p-5 text-[var(--color-photon)] md:p-7 lg:p-8">
+				<section className="space-y-4">
+					<div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
 						<div className="space-y-2">
-							<h1 className="text-3xl font-bold tracking-tight">Ventas</h1>
-							<p className="max-w-2xl text-sm text-gray-400 md:text-base">
-								Consulta la operación del día y el histórico completo en vistas
-								separadas, con acceso rápido al detalle de cada venta.
-							</p>
-						</div>
-					</div>
-
-					<div className="flex flex-col gap-3 sm:flex-row">
-						<Button
-							asChild
-							className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
-						>
-							<Link to="/pos">
-								<Store className="h-4 w-4" />
-								Ir al POS
-							</Link>
-						</Button>
-						<Button
-							asChild
-							variant="outline"
-							className="border-gray-700 bg-[var(--color-carbon)] text-gray-200 hover:bg-white/5 hover:text-white"
-						>
-							<Link to="/dashboard">
-								Ver dashboard
-								<ArrowRight className="h-4 w-4" />
-							</Link>
-						</Button>
-					</div>
-				</section>
-
-				<section>
-					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-						<CardContent className="space-y-5 pt-6">
-							<div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-								<div className="space-y-2">
-									<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-										{viewSummary.kicker}
-									</Badge>
-									<div className="space-y-1">
-										<h2 className="text-2xl font-semibold tracking-tight text-white">
-											{viewSummary.title}
-										</h2>
-										<p className="max-w-3xl text-sm text-gray-400">
-											{viewSummary.description}
-										</p>
-									</div>
-								</div>
-
+							<div className="flex flex-wrap items-center gap-2">
+								<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+									Historial operativo
+								</Badge>
+								<Badge className="border-gray-700 bg-black/20 text-gray-300 hover:bg-black/20">
+									{viewSummary.kicker}
+								</Badge>
 								{isViewPending || salesQuery.isFetching ? (
 									<Badge className="border-gray-700 bg-black/20 text-gray-300 hover:bg-black/20">
-										Actualizando vista
+										Actualizando vista…
 									</Badge>
 								) : null}
 							</div>
+							<div className="space-y-1">
+								<h1 className="text-balance text-2xl font-semibold tracking-tight text-white md:text-3xl">
+									Ventas
+								</h1>
+								<p className="max-w-2xl text-sm text-gray-400 md:text-[15px]">
+									Consulta la operación del día y el histórico completo sin que
+									el encabezado le robe espacio a la lista.
+								</p>
+							</div>
+						</div>
 
+						<div className="flex flex-col gap-2 sm:flex-row">
+							<Button
+								asChild
+								className="h-10 bg-[var(--color-voltage)] px-4 text-black hover:bg-[#d9f15c]"
+							>
+								<Link to="/pos">
+									<Store className="h-4 w-4" aria-hidden="true" />
+									Ir al POS
+								</Link>
+							</Button>
+							<Button
+								asChild
+								variant="outline"
+								className="h-10 border-gray-700 bg-[var(--color-carbon)] px-4 text-gray-200 hover:bg-white/5 hover:text-white"
+							>
+								<Link to="/dashboard">
+									Ver dashboard
+									<ArrowRight className="h-4 w-4" aria-hidden="true" />
+								</Link>
+							</Button>
+						</div>
+					</div>
+
+					<div className="space-y-3">
+						<div className="rounded-2xl border border-gray-800 bg-[var(--color-carbon)] p-2">
 							<div
 								role="tablist"
 								aria-label="Vista de ventas"
-								className="grid gap-3 md:grid-cols-2"
+								className="grid gap-2 md:grid-cols-2"
 							>
 								<SalesViewToggle
 									value="today"
 									isActive={activeView === "today"}
 									title="Ventas de hoy"
-									description="Enfoca la operación actual sin mezclar movimientos de otros días."
 									icon={CalendarDays}
 									onSelect={handleViewChange}
 								/>
@@ -441,84 +410,95 @@ function SalesPage() {
 									value="history"
 									isActive={activeView === "history"}
 									title="Historial de ventas"
-									description="Revisa ventas pasadas con filtros por fecha, estado y medio de pago."
 									icon={History}
 									onSelect={handleViewChange}
 								/>
 							</div>
-						</CardContent>
-					</Card>
-				</section>
+						</div>
 
-				<section className="grid gap-4 md:grid-cols-3">
-					<SummaryCard
-						title={viewSummary.resultsTitle}
-						value={`${sales.length}`}
-						description={viewSummary.resultsDescription}
-						icon={Receipt}
-					/>
-					<SummaryCard
-						title={viewSummary.revenueTitle}
-						value={formatCurrency(totalRevenue)}
-						description={viewSummary.revenueDescription}
-						icon={Wallet}
-					/>
-					<SummaryCard
-						title={viewSummary.pendingTitle}
-						value={formatCurrency(totalPending)}
-						description={viewSummary.pendingDescription}
-						icon={Clock3}
-					/>
+						<div className="grid gap-3 lg:grid-cols-3">
+							<SummaryCard
+								title={viewSummary.resultsTitle}
+								value={`${sales.length}`}
+								icon={Receipt}
+							/>
+							<SummaryCard
+								title={viewSummary.revenueTitle}
+								value={formatCurrency(totalRevenue)}
+								icon={Wallet}
+							/>
+							<SummaryCard
+								title={viewSummary.pendingTitle}
+								value={formatCurrency(totalPending)}
+								icon={Clock3}
+							/>
+						</div>
+					</div>
 				</section>
 
 				<section>
 					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-						<CardHeader>
-							<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-								<div>
-									<CardTitle className="flex items-center gap-2">
-										<Filter className="h-4 w-4 text-[var(--color-voltage)]" />
-										{viewSummary.filterTitle}
+						<CardHeader className="space-y-4 pb-4">
+							<div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+								<div className="space-y-1">
+									<CardTitle className="text-xl text-white">
+										{viewSummary.listTitle}
 									</CardTitle>
-									<CardDescription className="mt-1 text-gray-400">
-										{viewSummary.filterDescription}
+									<CardDescription className="text-sm text-gray-400">
+										{viewSummary.listDescription}
 									</CardDescription>
 								</div>
-								{activeFilterCount > 0 ? (
-									<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-										{activeFilterCount} filtro
-										{activeFilterCount === 1 ? "" : "s"} activo
-										{activeFilterCount === 1 ? "" : "s"}
-									</Badge>
-								) : null}
+
+								<div className="flex flex-wrap items-center gap-2">
+									{activeFilterCount > 0 ? (
+										<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+											{activeFilterCount} filtro
+											{activeFilterCount === 1 ? "" : "s"} activo
+											{activeFilterCount === 1 ? "" : "s"}
+										</Badge>
+									) : null}
+									{isTodayView ? (
+										<Badge className="border-gray-700 bg-black/20 text-gray-300 hover:bg-black/20">
+											Solo ventas del {todayLabel}
+										</Badge>
+									) : null}
+									<Button
+										type="button"
+										variant="outline"
+										onClick={clearFilters}
+										className="h-9 border-gray-700 bg-transparent px-3 text-gray-200 hover:bg-white/5 hover:text-white"
+										disabled={activeFilterCount === 0}
+									>
+										<X className="h-4 w-4" aria-hidden="true" />
+										Limpiar
+									</Button>
+								</div>
 							</div>
-						</CardHeader>
-						<CardContent>
-							<form
-								className="space-y-4"
-								onSubmit={(event) => {
-									event.preventDefault();
-									applyFilters();
-								}}
-							>
+
+							<div className="space-y-3">
 								<div
-									className={`grid gap-4 ${
+									className={`grid gap-3 ${
 										isTodayView
-											? "xl:grid-cols-[1.3fr_repeat(3,minmax(0,1fr))]"
-											: "xl:grid-cols-[1.3fr_repeat(4,minmax(0,1fr))]"
+											? "md:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,180px))_minmax(220px,0.9fr)]"
+											: "md:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,180px))_repeat(2,minmax(0,150px))]"
 									}`}
 								>
 									<div className="space-y-2">
 										<label
-											className="text-sm text-gray-400"
+											className="text-xs font-medium tracking-[0.16em] text-gray-500 uppercase"
 											htmlFor={salesSearchId}
 										>
 											Busqueda
 										</label>
 										<div className="relative">
-											<Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-500" />
+											<Search
+												className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-500"
+												aria-hidden="true"
+											/>
 											<Input
 												id={salesSearchId}
+												name="q"
+												autoComplete="off"
 												value={draftFilters.q}
 												onChange={(event) =>
 													setDraftFilters((current) => ({
@@ -526,8 +506,8 @@ function SalesPage() {
 														q: event.target.value,
 													}))
 												}
-												placeholder="Cliente, cajero o id"
-												className="border-gray-700 bg-black/20 pl-9 text-white placeholder:text-gray-500"
+												placeholder="Cliente, cajero o id…"
+												className="h-10 border-gray-700 bg-black/20 pl-9 text-white placeholder:text-gray-500"
 											/>
 										</div>
 									</div>
@@ -544,7 +524,7 @@ function SalesPage() {
 										>
 											<SelectTrigger
 												id={salesStatusId}
-												className="h-8 w-full border-gray-700 bg-black/20 text-white"
+												className="h-10 w-full border-gray-700 bg-black/20 text-white"
 											>
 												<SelectValue placeholder="Todos" />
 											</SelectTrigger>
@@ -573,7 +553,7 @@ function SalesPage() {
 										>
 											<SelectTrigger
 												id={salesPaymentMethodId}
-												className="h-8 w-full border-gray-700 bg-black/20 text-white"
+												className="h-10 w-full border-gray-700 bg-black/20 text-white"
 											>
 												<SelectValue placeholder="Todos" />
 											</SelectTrigger>
@@ -590,20 +570,23 @@ function SalesPage() {
 									</FilterField>
 
 									{isTodayView ? (
-										<div className="rounded-2xl border border-dashed border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/5 px-4 py-3 text-sm text-gray-300">
-											<p className="font-medium text-white">
-												Fecha fija en hoy
-											</p>
-											<p className="mt-1 text-gray-400">
-												Esta vista solo muestra ventas del {todayLabel}. Usa el
-												historial para cambiar el rango.
-											</p>
+										<div className="flex items-end">
+											<div className="w-full rounded-2xl border border-dashed border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/5 px-4 py-2.5 text-sm text-gray-300">
+												<p className="font-medium text-white">
+													Fecha fija en hoy
+												</p>
+												<p className="mt-0.5 text-xs text-gray-400">
+													Mostrando solo ventas del {todayLabel}.
+												</p>
+											</div>
 										</div>
 									) : (
 										<>
 											<FilterField label="Desde" htmlFor={salesStartDateId}>
 												<Input
 													id={salesStartDateId}
+													name="startDate"
+													autoComplete="off"
 													type="date"
 													value={draftFilters.startDate}
 													onChange={(event) =>
@@ -612,13 +595,15 @@ function SalesPage() {
 															startDate: event.target.value,
 														}))
 													}
-													className="border-gray-700 bg-black/20 text-white"
+													className="h-10 border-gray-700 bg-black/20 text-white"
 												/>
 											</FilterField>
 
 											<FilterField label="Hasta" htmlFor={salesEndDateId}>
 												<Input
 													id={salesEndDateId}
+													name="endDate"
+													autoComplete="off"
 													type="date"
 													value={draftFilters.endDate}
 													onChange={(event) =>
@@ -627,114 +612,119 @@ function SalesPage() {
 															endDate: event.target.value,
 														}))
 													}
-													className="border-gray-700 bg-black/20 text-white"
+													className="h-10 border-gray-700 bg-black/20 text-white"
 												/>
 											</FilterField>
 										</>
 									)}
 								</div>
-
-								<div className="flex flex-col gap-3 sm:flex-row">
-									<Button
-										type="submit"
-										className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
-									>
-										<Filter className="h-4 w-4" />
-										Aplicar filtros
-									</Button>
-									<Button
-										type="button"
-										variant="outline"
-										onClick={clearFilters}
-										className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
-									>
-										<X className="h-4 w-4" />
-										Limpiar
-									</Button>
-								</div>
-							</form>
-						</CardContent>
-					</Card>
-				</section>
-
-				<section>
-					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-						<CardHeader>
-							<CardTitle>{viewSummary.listTitle}</CardTitle>
-							<CardDescription className="text-gray-400">
-								{viewSummary.listDescription}
-							</CardDescription>
+							</div>
 						</CardHeader>
-						<CardContent>
+						<CardContent className="pt-0">
 							{sales.length > 0 ? (
-								<div className="space-y-3">
-									{sales.map((sale) => (
-										<button
-											key={sale.id}
-											type="button"
-											onClick={() => {
-												setSelectedSaleId(sale.id);
-												setIsDetailOpen(true);
-											}}
-											className={`flex w-full flex-col gap-4 rounded-2xl border px-4 py-4 text-left transition-colors sm:flex-row sm:items-center sm:justify-between ${
-												selectedSaleSummary?.id === sale.id
-													? "border-[var(--color-voltage)]/30 bg-[var(--color-voltage)]/5"
-													: "border-gray-800 bg-black/20 hover:border-gray-700 hover:bg-black/30"
-											}`}
-										>
-											<div className="min-w-0 flex-1">
-												<div className="flex flex-wrap items-center gap-2">
-													<p className="truncate font-medium text-white">
-														{sale.customerName ?? "Cliente mostrador"}
-													</p>
-													<Badge
-														className={getSaleStatusBadgeClass(sale.status)}
-													>
-														{formatSaleStatus(sale.status)}
-													</Badge>
-												</div>
-												<div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-400">
-													<span className="inline-flex items-center gap-1.5">
-														<UserRound className="h-3.5 w-3.5" />
-														{sale.cashierName ?? "Sin cajero"}
-													</span>
-													<span className="inline-flex items-center gap-1.5">
-														<Clock3 className="h-3.5 w-3.5" />
-														{dateTimeFormatter.format(sale.createdAt)}
-													</span>
-													<span>{sale.itemCount} items</span>
-													<span>{formatPaymentSummary(sale)}</span>
-												</div>
-											</div>
+								<div className="space-y-2">
+									<div className="hidden grid-cols-[minmax(0,1.45fr)_minmax(0,1.15fr)_84px_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.2fr)_44px] gap-4 px-3 text-[11px] font-medium tracking-[0.16em] text-gray-500 uppercase md:grid">
+										<span>Cliente</span>
+										<span>Fecha/Hora</span>
+										<span>Items</span>
+										<span>Metodo</span>
+										<span className="text-right">Monto total</span>
+										<span className="text-right">Estado</span>
+										<span />
+									</div>
 
-											<div className="flex items-center gap-4">
-												<div className="text-right">
-													<p className="text-lg font-semibold text-white">
-														{formatCurrency(sale.totalAmount)}
-													</p>
-													<p className="text-sm text-gray-400">
-														{sale.balanceDue > 0
-															? `Pendiente ${formatCurrency(sale.balanceDue)}`
-															: "Sin saldo pendiente"}
-													</p>
-												</div>
-												<div className="rounded-full border border-gray-800 p-2 text-gray-400">
-													<ArrowRight className="h-4 w-4" />
-												</div>
-											</div>
-										</button>
-									))}
-									<div className="flex flex-col items-center justify-between gap-4 border-t border-gray-800 bg-black/10 p-4 text-sm text-gray-400 sm:flex-row sm:gap-0">
-										<div className="flex w-full items-center justify-between gap-4 sm:w-auto sm:justify-start">
+									<div className="space-y-2 [content-visibility:auto]">
+										{sales.map((sale) => {
+											const paymentSummary = formatPaymentSummary(sale);
+
+											return (
+												<button
+													key={sale.id}
+													type="button"
+													onClick={() => {
+														setSelectedSaleId(sale.id);
+														setIsDetailOpen(true);
+													}}
+													className={`group w-full touch-manipulation rounded-xl border px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-voltage)]/30 focus-visible:outline-none ${
+														selectedSaleSummary?.id === sale.id
+															? "border-[var(--color-voltage)]/30 bg-[var(--color-voltage)]/6"
+															: "border-gray-800 bg-black/20 hover:border-gray-700 hover:bg-black/30"
+													}`}
+												>
+													<div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1.45fr)_minmax(0,1.15fr)_84px_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.2fr)_44px] md:items-center md:gap-4">
+														<div className="min-w-0">
+															<div className="flex min-w-0 items-center gap-2">
+																<UserRound
+																	className="h-3.5 w-3.5 shrink-0 text-gray-500"
+																	aria-hidden="true"
+																/>
+																<p className="truncate font-medium text-white">
+																	{sale.customerName ?? "Cliente mostrador"}
+																</p>
+															</div>
+															<p className="mt-1 truncate pl-5 text-xs text-gray-500">
+																{sale.cashierName ?? "Sin cajero"}
+															</p>
+														</div>
+
+														<div className="min-w-0 tabular-nums text-sm text-gray-300">
+															<p>{dateTimeFormatter.format(sale.createdAt)}</p>
+														</div>
+
+														<div className="text-sm text-gray-300">
+															{formatItemCountLabel(sale.itemCount)}
+														</div>
+
+														<div className="min-w-0 text-sm text-gray-300">
+															<p className="truncate" title={paymentSummary}>
+																{paymentSummary}
+															</p>
+														</div>
+
+														<div className="tabular-nums md:text-right">
+															<p className="text-base font-semibold text-white">
+																{formatCurrency(sale.totalAmount)}
+															</p>
+														</div>
+
+														<div className="flex flex-wrap items-center gap-2 md:justify-end">
+															<Badge
+																className={`${getSaleStatusBadgeClass(sale.status)} px-2 py-0.5 text-xs`}
+															>
+																{formatSaleStatus(sale.status)}
+															</Badge>
+															<p className="text-sm text-gray-400 md:text-right">
+																{sale.balanceDue > 0
+																	? `Pendiente ${formatCurrency(sale.balanceDue)}`
+																	: "Sin saldo pendiente"}
+															</p>
+														</div>
+
+														<div className="hidden justify-end md:flex">
+															<div className="rounded-full border border-gray-800 p-2 text-gray-400 transition-colors group-hover:border-gray-700 group-hover:text-white">
+																<ArrowRight
+																	className="h-4 w-4"
+																	aria-hidden="true"
+																/>
+															</div>
+														</div>
+													</div>
+												</button>
+											);
+										})}
+									</div>
+
+									<div className="flex flex-col items-center justify-between gap-3 border-t border-gray-800 pt-3 text-sm text-gray-400 sm:flex-row">
+										<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
 											<div className="flex items-center gap-2">
-												<span>Show</span>
+												<span>Mostrar</span>
 												<Select
 													value={`${pageSize}`}
 													onValueChange={(value) => {
 														updatePagination(0, Number(value));
 													}}
 												>
-													<SelectTrigger className="h-8 w-[74px] rounded-md border-gray-700 bg-[var(--color-carbon)] text-white">
+													<SelectTrigger className="h-9 w-[82px] rounded-md border-gray-700 bg-[var(--color-carbon)] text-white">
 														<SelectValue placeholder={pageSize} />
 													</SelectTrigger>
 													<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
@@ -745,10 +735,10 @@ function SalesPage() {
 														))}
 													</SelectContent>
 												</Select>
-												<span>rows</span>
+												<span>filas</span>
 											</div>
-											<div className="hidden sm:block">
-												{rangeStart}-{rangeEnd} of {totalResults} results
+											<div className="tabular-nums text-xs text-gray-500 sm:text-sm">
+												{rangeStart}-{rangeEnd} de {totalResults}
 											</div>
 										</div>
 
@@ -756,18 +746,18 @@ function SalesPage() {
 											<Button
 												variant="outline"
 												size="sm"
-												className="h-8 rounded-md border-gray-700 bg-[var(--color-carbon)] px-3 text-gray-300 hover:bg-white/5 hover:text-white"
+												className="h-9 rounded-md border-gray-700 bg-[var(--color-carbon)] px-3 text-gray-300 hover:bg-white/5 hover:text-white"
 												onClick={() =>
 													updatePagination(Math.max(cursor - pageSize, 0))
 												}
 												disabled={cursor === 0}
 											>
-												Previous
+												Anterior
 											</Button>
 											<Button
 												variant="default"
 												size="sm"
-												className="h-8 rounded-md border-none bg-[var(--color-voltage)] px-4 font-medium text-black hover:bg-[#c9e605]"
+												className="h-9 rounded-md border-none bg-[var(--color-voltage)] px-4 font-medium text-black hover:bg-[#c9e605]"
 												onClick={() => {
 													if (nextCursor !== null) {
 														updatePagination(nextCursor);
@@ -775,7 +765,7 @@ function SalesPage() {
 												}}
 												disabled={nextCursor === null}
 											>
-												Next
+												Siguiente
 											</Button>
 										</div>
 									</div>
@@ -808,6 +798,61 @@ function SalesPage() {
 				creditAccount={selectedSaleCreditAccount}
 			/>
 		</>
+	);
+}
+
+function buildSearchFromDraftFilters({
+	draftFilters,
+	activeView,
+	pageSize,
+	search,
+}: {
+	draftFilters: {
+		q: string;
+		status: string;
+		paymentMethod: string;
+		startDate: string;
+		endDate: string;
+	};
+	activeView: SalesView;
+	pageSize: number;
+	search: Record<string, unknown>;
+}) {
+	return {
+		...search,
+		view: activeView !== DEFAULT_SALES_VIEW ? activeView : undefined,
+		q: normalizeFilterValue(draftFilters.q),
+		status: normalizeEnumFilterValue(draftFilters.status, SALE_STATUS_VALUES),
+		paymentMethod: normalizeEnumFilterValue(
+			draftFilters.paymentMethod,
+			SALE_PAYMENT_METHOD_VALUES,
+		),
+		startDate:
+			activeView === "today"
+				? undefined
+				: normalizeFilterValue(draftFilters.startDate),
+		endDate:
+			activeView === "today"
+				? undefined
+				: normalizeFilterValue(draftFilters.endDate),
+		cursor: undefined,
+		pageSize: pageSize !== DEFAULT_LIST_PARAMS.limit ? pageSize : undefined,
+	};
+}
+
+function areSalesSearchValuesEqual(
+	currentSearch: Record<string, unknown>,
+	nextSearch: Record<string, unknown>,
+) {
+	return (
+		currentSearch.view === nextSearch.view &&
+		currentSearch.q === nextSearch.q &&
+		currentSearch.status === nextSearch.status &&
+		currentSearch.paymentMethod === nextSearch.paymentMethod &&
+		currentSearch.startDate === nextSearch.startDate &&
+		currentSearch.endDate === nextSearch.endDate &&
+		currentSearch.cursor === nextSearch.cursor &&
+		currentSearch.pageSize === nextSearch.pageSize
 	);
 }
 
@@ -846,32 +891,29 @@ function getCurrentDateFilterValue() {
 function SummaryCard({
 	title,
 	value,
-	description,
 	icon: Icon,
 }: {
 	title: string;
 	value: string;
-	description: string;
 	icon: typeof Receipt;
 }) {
 	return (
 		<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-			<CardHeader className="space-y-4">
-				<div className="flex items-center gap-3">
-					<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]">
-						<Icon className="h-4 w-4" />
+			<CardHeader className="px-4 py-3">
+				<div className="flex items-center justify-between gap-4">
+					<div className="flex min-w-0 items-center gap-3">
+						<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]">
+							<Icon className="h-4 w-4" aria-hidden="true" />
+						</div>
+						<CardDescription className="text-base text-gray-400">
+							{title}
+						</CardDescription>
 					</div>
-					<div>
-						<CardDescription className="text-gray-400">{title}</CardDescription>
-						<CardTitle className="mt-1 text-2xl font-semibold tracking-tight text-white">
-							{value}
-						</CardTitle>
-					</div>
+					<CardTitle className="shrink-0 text-2xl font-semibold tracking-tight text-white tabular-nums">
+						{value}
+					</CardTitle>
 				</div>
 			</CardHeader>
-			<CardContent className="pt-0">
-				<p className="text-sm text-gray-400">{description}</p>
-			</CardContent>
 		</Card>
 	);
 }
@@ -880,14 +922,12 @@ function SalesViewToggle({
 	value,
 	isActive,
 	title,
-	description,
 	icon: Icon,
 	onSelect,
 }: {
 	value: SalesView;
 	isActive: boolean;
 	title: string;
-	description: string;
 	icon: typeof CalendarDays;
 	onSelect: (value: string) => void;
 }) {
@@ -897,7 +937,7 @@ function SalesViewToggle({
 			role="tab"
 			aria-selected={isActive}
 			onClick={() => onSelect(value)}
-			className={`group flex min-h-[112px] w-full items-start gap-3 rounded-2xl border px-4 py-4 text-left transition-colors ${
+			className={`group flex w-full items-center gap-3 rounded-xl border px-5 py-5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-voltage)]/30 focus-visible:outline-none ${
 				isActive
 					? "border-[var(--color-voltage)]/30 bg-[var(--color-voltage)]/10 text-white"
 					: "border-gray-800 bg-black/20 text-gray-300 hover:border-gray-700 hover:bg-black/30 hover:text-white"
@@ -910,16 +950,11 @@ function SalesViewToggle({
 						: "border-gray-700 bg-black/30 text-gray-400 group-hover:border-gray-600 group-hover:text-gray-200"
 				}`}
 			>
-				<Icon className="h-4 w-4" />
+				<Icon className="h-4 w-4" aria-hidden="true" />
 			</div>
-			<div className="space-y-1">
-				<p className="font-semibold">{title}</p>
-				<p
-					className={
-						isActive ? "text-sm text-gray-200" : "text-sm text-gray-400"
-					}
-				>
-					{description}
+			<div className="min-w-0">
+				<p className="text-2xl font-semibold tracking-tight md:text-[28px]">
+					{title}
 				</p>
 			</div>
 		</button>
@@ -966,6 +1001,10 @@ function formatPaymentSummary(sale: SaleListItem) {
 	return sale.paymentMethods.map(formatPaymentMethodLabel).join(" + ");
 }
 
+function formatItemCountLabel(itemCount: number) {
+	return `${itemCount} item${itemCount === 1 ? "" : "s"}`;
+}
+
 function normalizeFilterValue(value: string) {
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
@@ -996,7 +1035,10 @@ function FilterField({
 }) {
 	return (
 		<div className="space-y-2">
-			<label className="text-sm text-gray-400" htmlFor={htmlFor}>
+			<label
+				className="text-xs font-medium tracking-[0.16em] text-gray-500 uppercase"
+				htmlFor={htmlFor}
+			>
 				{label}
 			</label>
 			{children}

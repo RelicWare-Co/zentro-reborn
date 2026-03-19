@@ -1,5 +1,5 @@
 import "@tanstack/react-start/server-only";
-import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
 	creditAccount,
@@ -429,11 +429,6 @@ export async function createPosSaleForCurrentOrganization(
 				continue;
 			}
 
-			const stockCheck =
-				deltaQuantity < 0
-					? gte(product.stock, Math.abs(deltaQuantity))
-					: undefined;
-
 			const updatedProducts = await tx
 				.update(product)
 				.set({ stock: sql`${product.stock} + ${deltaQuantity}` })
@@ -442,14 +437,13 @@ export async function createPosSaleForCurrentOrganization(
 						eq(product.id, productId),
 						eq(product.organizationId, organizationId),
 						isNull(product.deletedAt),
-						...(stockCheck ? [stockCheck] : []),
 					),
 				)
 				.returning({ id: product.id });
 
 			if (updatedProducts.length === 0) {
 				throw new Error(
-					`Stock insuficiente para ${productRow.name}. Disponible: ${productRow.stock}`,
+					`No fue posible actualizar el stock de ${productRow.name}`,
 				);
 			}
 

@@ -435,7 +435,9 @@ function PosPage() {
 				allowCreditSales={posSettings.allowCreditSales}
 				isCreditSale={checkout.isCreditSale}
 				setIsCreditSale={checkout.setIsCreditSale}
+				customers={customers}
 				selectedCustomerId={selectedCustomerId}
+				onCustomerChange={handleCustomerChange}
 				selectedCustomerCreditAccount={selectedCustomerCreditAccount}
 				projectedCreditBalance={projectedCreditBalance}
 				remainingCreditAmount={checkout.remainingCreditAmount}

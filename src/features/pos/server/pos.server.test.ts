@@ -500,7 +500,7 @@ describe("pos server modules", () => {
 		}
 	});
 
-	test("rejects sale when there is not enough inventory", async () => {
+	test("allows sale to leave tracked product stock in negative", async () => {
 		const { ctx, shiftsServer, salesServer } = await setupPosServers();
 		try {
 			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
@@ -518,13 +518,19 @@ describe("pos server modules", () => {
 				trackInventory: true,
 			});
 
-			await expect(
-				salesServer.createPosSaleForCurrentOrganization({
-					shiftId: openedShift.id,
-					items: [{ productId, quantity: 2 }],
-					payments: [{ method: "cash", amount: 2400 }],
-				}),
-			).rejects.toThrow("Stock insuficiente para Producto corto");
+			await salesServer.createPosSaleForCurrentOrganization({
+				shiftId: openedShift.id,
+				items: [{ productId, quantity: 2 }],
+				payments: [{ method: "cash", amount: 2400 }],
+			});
+
+			const [updatedProduct] = await ctx.db
+				.select({ stock: schema.product.stock })
+				.from(schema.product)
+				.where(eq(schema.product.id, productId))
+				.limit(1);
+
+			expect(updatedProduct?.stock).toBe(-1);
 		} finally {
 			ctx.cleanup();
 		}
@@ -920,19 +926,21 @@ describe("pos server modules", () => {
 				stock: 0,
 			});
 
-			const createdSale = await salesServer.createPosSaleForCurrentOrganization({
-				shiftId: openedShift.id,
-				customerId,
-				items: [
-					{
-						productId,
-						quantity: 2,
-						modifiers: [{ modifierProductId: modifierId, quantity: 1 }],
-					},
-				],
-				payments: [{ method: "cash", amount: 4000 }],
-				isCreditSale: true,
-			});
+			const createdSale = await salesServer.createPosSaleForCurrentOrganization(
+				{
+					shiftId: openedShift.id,
+					customerId,
+					items: [
+						{
+							productId,
+							quantity: 2,
+							modifiers: [{ modifierProductId: modifierId, quantity: 1 }],
+						},
+					],
+					payments: [{ method: "cash", amount: 4000 }],
+					isCreditSale: true,
+				},
+			);
 
 			const [creditAccountRow] = await ctx.db
 				.select({ id: schema.creditAccount.id })
@@ -970,9 +978,11 @@ describe("pos server modules", () => {
 				createdAt: new Date(Date.now() + 1_000),
 			});
 
-			const detail = await salesHistoryServer.getSaleByIdForCurrentOrganization({
-				saleId: createdSale.saleId,
-			});
+			const detail = await salesHistoryServer.getSaleByIdForCurrentOrganization(
+				{
+					saleId: createdSale.saleId,
+				},
+			);
 
 			expect(detail).toEqual(
 				expect.objectContaining({

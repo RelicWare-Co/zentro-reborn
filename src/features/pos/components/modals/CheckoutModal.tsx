@@ -18,8 +18,9 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { formatMoneyInput, sanitizeMoneyInput } from "@/lib/utils";
-import type { CreditAccount, PaymentMethod } from "../../types";
+import type { CreditAccount, PaymentMethod, PosCustomer } from "../../types";
 import { formatCurrency } from "../../utils";
+import { CustomerPicker } from "../CustomerPicker";
 
 interface CheckoutModalProps {
 	isOpen: boolean;
@@ -36,7 +37,9 @@ interface CheckoutModalProps {
 	allowCreditSales: boolean;
 	isCreditSale: boolean;
 	setIsCreditSale: (value: boolean) => void;
+	customers: PosCustomer[];
 	selectedCustomerId: string;
+	onCustomerChange: (customerId: string) => void;
 	selectedCustomerCreditAccount: CreditAccount | null;
 	projectedCreditBalance: number;
 	remainingCreditAmount: number;
@@ -74,7 +77,9 @@ export function CheckoutModal({
 	allowCreditSales,
 	isCreditSale,
 	setIsCreditSale,
+	customers,
 	selectedCustomerId,
+	onCustomerChange,
 	selectedCustomerCreditAccount,
 	projectedCreditBalance,
 	remainingCreditAmount,
@@ -146,6 +151,24 @@ export function CheckoutModal({
 					</div>
 
 					<div className="space-y-4">
+						<div className="rounded-lg border border-gray-800 bg-[#0a0a0a] p-3">
+							<div className="space-y-1">
+								<p className="text-sm font-medium text-gray-200">
+									Cliente de la venta
+								</p>
+								<p className="text-xs text-gray-500">
+									Puedes asignarlo aquí mismo antes de finalizar el cobro.
+								</p>
+							</div>
+							<CustomerPicker
+								customers={customers}
+								selectedCustomerId={selectedCustomerId}
+								onCustomerChange={onCustomerChange}
+								buttonClassName="mt-3 h-auto w-full justify-between border-gray-700 bg-[#151515] hover:bg-[#151515]"
+								contentClassName="w-[min(420px,calc(100vw-2rem))]"
+							/>
+						</div>
+
 						<div className="rounded-lg border border-gray-800 bg-[#0a0a0a] p-3">
 							<div className="flex items-center justify-between gap-3">
 								<div>

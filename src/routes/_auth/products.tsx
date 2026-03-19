@@ -103,6 +103,9 @@ function ProductsPage() {
 		selectedProductForInventoryEntry,
 		setSelectedProductForInventoryEntry,
 	] = useState<Product | null>(null);
+	const [inventoryEntryRestockMode, setInventoryEntryRestockMode] = useState<
+		"add_to_stock" | "set_as_total"
+	>("add_to_stock");
 	const [inventoryEntryQuantity, setInventoryEntryQuantity] = useState("");
 	const [inventoryEntryCost, setInventoryEntryCost] = useState("");
 	const [inventoryEntryPrice, setInventoryEntryPrice] = useState("");
@@ -117,6 +120,7 @@ function ProductsPage() {
 	const inventoryNotesId = useId();
 	const inventoryEntrySearchId = useId();
 	const inventoryEntryQuantityId = useId();
+	const inventoryEntryRestockModeId = useId();
 	const inventoryEntryCostId = useId();
 	const inventoryEntryPriceId = useId();
 
@@ -171,6 +175,7 @@ function ProductsPage() {
 	const resetInventoryEntryForm = useCallback(() => {
 		setInventoryEntrySearch("");
 		setSelectedProductForInventoryEntry(null);
+		setInventoryEntryRestockMode("add_to_stock");
 		setInventoryEntryQuantity("");
 		setInventoryEntryCost("");
 		setInventoryEntryPrice("");
@@ -298,12 +303,20 @@ function ProductsPage() {
 	);
 
 	const inventoryEntryQuantityValue = Number(inventoryEntryQuantity);
-	const nextInventoryStockTotal =
-		selectedProductForInventoryEntry &&
+	const normalizedInventoryEntryQuantity =
 		Number.isFinite(inventoryEntryQuantityValue) &&
 		inventoryEntryQuantityValue > 0
-			? selectedProductForInventoryEntry.stock +
-				Math.trunc(inventoryEntryQuantityValue)
+			? Math.trunc(inventoryEntryQuantityValue)
+			: 0;
+	const hasNegativeInventoryEntryStock =
+		(selectedProductForInventoryEntry?.stock ?? 0) < 0;
+	const nextInventoryStockTotal =
+		selectedProductForInventoryEntry && normalizedInventoryEntryQuantity > 0
+			? hasNegativeInventoryEntryStock &&
+				inventoryEntryRestockMode === "set_as_total"
+				? normalizedInventoryEntryQuantity
+				: selectedProductForInventoryEntry.stock +
+					normalizedInventoryEntryQuantity
 			: (selectedProductForInventoryEntry?.stock ?? 0);
 	const isInventoryEntryPending =
 		registerInventoryMovementMutation.isPending ||
@@ -445,6 +458,10 @@ function ProductsPage() {
 				productId: selectedProductForInventoryEntry.id,
 				type: "restock",
 				quantity: normalizedQuantity,
+				restockMode:
+					selectedProductForInventoryEntry.stock < 0
+						? inventoryEntryRestockMode
+						: "add_to_stock",
 				notes: null,
 			});
 
@@ -546,7 +563,7 @@ function ProductsPage() {
 								onClick={() => setIsSheetOpen(true)}
 							>
 								<Plus className="w-4 h-4 mr-2" />
-							Agregar Producto
+								Agregar Producto
 							</Button>
 						</div>
 
@@ -726,7 +743,8 @@ function ProductsPage() {
 						))}
 						{categories.length === 0 && (
 							<div className="col-span-full h-32 flex items-center justify-center text-gray-500 border border-dashed border-gray-800 rounded-xl">
-								No se encontraron categorías. Haz clic en "Agregar Categoría" para crear una.
+								No se encontraron categorías. Haz clic en "Agregar Categoría"
+								para crear una.
 							</div>
 						)}
 					</div>
@@ -795,8 +813,8 @@ function ProductsPage() {
 							<Button
 								variant="ghost"
 								onClick={() => setIsCategoryDialogOpen(false)}
-						>
-							Cancelar
+							>
+								Cancelar
 							</Button>
 							<Button
 								onClick={
@@ -974,6 +992,46 @@ function ProductsPage() {
 										/>
 									</div>
 								</div>
+
+								{hasNegativeInventoryEntryStock ? (
+									<div className="grid gap-2">
+										<Label htmlFor={inventoryEntryRestockModeId}>
+											Cómo aplicar la entrada
+										</Label>
+										<Select
+											value={inventoryEntryRestockMode}
+											onValueChange={(value) =>
+												setInventoryEntryRestockMode(
+													value as "add_to_stock" | "set_as_total",
+												)
+											}
+										>
+											<SelectTrigger
+												id={inventoryEntryRestockModeId}
+												className="h-11 border-gray-700 bg-black/20 text-white"
+											>
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+												<SelectItem value="add_to_stock">
+													Restar el negativo actual
+												</SelectItem>
+												<SelectItem value="set_as_total">
+													Usar la cantidad como total final
+												</SelectItem>
+											</SelectContent>
+										</Select>
+										<p className="text-xs text-gray-400">
+											{inventoryEntryRestockMode === "set_as_total"
+												? "La cantidad digitada quedará como stock final, compensando primero el saldo negativo."
+												: "La cantidad digitada se sumará al stock actual, por lo que primero cubrirá el faltante negativo."}
+										</p>
+									</div>
+								) : (
+									<p className="text-xs text-gray-400">
+										La cantidad entrante se sumará al stock actual del producto.
+									</p>
+								)}
 
 								<div className="grid gap-2">
 									<Label>Nuevo total de stock</Label>

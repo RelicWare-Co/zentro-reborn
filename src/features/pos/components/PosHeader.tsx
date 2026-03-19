@@ -1,27 +1,8 @@
-import {
-	ArrowLeftRight,
-	Check,
-	ChevronsUpDown,
-	Lock,
-	Plus,
-	Users,
-} from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowLeftRight, Lock, Plus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-	Command,
-	CommandEmpty,
-	CommandInput,
-	CommandItem,
-	CommandList,
-} from "@/components/ui/command";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import type { ActiveShift, PosCustomer } from "../types";
+import { CustomerPicker } from "./CustomerPicker";
 
 interface PosHeaderProps {
 	activeShift: ActiveShift | null;
@@ -46,19 +27,6 @@ export function PosHeader({
 	onCloseShift,
 	onCreateCustomer,
 }: PosHeaderProps) {
-	const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
-	const selectedCustomer = useMemo(
-		() =>
-			customers.find((customer) => customer.id === selectedCustomerId) ?? null,
-		[customers, selectedCustomerId],
-	);
-	const selectedCustomerLabel = selectedCustomer?.name ?? "Cliente Mostrador";
-	const selectedCustomerMeta = selectedCustomer
-		? [selectedCustomer.documentNumber, selectedCustomer.phone]
-				.filter(Boolean)
-				.join(" · ")
-		: "Venta rápida sin cliente asociado";
-
 	return (
 		<header className="z-10 shrink-0 border-b border-gray-800 bg-[var(--color-carbon)] px-3 py-3 md:px-4 md:py-2">
 			<div className="flex min-h-10 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -86,103 +54,13 @@ export function PosHeader({
 
 					<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 rounded-lg border border-gray-800 bg-gray-900/50 px-3 py-2 transition-colors focus-within:border-[var(--color-voltage)] focus-within:ring-1 focus-within:ring-[var(--color-voltage)]/20">
 						<Users className="h-4 w-4 shrink-0 text-gray-400" />
-						<Popover
-							open={isCustomerPickerOpen}
-							onOpenChange={setIsCustomerPickerOpen}
-						>
-							<PopoverTrigger asChild>
-								<Button
-									type="button"
-									variant="ghost"
-									role="combobox"
-									aria-expanded={isCustomerPickerOpen}
-									className="h-auto min-h-7 min-w-0 flex-1 justify-between px-0 py-0 text-left text-sm text-white hover:bg-transparent hover:text-white"
-								>
-									<span className="min-w-0">
-										<span className="block truncate">
-											{selectedCustomerLabel}
-										</span>
-										<span className="block truncate text-xs text-gray-500">
-											{selectedCustomerMeta}
-										</span>
-									</span>
-									<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-gray-500" />
-								</Button>
-							</PopoverTrigger>
-							<PopoverContent
-								align="start"
-								className="w-[min(320px,calc(100vw-2rem))] border-gray-800 bg-[var(--color-carbon)] p-0 text-white"
-							>
-								<Command className="bg-transparent">
-									<CommandInput
-										placeholder="Buscar por nombre, documento o teléfono..."
-										className="text-white placeholder:text-gray-500"
-									/>
-									<CommandList className="p-1.5">
-										<CommandEmpty className="text-gray-400">
-											No se encontraron clientes.
-										</CommandEmpty>
-										<CommandItem
-											value="mostrador cliente mostrador venta rápida"
-											onSelect={() => {
-												onCustomerChange("");
-												setIsCustomerPickerOpen(false);
-											}}
-											className="gap-3 rounded-lg py-3 text-white"
-										>
-											<div className="min-w-0 flex-1 space-y-1">
-												<p className="truncate font-medium">
-													Cliente Mostrador
-												</p>
-												<p className="truncate text-xs text-gray-400">
-													Venta rápida sin cliente asociado
-												</p>
-											</div>
-											<Check
-												className={`h-4 w-4 shrink-0 ${
-													selectedCustomerId === ""
-														? "opacity-100"
-														: "opacity-0"
-												}`}
-											/>
-										</CommandItem>
-										{customers.map((customer) => (
-											<CommandItem
-												key={customer.id}
-												value={`${customer.name} ${customer.documentNumber ?? ""} ${customer.phone ?? ""} ${customer.email ?? ""}`}
-												onSelect={() => {
-													onCustomerChange(customer.id);
-													setIsCustomerPickerOpen(false);
-												}}
-												className="gap-3 rounded-lg py-3 text-white"
-											>
-												<div className="min-w-0 flex-1 space-y-1">
-													<p className="truncate font-medium">
-														{customer.name}
-													</p>
-													<p className="truncate text-xs text-gray-400">
-														{[
-															customer.documentNumber,
-															customer.phone,
-															customer.email,
-														]
-															.filter(Boolean)
-															.join(" · ") || "Sin datos adicionales"}
-													</p>
-												</div>
-												<Check
-													className={`h-4 w-4 shrink-0 ${
-														selectedCustomerId === customer.id
-															? "opacity-100"
-															: "opacity-0"
-													}`}
-												/>
-											</CommandItem>
-										))}
-									</CommandList>
-								</Command>
-							</PopoverContent>
-						</Popover>
+						<CustomerPicker
+							customers={customers}
+							selectedCustomerId={selectedCustomerId}
+							onCustomerChange={onCustomerChange}
+							buttonClassName="h-auto min-h-7 flex-1 border-0 bg-transparent px-0 py-0 hover:bg-transparent"
+							contentClassName="w-[min(320px,calc(100vw-2rem))]"
+						/>
 						<Button
 							type="button"
 							variant="ghost"

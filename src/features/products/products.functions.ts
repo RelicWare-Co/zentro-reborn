@@ -62,6 +62,7 @@ const registerInventoryMovementInputSchema = z.object({
 	productId: z.string().trim().min(1),
 	type: z.enum(["restock", "waste", "adjustment"]),
 	quantity: z.coerce.number().int(),
+	restockMode: z.enum(["add_to_stock", "set_as_total"]).optional(),
 	notes: nullableString,
 	createdAt: z.coerce.number().int().min(0).optional(),
 });

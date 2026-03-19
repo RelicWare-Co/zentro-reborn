@@ -274,6 +274,54 @@ describe("products.server", () => {
 		}
 	});
 
+	test("can restock a negative stock product using the entered quantity as final total", async () => {
+		const { ctx, server } = await setupProductsServer();
+		try {
+			const { id: productId } =
+				await server.createProductForCurrentOrganization({
+					name: "Harina",
+					price: 4000,
+					stock: 0,
+					trackInventory: true,
+				});
+
+			await ctx.db
+				.update(schema.product)
+				.set({ stock: -5 })
+				.where(eq(schema.product.id, productId));
+
+			await server.registerInventoryMovementForCurrentOrganization({
+				productId,
+				type: "restock",
+				quantity: 10,
+				restockMode: "set_as_total",
+				notes: "Conteo físico recibido",
+			});
+
+			const [productRow] = await ctx.db
+				.select({ stock: schema.product.stock })
+				.from(schema.product)
+				.where(eq(schema.product.id, productId))
+				.limit(1);
+
+			const [movementRow] = await ctx.db
+				.select({
+					type: schema.inventoryMovement.type,
+					quantity: schema.inventoryMovement.quantity,
+				})
+				.from(schema.inventoryMovement)
+				.where(eq(schema.inventoryMovement.productId, productId))
+				.limit(1);
+
+			expect(productRow?.stock).toBe(10);
+			expect(movementRow).toEqual(
+				expect.objectContaining({ type: "restock", quantity: 15 }),
+			);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
 	test("rejects update operations without fields", async () => {
 		const { ctx, server } = await setupProductsServer();
 		try {

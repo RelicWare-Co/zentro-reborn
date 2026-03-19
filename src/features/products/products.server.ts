@@ -36,6 +36,7 @@ export type RegisterInventoryMovementInput = {
 	productId: string;
 	type: "restock" | "waste" | "adjustment";
 	quantity: number;
+	restockMode?: "add_to_stock" | "set_as_total";
 	notes?: string | null;
 	createdAt?: number;
 };
@@ -395,6 +396,7 @@ export async function registerInventoryMovementForCurrentOrganization(
 	}
 
 	let deltaQuantity = baseQuantity;
+	const normalizedRestockMode = input.restockMode ?? "add_to_stock";
 	if (normalizedType === "restock" && baseQuantity < 0) {
 		throw new Error("La reposición debe tener una cantidad positiva");
 	}
@@ -430,6 +432,14 @@ export async function registerInventoryMovementForCurrentOrganization(
 			throw new Error(
 				"No puedes registrar movimientos en un producto sin control de inventario",
 			);
+		}
+
+		if (
+			normalizedType === "restock" &&
+			normalizedRestockMode === "set_as_total" &&
+			targetProduct.stock < 0
+		) {
+			deltaQuantity = baseQuantity - targetProduct.stock;
 		}
 
 		const updated = await tx

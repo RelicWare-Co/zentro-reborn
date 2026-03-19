@@ -121,6 +121,7 @@ export function useProductsMutations(options?: { onSuccess?: () => void }) {
 			productId: string;
 			type: "restock" | "waste" | "adjustment";
 			quantity: number;
+			restockMode?: "add_to_stock" | "set_as_total";
 			notes: string | null;
 		}) => registerInventoryMovement({ data: payload }),
 		onSuccess: handleSuccess,

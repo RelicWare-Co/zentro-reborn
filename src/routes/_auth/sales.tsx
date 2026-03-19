@@ -1,8 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
 	ArrowRight,
+	CalendarDays,
 	Clock3,
 	Filter,
+	History,
 	Receipt,
 	Search,
 	Store,
@@ -10,7 +12,7 @@ import {
 	Wallet,
 	X,
 } from "lucide-react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState, useTransition } from "react";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +48,8 @@ const DEFAULT_LIST_PARAMS = {
 };
 
 const ALL_FILTER_VALUE = "all";
+const SALES_VIEW_VALUES = ["today", "history"] as const;
+const DEFAULT_SALES_VIEW = "today" as const;
 const SALE_STATUS_VALUES = ["completed", "credit", "cancelled"] as const;
 const SALE_PAYMENT_METHOD_VALUES = [
 	"cash",
@@ -54,7 +58,10 @@ const SALE_PAYMENT_METHOD_VALUES = [
 	"transfer_bancolombia",
 ] as const;
 
+type SalesView = (typeof SALES_VIEW_VALUES)[number];
+
 const salesSearchSchema = z.object({
+	view: z.enum(SALES_VIEW_VALUES).optional(),
 	q: z.string().optional(),
 	status: z.enum(["completed", "credit", "cancelled"]).optional(),
 	paymentMethod: z
@@ -73,21 +80,35 @@ const dateTimeFormatter = new Intl.DateTimeFormat("es-CO", {
 	minute: "2-digit",
 });
 
+const dayFormatter = new Intl.DateTimeFormat("es-CO", {
+	day: "numeric",
+	month: "long",
+});
+
 export const Route = createFileRoute("/_auth/sales")({
 	validateSearch: salesSearchSchema,
 	loaderDeps: ({ search }) => search,
-	loader: ({ deps }) =>
-		listSales({
+	loader: ({ deps }) => {
+		const todayDate = getCurrentDateFilterValue();
+		const resolvedDateFilters = resolveSalesDateFilters(
+			deps.view,
+			deps.startDate,
+			deps.endDate,
+			todayDate,
+		);
+
+		return listSales({
 			data: {
 				limit: deps.pageSize ?? DEFAULT_LIST_PARAMS.limit,
 				cursor: deps.cursor ?? DEFAULT_LIST_PARAMS.cursor,
 				searchQuery: deps.q ?? null,
 				status: deps.status ?? null,
 				paymentMethod: deps.paymentMethod ?? null,
-				startDate: deps.startDate ?? null,
-				endDate: deps.endDate ?? null,
+				startDate: resolvedDateFilters.startDate,
+				endDate: resolvedDateFilters.endDate,
 			},
-		}),
+		});
+	},
 	component: SalesPage,
 });
 
@@ -100,8 +121,18 @@ function SalesPage() {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const search = Route.useSearch();
 	const initialSales = Route.useLoaderData();
+	const [isViewPending, startViewTransition] = useTransition();
 	const { data: posBootstrap } = usePosBootstrap();
 	const { data: creditAccountsSearchResult } = useCreditAccounts();
+	const activeView = normalizeSalesView(search.view);
+	const isTodayView = activeView === "today";
+	const todayDate = getCurrentDateFilterValue();
+	const resolvedDateFilters = resolveSalesDateFilters(
+		activeView,
+		search.startDate,
+		search.endDate,
+		todayDate,
+	);
 	const salesQuery = useSalesList(
 		{
 			limit: search.pageSize ?? DEFAULT_LIST_PARAMS.limit,
@@ -109,8 +140,8 @@ function SalesPage() {
 			searchQuery: search.q ?? null,
 			status: search.status ?? null,
 			paymentMethod: search.paymentMethod ?? null,
-			startDate: search.startDate ?? null,
-			endDate: search.endDate ?? null,
+			startDate: resolvedDateFilters.startDate,
+			endDate: resolvedDateFilters.endDate,
 		},
 		initialSales,
 	);
@@ -193,13 +224,59 @@ function SalesPage() {
 		search.q,
 		search.status,
 		search.paymentMethod,
-		search.startDate,
-		search.endDate,
+		...(isTodayView ? [] : [search.startDate, search.endDate]),
 	].filter(Boolean).length;
+	const todayLabel = dayFormatter.format(new Date(`${todayDate}T00:00:00`));
+	const viewSummary = isTodayView
+		? {
+				kicker: `Solo ${todayLabel}`,
+				title: "Ventas de hoy",
+				description:
+					"El día actual queda separado del histórico para que caja y administración lean la operación sin ruido de ventas pasadas.",
+				resultsTitle: "Ventas del dia",
+				resultsDescription:
+					activeFilterCount > 0
+						? "Resultados del filtro aplicado sobre hoy"
+						: "Registros creados durante el dia actual",
+				revenueTitle: "Ingreso del dia",
+				revenueDescription: "Total de ventas registradas hoy",
+				pendingTitle: "Saldo pendiente hoy",
+				pendingDescription: "Pendientes abiertos dentro del dia actual",
+				filterTitle: "Filtros rapidos de hoy",
+				filterDescription:
+					"Busca por cliente, cajero o id, y filtra por estado o medio de pago. La fecha queda fijada al dia actual.",
+				listTitle: "Ventas de hoy",
+				listDescription:
+					"Abre cualquier venta de hoy para revisar items, cliente y pagos sin mezclar operaciones pasadas.",
+				emptyTitle: "No hay ventas registradas hoy.",
+			}
+		: {
+				kicker: "Consulta completa",
+				title: "Historial de ventas",
+				description:
+					"Usa el historial cuando necesites revisar cierres, seguimientos o ventas anteriores con filtros por fecha.",
+				resultsTitle: "Ventas cargadas",
+				resultsDescription:
+					activeFilterCount > 0
+						? "Resultados del filtro actual"
+						: "Ultimos registros disponibles en pantalla",
+				revenueTitle: "Monto acumulado",
+				revenueDescription: "Suma de las ventas listadas",
+				pendingTitle: "Saldo pendiente",
+				pendingDescription: "Principalmente ventas a credito",
+				filterTitle: "Filtros del historial",
+				filterDescription:
+					"Busca por cliente, cajero o id, y combina estado, fechas y medio de pago.",
+				listTitle: "Historial de ventas",
+				listDescription:
+					"Selecciona una venta para revisar items, cliente y pagos.",
+				emptyTitle: "No se han registrado ventas todavia.",
+			};
 
 	const applyFilters = () => {
 		void navigate({
 			search: {
+				view: activeView !== DEFAULT_SALES_VIEW ? activeView : undefined,
 				q: normalizeFilterValue(draftFilters.q),
 				status: normalizeEnumFilterValue(
 					draftFilters.status,
@@ -209,10 +286,14 @@ function SalesPage() {
 					draftFilters.paymentMethod,
 					SALE_PAYMENT_METHOD_VALUES,
 				),
-				startDate: normalizeFilterValue(draftFilters.startDate),
-				endDate: normalizeFilterValue(draftFilters.endDate),
+				startDate: isTodayView
+					? search.startDate
+					: normalizeFilterValue(draftFilters.startDate),
+				endDate: isTodayView
+					? search.endDate
+					: normalizeFilterValue(draftFilters.endDate),
 				cursor: undefined,
-				pageSize,
+				pageSize: pageSize !== DEFAULT_LIST_PARAMS.limit ? pageSize : undefined,
 			},
 			replace: true,
 		});
@@ -228,6 +309,12 @@ function SalesPage() {
 		});
 		void navigate({
 			search: {
+				view: activeView !== DEFAULT_SALES_VIEW ? activeView : undefined,
+				q: undefined,
+				status: undefined,
+				paymentMethod: undefined,
+				startDate: isTodayView ? search.startDate : undefined,
+				endDate: isTodayView ? search.endDate : undefined,
 				pageSize: pageSize !== DEFAULT_LIST_PARAMS.limit ? pageSize : undefined,
 			},
 			replace: true,
@@ -246,6 +333,32 @@ function SalesPage() {
 		});
 	};
 
+	const handleViewChange = (value: string) => {
+		const nextView = normalizeSalesView(value);
+		if (nextView === activeView) {
+			return;
+		}
+
+		setDraftFilters({
+			q: search.q ?? "",
+			status: search.status ?? "",
+			paymentMethod: search.paymentMethod ?? "",
+			startDate: search.startDate ?? "",
+			endDate: search.endDate ?? "",
+		});
+
+		startViewTransition(() => {
+			void navigate({
+				search: {
+					...search,
+					view: nextView !== DEFAULT_SALES_VIEW ? nextView : undefined,
+					cursor: undefined,
+				},
+				replace: true,
+			});
+		});
+	};
+
 	return (
 		<>
 			<main className="flex-1 space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12">
@@ -257,8 +370,8 @@ function SalesPage() {
 						<div className="space-y-2">
 							<h1 className="text-3xl font-bold tracking-tight">Ventas</h1>
 							<p className="max-w-2xl text-sm text-gray-400 md:text-base">
-								Consulta el historial reciente, valida pagos y abre el detalle
-								completo de cada venta.
+								Consulta la operación del día y el histórico completo en vistas
+								separadas, con acceso rápido al detalle de cada venta.
 							</p>
 						</div>
 					</div>
@@ -286,27 +399,74 @@ function SalesPage() {
 					</div>
 				</section>
 
+				<section>
+					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
+						<CardContent className="space-y-5 pt-6">
+							<div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+								<div className="space-y-2">
+									<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+										{viewSummary.kicker}
+									</Badge>
+									<div className="space-y-1">
+										<h2 className="text-2xl font-semibold tracking-tight text-white">
+											{viewSummary.title}
+										</h2>
+										<p className="max-w-3xl text-sm text-gray-400">
+											{viewSummary.description}
+										</p>
+									</div>
+								</div>
+
+								{isViewPending || salesQuery.isFetching ? (
+									<Badge className="border-gray-700 bg-black/20 text-gray-300 hover:bg-black/20">
+										Actualizando vista
+									</Badge>
+								) : null}
+							</div>
+
+							<div
+								role="tablist"
+								aria-label="Vista de ventas"
+								className="grid gap-3 md:grid-cols-2"
+							>
+								<SalesViewToggle
+									value="today"
+									isActive={activeView === "today"}
+									title="Ventas de hoy"
+									description="Enfoca la operación actual sin mezclar movimientos de otros días."
+									icon={CalendarDays}
+									onSelect={handleViewChange}
+								/>
+								<SalesViewToggle
+									value="history"
+									isActive={activeView === "history"}
+									title="Historial de ventas"
+									description="Revisa ventas pasadas con filtros por fecha, estado y medio de pago."
+									icon={History}
+									onSelect={handleViewChange}
+								/>
+							</div>
+						</CardContent>
+					</Card>
+				</section>
+
 				<section className="grid gap-4 md:grid-cols-3">
 					<SummaryCard
-						title="Ventas cargadas"
+						title={viewSummary.resultsTitle}
 						value={`${sales.length}`}
-						description={
-							activeFilterCount > 0
-								? "Resultados del filtro actual"
-								: "Ultimos registros disponibles en pantalla"
-						}
+						description={viewSummary.resultsDescription}
 						icon={Receipt}
 					/>
 					<SummaryCard
-						title="Monto acumulado"
+						title={viewSummary.revenueTitle}
 						value={formatCurrency(totalRevenue)}
-						description="Suma de las ventas listadas"
+						description={viewSummary.revenueDescription}
 						icon={Wallet}
 					/>
 					<SummaryCard
-						title="Saldo pendiente"
+						title={viewSummary.pendingTitle}
 						value={formatCurrency(totalPending)}
-						description="Principalmente ventas a credito"
+						description={viewSummary.pendingDescription}
 						icon={Clock3}
 					/>
 				</section>
@@ -318,11 +478,10 @@ function SalesPage() {
 								<div>
 									<CardTitle className="flex items-center gap-2">
 										<Filter className="h-4 w-4 text-[var(--color-voltage)]" />
-										Filtros
+										{viewSummary.filterTitle}
 									</CardTitle>
 									<CardDescription className="mt-1 text-gray-400">
-										Busca por cliente, cajero o id, y combina estado, fechas y
-										medio de pago.
+										{viewSummary.filterDescription}
 									</CardDescription>
 								</div>
 								{activeFilterCount > 0 ? (
@@ -342,7 +501,13 @@ function SalesPage() {
 									applyFilters();
 								}}
 							>
-								<div className="grid gap-4 xl:grid-cols-[1.3fr_repeat(4,minmax(0,1fr))]">
+								<div
+									className={`grid gap-4 ${
+										isTodayView
+											? "xl:grid-cols-[1.3fr_repeat(3,minmax(0,1fr))]"
+											: "xl:grid-cols-[1.3fr_repeat(4,minmax(0,1fr))]"
+									}`}
+								>
 									<div className="space-y-2">
 										<label
 											className="text-sm text-gray-400"
@@ -424,35 +589,49 @@ function SalesPage() {
 										</Select>
 									</FilterField>
 
-									<FilterField label="Desde" htmlFor={salesStartDateId}>
-										<Input
-											id={salesStartDateId}
-											type="date"
-											value={draftFilters.startDate}
-											onChange={(event) =>
-												setDraftFilters((current) => ({
-													...current,
-													startDate: event.target.value,
-												}))
-											}
-											className="border-gray-700 bg-black/20 text-white"
-										/>
-									</FilterField>
+									{isTodayView ? (
+										<div className="rounded-2xl border border-dashed border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/5 px-4 py-3 text-sm text-gray-300">
+											<p className="font-medium text-white">
+												Fecha fija en hoy
+											</p>
+											<p className="mt-1 text-gray-400">
+												Esta vista solo muestra ventas del {todayLabel}. Usa el
+												historial para cambiar el rango.
+											</p>
+										</div>
+									) : (
+										<>
+											<FilterField label="Desde" htmlFor={salesStartDateId}>
+												<Input
+													id={salesStartDateId}
+													type="date"
+													value={draftFilters.startDate}
+													onChange={(event) =>
+														setDraftFilters((current) => ({
+															...current,
+															startDate: event.target.value,
+														}))
+													}
+													className="border-gray-700 bg-black/20 text-white"
+												/>
+											</FilterField>
 
-									<FilterField label="Hasta" htmlFor={salesEndDateId}>
-										<Input
-											id={salesEndDateId}
-											type="date"
-											value={draftFilters.endDate}
-											onChange={(event) =>
-												setDraftFilters((current) => ({
-													...current,
-													endDate: event.target.value,
-												}))
-											}
-											className="border-gray-700 bg-black/20 text-white"
-										/>
-									</FilterField>
+											<FilterField label="Hasta" htmlFor={salesEndDateId}>
+												<Input
+													id={salesEndDateId}
+													type="date"
+													value={draftFilters.endDate}
+													onChange={(event) =>
+														setDraftFilters((current) => ({
+															...current,
+															endDate: event.target.value,
+														}))
+													}
+													className="border-gray-700 bg-black/20 text-white"
+												/>
+											</FilterField>
+										</>
+									)}
 								</div>
 
 								<div className="flex flex-col gap-3 sm:flex-row">
@@ -481,9 +660,9 @@ function SalesPage() {
 				<section>
 					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
 						<CardHeader>
-							<CardTitle>Historial de ventas</CardTitle>
+							<CardTitle>{viewSummary.listTitle}</CardTitle>
 							<CardDescription className="text-gray-400">
-								Selecciona una venta para revisar items, cliente y pagos.
+								{viewSummary.listDescription}
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
@@ -555,10 +734,10 @@ function SalesPage() {
 														updatePagination(0, Number(value));
 													}}
 												>
-													<SelectTrigger className="h-8 w-[74px] border-gray-700 bg-[var(--color-carbon)] text-white rounded-md">
+													<SelectTrigger className="h-8 w-[74px] rounded-md border-gray-700 bg-[var(--color-carbon)] text-white">
 														<SelectValue placeholder={pageSize} />
 													</SelectTrigger>
-													<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+													<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
 														{[10, 20, 30, 40, 50].map((size) => (
 															<SelectItem key={size} value={`${size}`}>
 																{size}
@@ -577,7 +756,7 @@ function SalesPage() {
 											<Button
 												variant="outline"
 												size="sm"
-												className="border-gray-700 bg-[var(--color-carbon)] text-gray-300 hover:bg-white/5 hover:text-white rounded-md h-8 px-3"
+												className="h-8 rounded-md border-gray-700 bg-[var(--color-carbon)] px-3 text-gray-300 hover:bg-white/5 hover:text-white"
 												onClick={() =>
 													updatePagination(Math.max(cursor - pageSize, 0))
 												}
@@ -588,7 +767,7 @@ function SalesPage() {
 											<Button
 												variant="default"
 												size="sm"
-												className="bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-medium border-none rounded-md h-8 px-4"
+												className="h-8 rounded-md border-none bg-[var(--color-voltage)] px-4 font-medium text-black hover:bg-[#c9e605]"
 												onClick={() => {
 													if (nextCursor !== null) {
 														updatePagination(nextCursor);
@@ -604,7 +783,7 @@ function SalesPage() {
 							) : (
 								<div className="rounded-2xl border border-dashed border-gray-800 px-4 py-10 text-center">
 									<p className="text-sm text-gray-400">
-										No se han registrado ventas todavia.
+										{viewSummary.emptyTitle}
 									</p>
 									<Button
 										asChild
@@ -630,6 +809,38 @@ function SalesPage() {
 			/>
 		</>
 	);
+}
+
+function normalizeSalesView(value: string | undefined): SalesView {
+	return SALES_VIEW_VALUES.includes(value as SalesView)
+		? (value as SalesView)
+		: DEFAULT_SALES_VIEW;
+}
+
+function resolveSalesDateFilters(
+	view: string | undefined,
+	startDate: string | undefined,
+	endDate: string | undefined,
+	todayDate: string,
+) {
+	if (normalizeSalesView(view) === "today") {
+		return {
+			startDate: todayDate,
+			endDate: todayDate,
+		};
+	}
+
+	return {
+		startDate: startDate ?? null,
+		endDate: endDate ?? null,
+	};
+}
+
+function getCurrentDateFilterValue() {
+	const now = new Date();
+	const month = `${now.getMonth() + 1}`.padStart(2, "0");
+	const day = `${now.getDate()}`.padStart(2, "0");
+	return `${now.getFullYear()}-${month}-${day}`;
 }
 
 function SummaryCard({
@@ -662,6 +873,56 @@ function SummaryCard({
 				<p className="text-sm text-gray-400">{description}</p>
 			</CardContent>
 		</Card>
+	);
+}
+
+function SalesViewToggle({
+	value,
+	isActive,
+	title,
+	description,
+	icon: Icon,
+	onSelect,
+}: {
+	value: SalesView;
+	isActive: boolean;
+	title: string;
+	description: string;
+	icon: typeof CalendarDays;
+	onSelect: (value: string) => void;
+}) {
+	return (
+		<button
+			type="button"
+			role="tab"
+			aria-selected={isActive}
+			onClick={() => onSelect(value)}
+			className={`group flex min-h-[112px] w-full items-start gap-3 rounded-2xl border px-4 py-4 text-left transition-colors ${
+				isActive
+					? "border-[var(--color-voltage)]/30 bg-[var(--color-voltage)]/10 text-white"
+					: "border-gray-800 bg-black/20 text-gray-300 hover:border-gray-700 hover:bg-black/30 hover:text-white"
+			}`}
+		>
+			<div
+				className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${
+					isActive
+						? "border-[var(--color-voltage)]/30 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]"
+						: "border-gray-700 bg-black/30 text-gray-400 group-hover:border-gray-600 group-hover:text-gray-200"
+				}`}
+			>
+				<Icon className="h-4 w-4" />
+			</div>
+			<div className="space-y-1">
+				<p className="font-semibold">{title}</p>
+				<p
+					className={
+						isActive ? "text-sm text-gray-200" : "text-sm text-gray-400"
+					}
+				>
+					{description}
+				</p>
+			</div>
+		</button>
 	);
 }
 

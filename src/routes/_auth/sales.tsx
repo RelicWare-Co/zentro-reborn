@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
 	ArrowRight,
@@ -16,6 +17,7 @@ import {
 	useEffect,
 	useId,
 	useMemo,
+	useRef,
 	useState,
 	useTransition,
 } from "react";
@@ -39,6 +41,7 @@ import {
 } from "@/components/ui/select";
 import { SaleDetailSheet } from "@/features/pos/components/SaleDetailSheet";
 import {
+	prefetchSalesList,
 	useCreditAccounts,
 	usePosBootstrap,
 	useSaleDetail,
@@ -63,6 +66,8 @@ const SALE_PAYMENT_METHOD_VALUES = [
 	"transfer_nequi",
 	"transfer_bancolombia",
 ] as const;
+const SALES_LOADING_FEEDBACK_DELAY_MS = 120;
+const SALES_LOADING_FEEDBACK_MIN_VISIBLE_MS = 420;
 
 type SalesView = (typeof SALES_VIEW_VALUES)[number];
 
@@ -78,6 +83,8 @@ const salesSearchSchema = z.object({
 	cursor: z.coerce.number().int().min(0).optional(),
 	pageSize: z.coerce.number().int().min(1).max(100).optional(),
 });
+
+type SalesSearch = z.infer<typeof salesSearchSchema>;
 
 const dateTimeFormatter = new Intl.DateTimeFormat("es-CO", {
 	day: "numeric",
@@ -96,23 +103,8 @@ export const Route = createFileRoute("/_auth/sales")({
 	loaderDeps: ({ search }) => search,
 	loader: ({ deps }) => {
 		const todayDate = getCurrentDateFilterValue();
-		const resolvedDateFilters = resolveSalesDateFilters(
-			deps.view,
-			deps.startDate,
-			deps.endDate,
-			todayDate,
-		);
-
 		return listSales({
-			data: {
-				limit: deps.pageSize ?? DEFAULT_LIST_PARAMS.limit,
-				cursor: deps.cursor ?? DEFAULT_LIST_PARAMS.cursor,
-				searchQuery: deps.q ?? null,
-				status: deps.status ?? null,
-				paymentMethod: deps.paymentMethod ?? null,
-				startDate: resolvedDateFilters.startDate,
-				endDate: resolvedDateFilters.endDate,
-			},
+			data: buildSalesListParams(deps, todayDate),
 		});
 	},
 	component: SalesPage,
@@ -124,6 +116,7 @@ function SalesPage() {
 	const salesPaymentMethodId = useId();
 	const salesStartDateId = useId();
 	const salesEndDateId = useId();
+	const queryClient = useQueryClient();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const search = Route.useSearch();
 	const initialSales = Route.useLoaderData();
@@ -133,24 +126,8 @@ function SalesPage() {
 	const activeView = normalizeSalesView(search.view);
 	const isTodayView = activeView === "today";
 	const todayDate = getCurrentDateFilterValue();
-	const resolvedDateFilters = resolveSalesDateFilters(
-		activeView,
-		search.startDate,
-		search.endDate,
-		todayDate,
-	);
-	const salesQuery = useSalesList(
-		{
-			limit: search.pageSize ?? DEFAULT_LIST_PARAMS.limit,
-			cursor: search.cursor ?? DEFAULT_LIST_PARAMS.cursor,
-			searchQuery: search.q ?? null,
-			status: search.status ?? null,
-			paymentMethod: search.paymentMethod ?? null,
-			startDate: resolvedDateFilters.startDate,
-			endDate: resolvedDateFilters.endDate,
-		},
-		initialSales,
-	);
+	const salesListParams = buildSalesListParams(search, todayDate);
+	const salesQuery = useSalesList(salesListParams, initialSales);
 	const sales = salesQuery.data?.data ?? [];
 	const creditAccounts = creditAccountsSearchResult?.data ?? [];
 	const pageSize = search.pageSize ?? DEFAULT_LIST_PARAMS.limit;
@@ -166,7 +143,16 @@ function SalesPage() {
 		startDate: search.startDate ?? "",
 		endDate: search.endDate ?? "",
 	}));
+	const [isLoadingFeedbackVisible, setIsLoadingFeedbackVisible] =
+		useState(false);
 	const deferredDraftFilters = useDeferredValue(draftFilters);
+	const loadingFeedbackShownAtRef = useRef(0);
+	const loadingFeedbackShowTimeoutRef = useRef<ReturnType<
+		typeof setTimeout
+	> | null>(null);
+	const loadingFeedbackHideTimeoutRef = useRef<ReturnType<
+		typeof setTimeout
+	> | null>(null);
 
 	useEffect(() => {
 		if (sales.length === 0) {
@@ -255,6 +241,7 @@ function SalesPage() {
 		search.paymentMethod,
 		...(isTodayView ? [] : [search.startDate, search.endDate]),
 	].filter(Boolean).length;
+	const isSalesViewRefreshing = isViewPending || salesQuery.isFetching;
 	const todayLabel = dayFormatter.format(new Date(`${todayDate}T00:00:00`));
 	const viewSummary = isTodayView
 		? {
@@ -292,6 +279,96 @@ function SalesPage() {
 					"Usa esta vista para revisar ventas anteriores, pagos y saldos.",
 				emptyTitle: "No se han registrado ventas todavia.",
 			};
+
+	useEffect(() => {
+		return () => {
+			if (loadingFeedbackShowTimeoutRef.current !== null) {
+				clearTimeout(loadingFeedbackShowTimeoutRef.current);
+			}
+			if (loadingFeedbackHideTimeoutRef.current !== null) {
+				clearTimeout(loadingFeedbackHideTimeoutRef.current);
+			}
+		};
+	}, []);
+
+	useEffect(() => {
+		if (loadingFeedbackShowTimeoutRef.current !== null) {
+			clearTimeout(loadingFeedbackShowTimeoutRef.current);
+			loadingFeedbackShowTimeoutRef.current = null;
+		}
+
+		if (loadingFeedbackHideTimeoutRef.current !== null) {
+			clearTimeout(loadingFeedbackHideTimeoutRef.current);
+			loadingFeedbackHideTimeoutRef.current = null;
+		}
+
+		if (isSalesViewRefreshing) {
+			if (isLoadingFeedbackVisible) {
+				return;
+			}
+
+			loadingFeedbackShowTimeoutRef.current = setTimeout(() => {
+				loadingFeedbackShownAtRef.current = Date.now();
+				setIsLoadingFeedbackVisible(true);
+				loadingFeedbackShowTimeoutRef.current = null;
+			}, SALES_LOADING_FEEDBACK_DELAY_MS);
+			return;
+		}
+
+		if (!isLoadingFeedbackVisible) {
+			return;
+		}
+
+		const elapsed = Date.now() - loadingFeedbackShownAtRef.current;
+		const remaining = Math.max(
+			SALES_LOADING_FEEDBACK_MIN_VISIBLE_MS - elapsed,
+			0,
+		);
+
+		loadingFeedbackHideTimeoutRef.current = setTimeout(() => {
+			setIsLoadingFeedbackVisible(false);
+			loadingFeedbackShownAtRef.current = 0;
+			loadingFeedbackHideTimeoutRef.current = null;
+		}, remaining);
+	}, [isLoadingFeedbackVisible, isSalesViewRefreshing]);
+
+	useEffect(() => {
+		if (activeFilterCount > 0 || cursor > 0) {
+			return;
+		}
+
+		const alternateView = activeView === "today" ? "history" : "today";
+		void prefetchSalesList(
+			queryClient,
+			buildSalesListParams(
+				{
+					...search,
+					view:
+						alternateView !== DEFAULT_SALES_VIEW ? alternateView : undefined,
+					cursor: undefined,
+				},
+				todayDate,
+			),
+		);
+	}, [activeFilterCount, activeView, cursor, queryClient, search, todayDate]);
+
+	const handleViewPrefetch = (value: SalesView) => {
+		if (value === activeView) {
+			return;
+		}
+
+		void prefetchSalesList(
+			queryClient,
+			buildSalesListParams(
+				{
+					...search,
+					view: value !== DEFAULT_SALES_VIEW ? value : undefined,
+					cursor: undefined,
+				},
+				todayDate,
+			),
+		);
+	};
 
 	const clearFilters = () => {
 		setDraftFilters({
@@ -354,11 +431,6 @@ function SalesPage() {
 								<Badge className="border-gray-700 bg-black/20 text-gray-300 hover:bg-black/20">
 									{viewSummary.kicker}
 								</Badge>
-								{isViewPending || salesQuery.isFetching ? (
-									<Badge className="border-gray-700 bg-black/20 text-gray-300 hover:bg-black/20">
-										Actualizando vista…
-									</Badge>
-								) : null}
 							</div>
 							<div className="space-y-1">
 								<h1 className="text-balance text-2xl font-semibold tracking-tight text-white md:text-3xl">
@@ -399,6 +471,7 @@ function SalesPage() {
 							<div
 								role="tablist"
 								aria-label="Vista de ventas"
+								aria-busy={isSalesViewRefreshing}
 								className="grid gap-2 md:grid-cols-2"
 							>
 								<SalesViewToggle
@@ -407,6 +480,7 @@ function SalesPage() {
 									title="Ventas de hoy"
 									icon={CalendarDays}
 									onSelect={handleViewChange}
+									onIntent={handleViewPrefetch}
 								/>
 								<SalesViewToggle
 									value="history"
@@ -414,8 +488,10 @@ function SalesPage() {
 									title="Historial de ventas"
 									icon={History}
 									onSelect={handleViewChange}
+									onIntent={handleViewPrefetch}
 								/>
 							</div>
+							<IndeterminateProgressBar active={isLoadingFeedbackVisible} />
 						</div>
 
 						<div className="grid gap-3 lg:grid-cols-3">
@@ -439,7 +515,12 @@ function SalesPage() {
 				</section>
 
 				<section>
-					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
+					<Card
+						className={`border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none transition-opacity ${
+							isLoadingFeedbackVisible ? "opacity-80" : "opacity-100"
+						}`}
+						aria-busy={isSalesViewRefreshing}
+					>
 						<CardHeader className="space-y-4 pb-4">
 							<div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
 								<div className="space-y-1">
@@ -842,6 +923,25 @@ function buildSearchFromDraftFilters({
 	};
 }
 
+function buildSalesListParams(search: SalesSearch, todayDate: string) {
+	const resolvedDateFilters = resolveSalesDateFilters(
+		search.view,
+		search.startDate,
+		search.endDate,
+		todayDate,
+	);
+
+	return {
+		limit: search.pageSize ?? DEFAULT_LIST_PARAMS.limit,
+		cursor: search.cursor ?? DEFAULT_LIST_PARAMS.cursor,
+		searchQuery: search.q ?? null,
+		status: search.status ?? null,
+		paymentMethod: search.paymentMethod ?? null,
+		startDate: resolvedDateFilters.startDate,
+		endDate: resolvedDateFilters.endDate,
+	};
+}
+
 function areSalesSearchValuesEqual(
 	currentSearch: Record<string, unknown>,
 	nextSearch: Record<string, unknown>,
@@ -920,18 +1020,77 @@ function SummaryCard({
 	);
 }
 
+function IndeterminateProgressBar({ active }: { active: boolean }) {
+	return (
+		<>
+			<style>{`
+				@keyframes sales-progress-primary {
+					0% {
+						transform: translateX(-140%) scaleX(0.55);
+					}
+					100% {
+						transform: translateX(340%) scaleX(1);
+					}
+				}
+
+				@keyframes sales-progress-secondary {
+					0% {
+						transform: translateX(-180%) scaleX(0.35);
+					}
+					100% {
+						transform: translateX(250%) scaleX(0.8);
+					}
+				}
+			`}</style>
+			<div
+				className={`mt-2 h-1 overflow-hidden rounded-full bg-white/5 transition-opacity ${
+					active ? "opacity-100" : "opacity-0"
+				}`}
+				aria-hidden="true"
+			>
+				<div className="relative h-full w-full">
+					<div
+						className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-[var(--color-voltage)]/85"
+						style={
+							active
+								? {
+										animation:
+											"sales-progress-primary 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite",
+									}
+								: undefined
+						}
+					/>
+					<div
+						className="absolute inset-y-0 left-0 w-1/2 rounded-full bg-[var(--color-voltage)]/35"
+						style={
+							active
+								? {
+										animation:
+											"sales-progress-secondary 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite",
+									}
+								: undefined
+						}
+					/>
+				</div>
+			</div>
+		</>
+	);
+}
+
 function SalesViewToggle({
 	value,
 	isActive,
 	title,
 	icon: Icon,
 	onSelect,
+	onIntent,
 }: {
 	value: SalesView;
 	isActive: boolean;
 	title: string;
 	icon: typeof CalendarDays;
 	onSelect: (value: string) => void;
+	onIntent: (value: SalesView) => void;
 }) {
 	return (
 		<button
@@ -939,6 +1098,8 @@ function SalesViewToggle({
 			role="tab"
 			aria-selected={isActive}
 			onClick={() => onSelect(value)}
+			onFocus={() => onIntent(value)}
+			onMouseEnter={() => onIntent(value)}
 			className={`group flex w-full items-center gap-3 rounded-xl border px-5 py-5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-voltage)]/30 focus-visible:outline-none ${
 				isActive
 					? "border-[var(--color-voltage)]/30 bg-[var(--color-voltage)]/10 text-white"

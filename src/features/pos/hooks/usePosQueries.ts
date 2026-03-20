@@ -1,4 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	keepPreviousData,
+	type QueryClient,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import {
 	registerCreditPayment,
 	searchCreditAccounts,
@@ -65,35 +71,69 @@ type SalesListParams = {
 	endDate?: string | null;
 };
 
+const SALES_LIST_STALE_TIME_MS = 30_000;
+const SALES_LIST_GC_TIME_MS = 5 * 60_000;
+
+function getSalesListQueryKey(params: SalesListParams = {}) {
+	return [
+		"sales-list",
+		params.limit ?? 10,
+		params.cursor ?? 0,
+		params.status ?? "all",
+		params.searchQuery ?? "",
+		params.paymentMethod ?? "all",
+		params.startDate ?? "",
+		params.endDate ?? "",
+	] as const;
+}
+
+function getSalesListServerInput(params: SalesListParams = {}) {
+	return {
+		limit: params.limit,
+		cursor: params.cursor,
+		status: params.status ?? null,
+		searchQuery: params.searchQuery ?? null,
+		paymentMethod: params.paymentMethod ?? null,
+		startDate: params.startDate ?? null,
+		endDate: params.endDate ?? null,
+	};
+}
+
+function getSalesListQueryOptions(
+	params: SalesListParams = {},
+	initialData?: SaleListResult,
+) {
+	return {
+		queryKey: getSalesListQueryKey(params),
+		queryFn: () =>
+			listSales({
+				data: getSalesListServerInput(params),
+			}),
+		staleTime: SALES_LIST_STALE_TIME_MS,
+		gcTime: SALES_LIST_GC_TIME_MS,
+		refetchOnWindowFocus: false,
+		placeholderData: keepPreviousData,
+		...(initialData
+			? {
+					initialData,
+					initialDataUpdatedAt: Date.now(),
+				}
+			: {}),
+	};
+}
+
 export function useSalesList(
 	params: SalesListParams = {},
 	initialData?: SaleListResult,
 ) {
-	return useQuery({
-		queryKey: [
-			"sales-list",
-			params.limit ?? 10,
-			params.cursor ?? 0,
-			params.status ?? "all",
-			params.searchQuery ?? "",
-			params.paymentMethod ?? "all",
-			params.startDate ?? "",
-			params.endDate ?? "",
-		],
-		queryFn: () =>
-			listSales({
-				data: {
-					limit: params.limit,
-					cursor: params.cursor,
-					status: params.status ?? null,
-					searchQuery: params.searchQuery ?? null,
-					paymentMethod: params.paymentMethod ?? null,
-					startDate: params.startDate ?? null,
-					endDate: params.endDate ?? null,
-				},
-			}),
-		initialData,
-	});
+	return useQuery(getSalesListQueryOptions(params, initialData));
+}
+
+export function prefetchSalesList(
+	queryClient: QueryClient,
+	params: SalesListParams = {},
+) {
+	return queryClient.prefetchQuery(getSalesListQueryOptions(params));
 }
 
 export function useSaleDetail(

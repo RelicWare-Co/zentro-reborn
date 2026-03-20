@@ -6,6 +6,12 @@ import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { db } from "#/db";
 
 export const auth = betterAuth({
+	session: {
+		cookieCache: {
+			enabled: true,
+			maxAge: 5 * 60, // Cache duration in seconds
+		},
+	},
 	database: drizzleAdapter(db, {
 		provider: "sqlite",
 	}),

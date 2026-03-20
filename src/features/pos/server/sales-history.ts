@@ -61,58 +61,36 @@ export async function listSalesForCurrentOrganization(
 	const endDateExclusiveMs =
 		endDateMs === null ? null : endDateMs + 24 * 60 * 60 * 1000;
 
-	const filteredSaleIdsByPaymentMethod = input.paymentMethod
-		? (
-				await db
-					.select({ saleId: payment.saleId })
-					.from(payment)
-					.where(
-						and(
-							eq(payment.organizationId, organizationId),
-							eq(payment.method, input.paymentMethod),
-						),
-					)
-			)
-				.map((row) => row.saleId)
-				.filter((saleId): saleId is string => Boolean(saleId))
-		: null;
-
-	if (
-		input.paymentMethod &&
-		(!filteredSaleIdsByPaymentMethod ||
-			filteredSaleIdsByPaymentMethod.length === 0)
-	) {
-		return {
-			data: [],
-			total: 0,
-			hasMore: false,
-			nextCursor: null,
-		};
-	}
-
-	const whereConditions = [eq(sale.organizationId, organizationId)];
+	const baseWhereConditions = [eq(sale.organizationId, organizationId)];
 	if (input.status) {
-		whereConditions.push(eq(sale.status, input.status));
-	}
-	if (trimmedSearchQuery) {
-		const searchPattern = `%${trimmedSearchQuery}%`;
-		whereConditions.push(
-			sql`(
-				${sale.id} like ${searchPattern}
-				or coalesce(${customer.name}, '') like ${searchPattern}
-				or coalesce(${user.name}, '') like ${searchPattern}
-			)`,
-		);
+		baseWhereConditions.push(eq(sale.status, input.status));
 	}
 	if (startDateMs !== null) {
-		whereConditions.push(gte(sale.createdAt, new Date(startDateMs)));
+		baseWhereConditions.push(gte(sale.createdAt, new Date(startDateMs)));
 	}
 	if (endDateExclusiveMs !== null) {
-		whereConditions.push(lt(sale.createdAt, new Date(endDateExclusiveMs)));
+		baseWhereConditions.push(lt(sale.createdAt, new Date(endDateExclusiveMs)));
 	}
-	if (filteredSaleIdsByPaymentMethod) {
-		whereConditions.push(inArray(sale.id, filteredSaleIdsByPaymentMethod));
+	if (input.paymentMethod) {
+		baseWhereConditions.push(sql`exists (
+			select 1
+			from ${payment}
+			where ${payment.organizationId} = ${organizationId}
+				and ${payment.saleId} = ${sale.id}
+				and ${payment.method} = ${input.paymentMethod}
+		)`);
 	}
+
+	const searchCondition = trimmedSearchQuery
+		? sql`(
+			${sale.id} like ${`%${trimmedSearchQuery}%`}
+			or coalesce(${customer.name}, '') like ${`%${trimmedSearchQuery}%`}
+			or coalesce(${user.name}, '') like ${`%${trimmedSearchQuery}%`}
+		)`
+		: null;
+	const salesWhereConditions = searchCondition
+		? [...baseWhereConditions, searchCondition]
+		: baseWhereConditions;
 
 	const [salesRows, totalRows] = await Promise.all([
 		db
@@ -123,7 +101,6 @@ export async function listSalesForCurrentOrganization(
 				createdAt: sale.createdAt,
 				customerName: customer.name,
 				cashierName: user.name,
-				terminalName: shift.terminalName,
 			})
 			.from(sale)
 			.leftJoin(
@@ -134,31 +111,31 @@ export async function listSalesForCurrentOrganization(
 				),
 			)
 			.leftJoin(user, eq(user.id, sale.userId))
-			.leftJoin(
-				shift,
-				and(
-					eq(shift.id, sale.shiftId),
-					eq(shift.organizationId, organizationId),
-				),
-			)
-			.where(and(...whereConditions))
+			.where(and(...salesWhereConditions))
 			.orderBy(desc(sale.createdAt), desc(sale.id))
 			.limit(limit + 1)
 			.offset(cursor),
-		db
-			.select({
-				total: sql<number>`count(*)`,
-			})
-			.from(sale)
-			.leftJoin(
-				customer,
-				and(
-					eq(customer.id, sale.customerId),
-					eq(customer.organizationId, organizationId),
-				),
-			)
-			.leftJoin(user, eq(user.id, sale.userId))
-			.where(and(...whereConditions)),
+		searchCondition
+			? db
+					.select({
+						total: sql<number>`count(*)`,
+					})
+					.from(sale)
+					.leftJoin(
+						customer,
+						and(
+							eq(customer.id, sale.customerId),
+							eq(customer.organizationId, organizationId),
+						),
+					)
+					.leftJoin(user, eq(user.id, sale.userId))
+					.where(and(...salesWhereConditions))
+			: db
+					.select({
+						total: sql<number>`count(*)`,
+					})
+					.from(sale)
+					.where(and(...baseWhereConditions)),
 	]);
 
 	const pageRows = salesRows.slice(0, limit);
@@ -192,7 +169,7 @@ export async function listSalesForCurrentOrganization(
 		db
 			.select({
 				saleId: saleItem.saleId,
-				quantity: saleItem.quantity,
+				itemCount: sql<number>`coalesce(sum(${saleItem.quantity}), 0)`,
 			})
 			.from(saleItem)
 			.where(
@@ -200,7 +177,8 @@ export async function listSalesForCurrentOrganization(
 					eq(saleItem.organizationId, organizationId),
 					inArray(saleItem.saleId, saleIds),
 				),
-			),
+			)
+			.groupBy(saleItem.saleId),
 	]);
 
 	const paymentsBySaleId = new Map<
@@ -227,8 +205,7 @@ export async function listSalesForCurrentOrganization(
 	for (const saleItemRow of saleItemRows) {
 		itemCountBySaleId.set(
 			saleItemRow.saleId,
-			(itemCountBySaleId.get(saleItemRow.saleId) ?? 0) +
-				normalizeNumber(saleItemRow.quantity),
+			normalizeNumber(saleItemRow.itemCount),
 		);
 	}
 
@@ -245,7 +222,6 @@ export async function listSalesForCurrentOrganization(
 				status: row.status,
 				customerName: row.customerName,
 				cashierName: row.cashierName,
-				terminalName: row.terminalName,
 				createdAt: normalizeTimestamp(row.createdAt),
 				itemCount: itemCountBySaleId.get(row.id) ?? 0,
 				paidAmount,

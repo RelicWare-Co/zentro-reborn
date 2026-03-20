@@ -265,6 +265,15 @@ function createResponseHandler(
 }
 
 /**
+ * Only fingerprinted assets should be cached as immutable.
+ * Example matches: main-BS4TRibw.js, globals-abc123.css
+ */
+function isFingerprintedAsset(relativePath: string): boolean {
+  const fileName = relativePath.split(/[/\\]/).pop() ?? relativePath
+  return /-[A-Za-z0-9_-]{6,}\.[A-Za-z0-9]+$/.test(fileName)
+}
+
+/**
  * Create composite glob pattern from include patterns
  */
 function createCompositeGlobPattern(): Bun.Glob {
@@ -343,7 +352,7 @@ async function initializeStaticRoutes(
             gz,
             etag,
             type: metadata.type,
-            immutable: true,
+            immutable: isFingerprintedAsset(relativePath),
             size: bytes.byteLength,
           }
           routes[route] = createResponseHandler(asset)

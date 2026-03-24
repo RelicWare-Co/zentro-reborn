@@ -173,7 +173,6 @@ interface PreloadResult {
   routes: Record<string, (req: Request) => Response | Promise<Response>>
   loaded: AssetMetadata[]
   skipped: AssetMetadata[]
-  currentGlobalsStylesheetRoute?: string
 }
 
 /**
@@ -298,7 +297,6 @@ async function initializeStaticRoutes(
     {}
   const loaded: AssetMetadata[] = []
   const skipped: AssetMetadata[] = []
-  let currentGlobalsStylesheetRoute: string | undefined
 
   log.info(`Loading static assets from ${clientDirectory}...`)
   if (VERBOSE) {
@@ -324,10 +322,6 @@ async function initializeStaticRoutes(
     for await (const relativePath of glob.scan({ cwd: clientDirectory })) {
       const filepath = path.join(clientDirectory, relativePath)
       const route = `/${relativePath.split(path.sep).join(path.posix.sep)}`
-
-      if (/^assets\/globals-[A-Za-z0-9_-]+\.css$/.test(relativePath)) {
-        currentGlobalsStylesheetRoute = route
-      }
 
       try {
         // Get file metadata
@@ -508,36 +502,7 @@ async function initializeStaticRoutes(
     )
   }
 
-  return { routes, loaded, skipped, currentGlobalsStylesheetRoute }
-}
-
-function createLegacyGlobalsStylesheetFallback(
-  routes: Record<string, (req: Request) => Response | Promise<Response>>,
-  currentGlobalsStylesheetRoute?: string,
-): ((req: Request) => Response | Promise<Response>) | undefined {
-  if (!currentGlobalsStylesheetRoute) {
-    return undefined
-  }
-
-  const currentStylesheetHandler = routes[currentGlobalsStylesheetRoute]
-  if (!currentStylesheetHandler) {
-    return undefined
-  }
-
-  return (req: Request) => {
-    const { pathname } = new URL(req.url)
-    if (
-      pathname !== currentGlobalsStylesheetRoute &&
-      /^\/assets\/globals-[A-Za-z0-9_-]+\.css$/.test(pathname)
-    ) {
-      log.warning(
-        `Serving ${currentGlobalsStylesheetRoute} as fallback for missing ${pathname}`,
-      )
-      return currentStylesheetHandler(req)
-    }
-
-    return new Response('Not Found', { status: 404 })
-  }
+  return { routes, loaded, skipped }
 }
 
 /**
@@ -560,13 +525,7 @@ async function initializeServer() {
   }
 
   // Build static routes with intelligent preloading
-  const { routes, currentGlobalsStylesheetRoute } = await initializeStaticRoutes(
-    CLIENT_DIRECTORY,
-  )
-  const legacyGlobalsStylesheetFallback = createLegacyGlobalsStylesheetFallback(
-    routes,
-    currentGlobalsStylesheetRoute,
-  )
+  const { routes } = await initializeStaticRoutes(CLIENT_DIRECTORY)
 
   // Create Bun server
   const server = Bun.serve({
@@ -577,19 +536,8 @@ async function initializeServer() {
       ...routes,
 
       // Fallback to TanStack Start handler for all other routes
-      '/*': async (req: Request) => {
+      '/*': (req: Request) => {
         try {
-          if (
-            legacyGlobalsStylesheetFallback &&
-            (req.method === 'GET' || req.method === 'HEAD') &&
-            new URL(req.url).pathname.startsWith('/assets/')
-          ) {
-            const fallbackResponse = await legacyGlobalsStylesheetFallback(req)
-            if (fallbackResponse.status !== 404) {
-              return fallbackResponse
-            }
-          }
-
           return handler.fetch(req)
         } catch (error) {
           log.error(`Server handler error: ${String(error)}`)

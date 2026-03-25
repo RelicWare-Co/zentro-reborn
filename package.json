@@ -9,6 +9,8 @@
     "dev": "bun --bun vite dev --port 3000",
     "build": "bun --bun vite build",
     "preview": "bun --bun vite preview",
+    "docker:build": "bash ./scripts/docker-release.sh",
+    "docker:push": "bash ./scripts/docker-release.sh --push",
     "test": "bun test",
     "format": "biome format",
     "lint": "biome lint",

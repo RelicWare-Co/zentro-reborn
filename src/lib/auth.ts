@@ -3,21 +3,44 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins/admin";
 import { organization } from "better-auth/plugins/organization";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
-import { db } from "#/db";
+import { getDb } from "#/db";
 
-export const auth = betterAuth({
-	session: {
-		cookieCache: {
-			enabled: true,
-			maxAge: 5 * 60, // Cache duration in seconds
+function createAuth() {
+	return betterAuth({
+		session: {
+			cookieCache: {
+				enabled: true,
+				maxAge: 5 * 60, // Cache duration in seconds
+			},
 		},
+		database: drizzleAdapter(getDb(), {
+			provider: "sqlite",
+		}),
+		experimental: { joins: true },
+		emailAndPassword: {
+			enabled: true,
+		},
+		plugins: [tanstackStartCookies(), admin(), organization()],
+	});
+}
+
+type Auth = ReturnType<typeof createAuth>;
+
+let authInstance: Auth | undefined;
+
+export function getAuth(): Auth {
+	if (authInstance) {
+		return authInstance;
+	}
+
+	authInstance = createAuth();
+	return authInstance;
+}
+
+export const auth = new Proxy({} as Auth, {
+	get(_target, property, receiver) {
+		const target = getAuth();
+		const value = Reflect.get(target, property, receiver);
+		return typeof value === "function" ? value.bind(target) : value;
 	},
-	database: drizzleAdapter(db, {
-		provider: "sqlite",
-	}),
-	experimental: { joins: true },
-	emailAndPassword: {
-		enabled: true,
-	},
-	plugins: [tanstackStartCookies(), admin(), organization()],
 });

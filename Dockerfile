@@ -3,6 +3,9 @@
 FROM oven/bun:1-slim AS build
 WORKDIR /usr/src/app
 
+ARG APP_RELEASE_ID
+ARG APP_BUILD_TIMESTAMP
+
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile && bun add --no-save @libsql/client
 
@@ -10,10 +13,19 @@ COPY . .
 RUN rm -rf .output .nitro .tanstack dist .vite
 
 ENV NODE_ENV=production
+ENV APP_RELEASE_ID=${APP_RELEASE_ID}
+ENV APP_BUILD_TIMESTAMP=${APP_BUILD_TIMESTAMP}
 RUN bun run build
 
 FROM oven/bun:1-slim AS release
 WORKDIR /usr/src/app
+
+ARG APP_RELEASE_ID
+ARG APP_BUILD_TIMESTAMP
+
+LABEL org.opencontainers.image.revision="${APP_RELEASE_ID}"
+LABEL io.zentro.release-id="${APP_RELEASE_ID}"
+LABEL io.zentro.build-timestamp="${APP_BUILD_TIMESTAMP}"
 
 COPY --from=build /usr/src/app/dist ./dist
 COPY --from=build /usr/src/app/package.json ./package.json

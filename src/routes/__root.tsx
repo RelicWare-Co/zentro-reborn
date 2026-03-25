@@ -6,8 +6,13 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { AppUpdateNotifier } from "../components/AppUpdateNotifier";
+import { DeploymentSkewProtection } from "../components/DeploymentSkewProtection";
+import { PwaRegistrar } from "../components/PwaRegistrar";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import TanStackQueryProvider from "../integrations/tanstack-query/root-provider";
+import { APP_BUILD_INFO } from "../lib/app-build";
+import { SITE_DESCRIPTION, SITE_TITLE } from "../lib/site";
 import appCss from "../styles/globals.css?url";
 
 interface MyRouterContext {
@@ -24,16 +29,68 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			},
 			{
 				name: "viewport",
-				content: "width=device-width, initial-scale=1",
+				content: "width=device-width, initial-scale=1, viewport-fit=cover",
 			},
 			{
-				title: "TanStack Start Starter",
+				title: SITE_TITLE,
 			},
-		],
-		links: [
+			{
+				name: "description",
+				content: SITE_DESCRIPTION,
+			},
+			{
+				name: "application-name",
+				content: SITE_TITLE,
+			},
+			{
+				name: "theme-color",
+				content: "#0f0f0f",
+			},
+			{
+				name: "mobile-web-app-capable",
+				content: "yes",
+			},
+			{
+				name: "apple-mobile-web-app-capable",
+				content: "yes",
+			},
+			{
+				name: "apple-mobile-web-app-status-bar-style",
+				content: "black-translucent",
+			},
+			{
+				name: "apple-mobile-web-app-title",
+				content: SITE_TITLE,
+			},
+				{
+					name: "format-detection",
+					content: "telephone=no",
+				},
+				{
+					name: "app-release-id",
+					content: APP_BUILD_INFO.releaseId,
+				},
+				{
+					name: "app-build-id",
+					content: APP_BUILD_INFO.buildId,
+				},
+			],
+			links: [
 			{
 				rel: "stylesheet",
 				href: appCss,
+			},
+			{
+				rel: "manifest",
+				href: "/manifest.json",
+			},
+			{
+				rel: "icon",
+				href: "/favicon.ico",
+			},
+			{
+				rel: "apple-touch-icon",
+				href: "/logo192.png",
 			},
 		],
 	}),
@@ -42,13 +99,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="en" suppressHydrationWarning>
+		<html lang="es-CO" suppressHydrationWarning>
 			<head>
 				{/** biome-ignore lint/security/noDangerouslySetInnerHtml: required for theme initialization */}
 				<script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
 				<HeadContent />
 			</head>
-			<body className="font-sans antialiased [overflow-wrap:anywhere] selection:bg-[rgba(79,184,178,0.24)]">
+			<body className="min-h-screen bg-[var(--color-void)] font-sans text-[var(--color-photon)] antialiased [overflow-wrap:anywhere] selection:bg-[rgba(79,184,178,0.24)]">
 				<TanStackQueryProvider>
 					{children}
 					<TanStackDevtools
@@ -64,6 +121,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 						]}
 					/>
 				</TanStackQueryProvider>
+				<AppUpdateNotifier />
+				<DeploymentSkewProtection />
+				<PwaRegistrar />
 				<Scripts />
 			</body>
 		</html>

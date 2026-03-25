@@ -63,12 +63,29 @@
  *   bun run server.ts
  */
 
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 // Configuration
 const SERVER_PORT = Number(process.env.PORT ?? 3000)
 const CLIENT_DIRECTORY = './dist/client'
 const SERVER_ENTRY_POINT = './dist/server/server.js'
+const APP_VERSION_ROUTE = '/_app-version'
+const APP_VERSION_FILE = path.join(CLIENT_DIRECTORY, 'app-version.json')
+
+interface AppBuildInfo {
+  releaseId: string
+  buildId: string
+  buildTimestamp: number
+  builtAt: string
+}
+
+let APP_BUILD_INFO: AppBuildInfo = {
+  releaseId: 'dev',
+  buildId: 'dev',
+  buildTimestamp: Date.now(),
+  builtAt: new Date().toISOString(),
+}
 
 // Logging utilities for professional output
 const log = {
@@ -145,6 +162,38 @@ function computeEtag(data: Uint8Array): string {
   return `W/"${hash.toString(16)}-${data.byteLength.toString()}"`
 }
 
+async function loadAppBuildInfo(): Promise<AppBuildInfo> {
+  try {
+    const rawContent = await readFile(APP_VERSION_FILE, 'utf8')
+    const parsed = JSON.parse(rawContent) as Partial<AppBuildInfo>
+
+    if (
+      typeof parsed.buildId === 'string' &&
+      typeof parsed.buildTimestamp === 'number' &&
+      typeof parsed.builtAt === 'string'
+    ) {
+      return {
+        releaseId:
+          typeof parsed.releaseId === 'string' ? parsed.releaseId : parsed.buildId,
+        buildId: parsed.buildId,
+        buildTimestamp: parsed.buildTimestamp,
+        builtAt: parsed.builtAt,
+      }
+    }
+  } catch {
+    log.warning(
+      `Could not read build metadata from ${APP_VERSION_FILE}. Falling back to runtime timestamp.`,
+    )
+  }
+
+  return {
+    releaseId: new Date().toISOString(),
+    buildId: new Date().toISOString(),
+    buildTimestamp: Date.now(),
+    builtAt: new Date().toISOString(),
+  }
+}
+
 /**
  * Metadata for preloaded static assets
  */
@@ -163,6 +212,7 @@ interface InMemoryAsset {
   etag?: string
   type: string
   immutable: boolean
+  cacheControl: string
   size: number
 }
 
@@ -231,9 +281,10 @@ function createResponseHandler(
   return (req: Request) => {
     const headers: Record<string, string> = {
       'Content-Type': asset.type,
-      'Cache-Control': asset.immutable
-        ? 'public, max-age=31536000, immutable'
-        : 'public, max-age=3600',
+      'Cache-Control': asset.cacheControl,
+      Vary: 'Accept-Encoding',
+      'X-App-Version': APP_BUILD_INFO.releaseId,
+      'X-App-Build-Id': APP_BUILD_INFO.buildId,
     }
 
     if (ENABLE_ETAG && asset.etag) {
@@ -271,6 +322,36 @@ function createResponseHandler(
 function isFingerprintedAsset(relativePath: string): boolean {
   const fileName = relativePath.split(/[/\\]/).pop() ?? relativePath
   return /-[A-Za-z0-9_-]{6,}\.[A-Za-z0-9]+$/.test(fileName)
+}
+
+/**
+ * Cache policy tuned to avoid deployment skew:
+ * - HTML entrypoints must never be cached
+ * - sw.js must revalidate immediately so updates propagate quickly
+ * - fingerprinted assets are immutable
+ * - everything else uses short revalidation-based caching
+ */
+function getCacheControl(relativePath: string, immutable: boolean): string {
+  const normalizedPath = relativePath.split(path.sep).join(path.posix.sep)
+
+  if (normalizedPath.endsWith('.html')) {
+    return 'no-store'
+  }
+
+  if (
+    normalizedPath === 'sw.js' ||
+    normalizedPath.endsWith('/sw.js') ||
+    normalizedPath === 'manifest.json' ||
+    normalizedPath === 'app-version.json'
+  ) {
+    return 'no-cache, no-store, must-revalidate'
+  }
+
+  if (immutable) {
+    return 'public, max-age=31536000, immutable'
+  }
+
+  return 'public, max-age=0, must-revalidate'
 }
 
 /**
@@ -353,6 +434,10 @@ async function initializeStaticRoutes(
             etag,
             type: metadata.type,
             immutable: isFingerprintedAsset(relativePath),
+            cacheControl: getCacheControl(
+              relativePath,
+              isFingerprintedAsset(relativePath),
+            ),
             size: bytes.byteLength,
           }
           routes[route] = createResponseHandler(asset)
@@ -366,7 +451,12 @@ async function initializeStaticRoutes(
             return new Response(fileOnDemand, {
               headers: {
                 'Content-Type': metadata.type,
-                'Cache-Control': 'public, max-age=3600',
+                'Cache-Control': getCacheControl(
+                  relativePath,
+                  isFingerprintedAsset(relativePath),
+                ),
+                'X-App-Version': APP_BUILD_INFO.releaseId,
+                'X-App-Build-Id': APP_BUILD_INFO.buildId,
               },
             })
           }
@@ -510,6 +600,10 @@ async function initializeStaticRoutes(
  */
 async function initializeServer() {
   log.header('Starting Production Server')
+  APP_BUILD_INFO = await loadAppBuildInfo()
+  log.info(
+    `Release loaded: ${APP_BUILD_INFO.releaseId} (build ${APP_BUILD_INFO.buildId})`,
+  )
 
   // Load TanStack Start server handler
   let handler: { fetch: (request: Request) => Response | Promise<Response> }
@@ -532,13 +626,24 @@ async function initializeServer() {
     port: SERVER_PORT,
 
     routes: {
+      [APP_VERSION_ROUTE]: () =>
+        Response.json(APP_BUILD_INFO, {
+          headers: {
+            'Cache-Control': 'no-store',
+            'X-App-Version': APP_BUILD_INFO.releaseId,
+            'X-App-Build-Id': APP_BUILD_INFO.buildId,
+          },
+        }),
+
       // Serve static assets (preloaded or on-demand)
       ...routes,
 
       // Fallback to TanStack Start handler for all other routes
       '/*': (req: Request) => {
         try {
-          return handler.fetch(req)
+          return Promise.resolve(handler.fetch(req)).then((response) =>
+            applyRuntimeCacheHeaders(req, response),
+          )
         } catch (error) {
           log.error(`Server handler error: ${String(error)}`)
           return new Response('Internal Server Error', { status: 500 })
@@ -563,3 +668,39 @@ initializeServer().catch((error: unknown) => {
   log.error(`Failed to start server: ${String(error)}`)
   process.exit(1)
 })
+
+function applyRuntimeCacheHeaders(req: Request, response: Response): Response {
+  if (req.method !== 'GET') {
+    return response
+  }
+
+  const url = new URL(req.url)
+  const responseHeaders = new Headers(response.headers)
+  const contentType = responseHeaders.get('content-type') ?? ''
+  responseHeaders.set('X-App-Version', APP_BUILD_INFO.releaseId)
+  responseHeaders.set('X-App-Build-Id', APP_BUILD_INFO.buildId)
+
+  if (contentType.includes('text/html')) {
+    responseHeaders.set('Cache-Control', 'no-store')
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+    })
+  }
+
+  if (
+    url.pathname === APP_VERSION_ROUTE ||
+    url.pathname.startsWith('/_serverFn/') ||
+    url.pathname.startsWith('/api/')
+  ) {
+    responseHeaders.set('Cache-Control', 'no-store')
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+    })
+  }
+
+  return response
+}

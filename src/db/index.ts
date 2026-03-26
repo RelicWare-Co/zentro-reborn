@@ -1,41 +1,52 @@
-import { drizzle } from "drizzle-orm/libsql";
+import { drizzle, LibSQLDatabase } from "drizzle-orm/libsql";
 
 import * as schema from "./schema/index.ts";
 
-function createDb() {
-	const databaseUrl = process.env.DATABASE_URL;
-	if (!databaseUrl) {
-		throw new Error("DATABASE_URL environment variable is not set");
-	}
-
-	const authToken = process.env.DATABASE_AUTH_TOKEN;
-	if (!authToken) {
-		throw new Error("DATABASE_AUTH_TOKEN environment variable is not set");
-	}
-
-	return drizzle({
-		connection: { url: databaseUrl, authToken },
-		schema,
-	});
+export interface EnvConfig {
+  databaseUrl: string;
+  authToken: string;
 }
 
-type Database = ReturnType<typeof createDb>;
+export const Environment: EnvConfig = {
+  authToken: process.env.DATABASE_AUTH_TOKEN ?? "",
+  databaseUrl: process.env.DATABASE_URL ?? "",
+};
 
-let dbInstance: Database | undefined;
+export class DBInstance {
+  private static dbIstance: DBInstance;
+  private readonly settings: EnvConfig;
+  public db: LibSQLDatabase<typeof schema>;
 
-export function getDb(): Database {
-	if (dbInstance) {
-		return dbInstance;
-	}
+  private constructor() {
+    this.settings = {
+      databaseUrl: Environment.databaseUrl,
+      authToken: Environment.authToken,
+    };
+    DBInstance.dbIstance;
+    this.db = this.connection();
+  }
 
-	dbInstance = createDb();
-	return dbInstance;
+  private connection(): LibSQLDatabase<typeof schema> {
+    const conexDB = drizzle({
+      connection: { url: this.settings.databaseUrl },
+      schema,
+    });
+
+    const db = new Proxy({} as LibSQLDatabase<typeof schema>, {
+      get(_target, property, receiver) {
+        const target = conexDB;
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+
+    return db;
+  }
+
+  public static getIstance(): DBInstance {
+    if (!DBInstance.dbIstance) {
+      DBInstance.dbIstance = new DBInstance();
+    }
+    return DBInstance.dbIstance;
+  }
 }
-
-export const db = new Proxy({} as Database, {
-	get(_target, property, receiver) {
-		const target = getDb();
-		const value = Reflect.get(target, property, receiver);
-		return typeof value === "function" ? value.bind(target) : value;
-	},
-});

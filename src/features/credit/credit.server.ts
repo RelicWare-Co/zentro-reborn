@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
-import { db } from "#/db";
+import { DBInstance } from "#/db";
 import {
 	creditAccount,
 	creditTransaction,
@@ -21,6 +21,8 @@ import {
 	getEnabledPaymentMethods,
 	parseOrganizationSettingsMetadata,
 } from "#/features/settings/settings.shared";
+
+const { db } = DBInstance.getIstance();
 
 export type SearchCreditAccountsInput = {
 	searchQuery?: string | null;

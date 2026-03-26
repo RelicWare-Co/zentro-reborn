@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 import { and, asc, desc, eq, gt, isNull, ne, or, sql } from "drizzle-orm";
-import { db } from "#/db";
+import { DBInstance } from "#/db";
 import {
 	category,
 	creditAccount,
@@ -22,6 +22,8 @@ import {
 
 const TREND_DAYS = 7;
 const TOP_PRODUCTS_WINDOW_DAYS = 30;
+
+const { db } = DBInstance.getIstance();
 
 type AggregateSalesMetrics = {
 	revenue: number;

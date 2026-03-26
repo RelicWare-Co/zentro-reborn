@@ -1,7 +1,7 @@
 import "@tanstack/react-start/server-only";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
-import { db } from "#/db";
+import { DBInstance } from "#/db";
 import { category, inventoryMovement, member, product } from "#/db/schema";
 import { auth } from "#/lib/auth";
 
@@ -53,6 +53,8 @@ export type UpdateCategoryInput = {
 };
 
 type AuthSession = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
+
+const { db } = DBInstance.getIstance();
 
 function normalizeOptionalString(value?: string | null) {
 	if (value == null) {

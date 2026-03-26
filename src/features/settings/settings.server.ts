@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { db } from "#/db";
+import { DBInstance } from "#/db";
 import {
 	customer,
 	invitation,
@@ -15,6 +15,9 @@ import {
 	parseOrganizationSettingsMetadata,
 	serializeOrganizationSettingsMetadata,
 } from "./settings.shared";
+
+
+const { db } = DBInstance.getIstance();
 
 function normalizeCount(value: unknown) {
 	if (typeof value === "number") {

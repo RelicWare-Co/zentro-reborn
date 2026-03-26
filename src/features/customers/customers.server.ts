@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
-import { db } from "#/db";
+import { DBInstance } from "#/db";
 import { customer } from "#/db/schema";
 import { requireAuthContext } from "#/features/pos/server/auth-context";
 import {
@@ -38,6 +38,8 @@ export type UpdateCustomerInput = {
 	city?: string | null;
 	taxRegime?: string | null;
 };
+
+const { db } = DBInstance.getIstance();
 
 function normalizeLimit(limit?: number | null) {
 	return Math.min(Math.max(limit ?? 50, 1), 100);

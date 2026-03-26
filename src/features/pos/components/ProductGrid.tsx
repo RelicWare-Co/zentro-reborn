@@ -349,36 +349,38 @@ export function ProductGrid({
 				/>
 			</div>
 
-			<ScrollArea className="flex-1 p-4 min-h-0 bg-[#0a0a0a]">
-				<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 pb-6">
-					{regularProducts.map((product) => {
-						const qty = getProductQuantity(product.id);
-						const isOutOfStock = product.trackInventory && product.stock <= 0;
+			<ScrollArea className="flex-1 min-h-0 bg-[#0a0a0a] p-4">
+				<div className="space-y-6 pb-24 md:pb-6">
+					<div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+						{regularProducts.map((product) => {
+							const qty = getProductQuantity(product.id);
+							const isOutOfStock = product.trackInventory && product.stock <= 0;
 
-						return (
-							<ProductCard
-								key={product.id}
-								product={product}
-								quantity={qty}
-								isOutOfStock={isOutOfStock}
-								isActiveShift={isActiveShift}
-								onSelect={() => onProductSelect(product)}
-							/>
-						);
-					})}
+							return (
+								<ProductCard
+									key={product.id}
+									product={product}
+									quantity={qty}
+									isOutOfStock={isOutOfStock}
+									isActiveShift={isActiveShift}
+									onSelect={() => onProductSelect(product)}
+								/>
+							);
+						})}
+					</div>
+
+					{isLoading && (
+						<div className="flex h-16 flex-col items-center justify-center text-gray-500">
+							<p>Cargando productos...</p>
+						</div>
+					)}
+
+					{!isLoading && regularProducts.length === 0 && (
+						<div className="flex h-48 flex-col items-center justify-center text-gray-500">
+							<p>No se encontraron productos.</p>
+						</div>
+					)}
 				</div>
-
-				{isLoading && (
-					<div className="flex flex-col items-center justify-center h-16 text-gray-500">
-						<p>Cargando productos...</p>
-					</div>
-				)}
-
-				{!isLoading && regularProducts.length === 0 && (
-					<div className="flex flex-col items-center justify-center h-48 text-gray-500">
-						<p>No se encontraron productos.</p>
-					</div>
-				)}
 			</ScrollArea>
 		</div>
 	);

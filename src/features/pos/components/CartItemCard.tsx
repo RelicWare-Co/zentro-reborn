@@ -61,11 +61,12 @@ export function CartItemCard({
 							id={`item-discount-${item.id}`}
 							type="text"
 							inputMode="numeric"
+							autoComplete="off"
 							value={formatMoneyInput(item.discountAmount)}
 							onChange={(event) =>
 								onUpdateDiscount(sanitizeMoneyInput(event.target.value))
 							}
-							className="h-8 pl-6 bg-black/50 border-gray-800/80 text-xs"
+							className="h-9 touch-manipulation border-gray-800/80 bg-black/50 pl-6 text-base md:h-8 md:text-xs"
 						/>
 					</div>
 				</div>

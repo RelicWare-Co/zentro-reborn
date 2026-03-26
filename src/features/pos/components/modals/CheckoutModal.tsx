@@ -17,6 +17,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { formatMoneyInput, sanitizeMoneyInput } from "@/lib/utils";
 import type { CreditAccount, PaymentMethod, PosCustomer } from "../../types";
 import { formatCurrency } from "../../utils";
@@ -62,7 +63,7 @@ interface CheckoutModalProps {
 }
 
 const paymentFieldClassName =
-	"h-10 rounded-lg border-gray-700 bg-[#151515] py-0 text-base text-white md:text-sm";
+	"h-10 touch-manipulation rounded-lg border-gray-700 bg-[#151515] py-0 text-base text-white md:text-sm";
 const paymentSelectFieldClassName =
 	"data-[size=default]:h-10 data-[size=default]:rounded-lg";
 
@@ -98,6 +99,7 @@ export function CheckoutModal({
 }: CheckoutModalProps) {
 	const paymentAmountInputRef = useRef<HTMLInputElement | null>(null);
 	const discountInputRef = useRef<HTMLInputElement | null>(null);
+	const isMobile = useIsMobile();
 	const discountInputId = useId();
 	const discountEnabledId = useId();
 	const creditSaleId = useId();
@@ -127,13 +129,17 @@ export function CheckoutModal({
 		}
 
 		setIsDiscountEnabled(Number(discountInput) > 0);
+		if (isMobile) {
+			return;
+		}
+
 		const focusTimeout = window.setTimeout(() => {
 			paymentAmountInputRef.current?.focus();
 			paymentAmountInputRef.current?.select();
 		}, 0);
 
 		return () => window.clearTimeout(focusTimeout);
-	}, [discountInput, isOpen]);
+	}, [discountInput, isMobile, isOpen]);
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
@@ -190,6 +196,10 @@ export function CheckoutModal({
 												setDiscountInput("0");
 												return;
 											}
+											if (isMobile) {
+												return;
+											}
+
 											window.setTimeout(() => {
 												discountInputRef.current?.focus();
 												discountInputRef.current?.select();
@@ -216,11 +226,12 @@ export function CheckoutModal({
 										id={discountInputId}
 										type="text"
 										inputMode="numeric"
+										autoComplete="off"
 										value={formatMoneyInput(discountInput)}
 										onChange={(event) =>
 											setDiscountInput(sanitizeMoneyInput(event.target.value))
 										}
-										className="h-10 border-gray-700 bg-[#151515] pl-7 focus-visible:border-[var(--color-voltage)] focus-visible:ring-0"
+										className="h-10 touch-manipulation border-gray-700 bg-[#151515] pl-7 text-base focus-visible:border-[var(--color-voltage)] focus-visible:ring-0 md:text-sm"
 									/>
 								</div>
 							) : null}
@@ -310,17 +321,23 @@ export function CheckoutModal({
 								return (
 									<div
 										key={payment.id}
-										className="flex flex-col gap-2 p-3 bg-[#0a0a0a] rounded-lg border border-gray-800 relative group"
+										className="relative flex flex-col gap-2 rounded-lg border border-gray-800 bg-[#0a0a0a] p-3"
 									>
 										{payments.length > 1 && (
-											<button
-												type="button"
-												onClick={() => onRemovePaymentMethod(index)}
-												className="absolute -top-2 -right-2 bg-red-500/20 text-red-400 hover:bg-red-500/40 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-												aria-label="Eliminar método de pago"
-											>
-												<XIcon className="w-3 h-3" />
-											</button>
+											<div className="flex items-center justify-between gap-3">
+												<p className="text-xs font-medium uppercase tracking-[0.14em] text-gray-500">
+													Pago {index + 1}
+												</p>
+												<button
+													type="button"
+													onClick={() => onRemovePaymentMethod(index)}
+													className="inline-flex h-8 touch-manipulation items-center gap-1 rounded-md px-2 text-sm text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60"
+													aria-label={`Eliminar método de pago ${index + 1}`}
+												>
+													<XIcon className="h-3.5 w-3.5" />
+													<span>Quitar</span>
+												</button>
+											</div>
 										)}
 
 										<div className="flex gap-2">
@@ -355,6 +372,7 @@ export function CheckoutModal({
 													ref={index === 0 ? paymentAmountInputRef : undefined}
 													type="text"
 													inputMode="numeric"
+													autoComplete="off"
 													placeholder="Monto"
 													value={formatMoneyInput(payment.amount)}
 													onChange={(e) =>
@@ -372,11 +390,12 @@ export function CheckoutModal({
 										{selectedPaymentMethod?.requiresReference ? (
 											<Input
 												placeholder="Referencia (Ej. últimos 4 dígitos o voucher)"
+												autoComplete="off"
 												value={payment.reference}
 												onChange={(e) =>
 													onUpdatePayment(index, "reference", e.target.value)
 												}
-												className="h-9 bg-[#151515] border-gray-700 focus-visible:ring-0 focus-visible:border-[var(--color-voltage)] text-sm"
+												className="h-10 touch-manipulation border-gray-700 bg-[#151515] text-base focus-visible:border-[var(--color-voltage)] focus-visible:ring-0 md:h-9 md:text-sm"
 											/>
 										) : null}
 									</div>

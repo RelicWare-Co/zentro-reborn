@@ -329,7 +329,7 @@ function PosPage() {
 			/>
 
 			{/* Main Content */}
-			<div className="flex flex-1 min-h-0 flex-col md:flex-row">
+			<div className="flex flex-1 min-h-0 flex-col overflow-hidden md:flex-row">
 				<ProductGrid
 					className="border-r-0 md:border-r"
 					categories={categories}
@@ -361,12 +361,12 @@ function PosPage() {
 				/>
 			</div>
 
-			<div className="border-t border-gray-800 bg-[var(--color-carbon)] p-3 md:hidden">
+			<div className="sticky bottom-0 z-20 border-t border-gray-800 bg-[var(--color-carbon)]/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 backdrop-blur md:hidden">
 				<Button
 					type="button"
 					variant="outline"
 					onClick={() => setIsMobileCartOpen(true)}
-					className="h-auto w-full justify-between border-gray-700 bg-[#0f0f0f] px-4 py-3 text-left text-white hover:border-gray-600 hover:bg-[#151515] hover:text-white"
+					className="h-auto w-full touch-manipulation justify-between border-gray-700 bg-[#0f0f0f] px-4 py-3 text-left text-white shadow-[0_-8px_24px_rgba(0,0,0,0.2)] hover:border-gray-600 hover:bg-[#151515] hover:text-white"
 				>
 					<div className="flex min-w-0 items-center gap-3">
 						<div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]">

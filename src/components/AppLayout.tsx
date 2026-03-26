@@ -17,6 +17,7 @@ import {
 	Receipt,
 	Settings,
 	Store,
+	Users,
 } from "lucide-react";
 import { useState } from "react";
 import { resetQueryCache } from "@/integrations/tanstack-query/root-provider";
@@ -35,6 +36,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
 	const navItems = [
 		{ name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+		{ name: "Organización", path: "/organization", icon: Users },
 		{ name: "POS", path: "/pos", icon: Store },
 		{ name: "Turnos", path: "/shifts", icon: Clock3 },
 		{ name: "Ventas", path: "/sales", icon: Receipt },

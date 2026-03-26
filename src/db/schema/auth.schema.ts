@@ -148,6 +148,38 @@ export const invitation = sqliteTable(
 	],
 );
 
+export const organizationJoinLink = sqliteTable(
+	"organization_join_link",
+	{
+		id: text("id").primaryKey(),
+		organizationId: text("organization_id")
+			.notNull()
+			.references(() => organization.id, { onDelete: "cascade" }),
+		token: text("token").notNull().unique(),
+		role: text("role").default("member").notNull(),
+		label: text("label"),
+		createdByUserId: text("created_by_user_id")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+		expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+		maxUses: integer("max_uses").default(1).notNull(),
+		useCount: integer("use_count").default(0).notNull(),
+		lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+		lastUsedByUserId: text("last_used_by_user_id").references(() => user.id, {
+			onDelete: "set null",
+		}),
+		revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+	},
+	(table) => [
+		index("organizationJoinLink_organizationId_idx").on(table.organizationId),
+		index("organizationJoinLink_createdByUserId_idx").on(table.createdByUserId),
+		index("organizationJoinLink_lastUsedByUserId_idx").on(
+			table.lastUsedByUserId,
+		),
+	],
+);
+
 export const userRelations = relations(user, ({ many }) => ({
 	sessions: many(session),
 	accounts: many(account),

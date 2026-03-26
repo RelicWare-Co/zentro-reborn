@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as JoinRouteImport } from './routes/join'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthShiftsRouteImport } from './routes/_auth/shifts'
@@ -17,12 +18,18 @@ import { Route as AuthSettingsRouteImport } from './routes/_auth/settings'
 import { Route as AuthSalesRouteImport } from './routes/_auth/sales'
 import { Route as AuthProductsRouteImport } from './routes/_auth/products'
 import { Route as AuthPosRouteImport } from './routes/_auth/pos'
+import { Route as AuthOrganizationRouteImport } from './routes/_auth/organization'
 import { Route as AuthDashboardRouteImport } from './routes/_auth/dashboard'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinRoute = JoinRouteImport.update({
+  id: '/join',
+  path: '/join',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -59,6 +66,11 @@ const AuthPosRoute = AuthPosRouteImport.update({
   path: '/pos',
   getParentRoute: () => AuthRoute,
 } as any)
+const AuthOrganizationRoute = AuthOrganizationRouteImport.update({
+  id: '/organization',
+  path: '/organization',
+  getParentRoute: () => AuthRoute,
+} as any)
 const AuthDashboardRoute = AuthDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -72,8 +84,10 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthDashboardRoute
+  '/organization': typeof AuthOrganizationRoute
   '/pos': typeof AuthPosRoute
   '/products': typeof AuthProductsRoute
   '/sales': typeof AuthSalesRoute
@@ -83,8 +97,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthDashboardRoute
+  '/organization': typeof AuthOrganizationRoute
   '/pos': typeof AuthPosRoute
   '/products': typeof AuthProductsRoute
   '/sales': typeof AuthSalesRoute
@@ -96,8 +112,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_auth': typeof AuthRouteWithChildren
+  '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/_auth/dashboard': typeof AuthDashboardRoute
+  '/_auth/organization': typeof AuthOrganizationRoute
   '/_auth/pos': typeof AuthPosRoute
   '/_auth/products': typeof AuthProductsRoute
   '/_auth/sales': typeof AuthSalesRoute
@@ -109,8 +127,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/join'
     | '/login'
     | '/dashboard'
+    | '/organization'
     | '/pos'
     | '/products'
     | '/sales'
@@ -120,8 +140,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/join'
     | '/login'
     | '/dashboard'
+    | '/organization'
     | '/pos'
     | '/products'
     | '/sales'
@@ -132,8 +154,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_auth'
+    | '/join'
     | '/login'
     | '/_auth/dashboard'
+    | '/_auth/organization'
     | '/_auth/pos'
     | '/_auth/products'
     | '/_auth/sales'
@@ -145,6 +169,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRouteWithChildren
+  JoinRoute: typeof JoinRoute
   LoginRoute: typeof LoginRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -156,6 +181,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join': {
+      id: '/join'
+      path: '/join'
+      fullPath: '/join'
+      preLoaderRoute: typeof JoinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_auth': {
@@ -207,6 +239,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthPosRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_auth/organization': {
+      id: '/_auth/organization'
+      path: '/organization'
+      fullPath: '/organization'
+      preLoaderRoute: typeof AuthOrganizationRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/dashboard': {
       id: '/_auth/dashboard'
       path: '/dashboard'
@@ -226,6 +265,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthRouteChildren {
   AuthDashboardRoute: typeof AuthDashboardRoute
+  AuthOrganizationRoute: typeof AuthOrganizationRoute
   AuthPosRoute: typeof AuthPosRoute
   AuthProductsRoute: typeof AuthProductsRoute
   AuthSalesRoute: typeof AuthSalesRoute
@@ -235,6 +275,7 @@ interface AuthRouteChildren {
 
 const AuthRouteChildren: AuthRouteChildren = {
   AuthDashboardRoute: AuthDashboardRoute,
+  AuthOrganizationRoute: AuthOrganizationRoute,
   AuthPosRoute: AuthPosRoute,
   AuthProductsRoute: AuthProductsRoute,
   AuthSalesRoute: AuthSalesRoute,
@@ -247,6 +288,7 @@ const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRouteWithChildren,
+  JoinRoute: JoinRoute,
   LoginRoute: LoginRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }

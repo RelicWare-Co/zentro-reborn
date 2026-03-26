@@ -1,19 +1,41 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+import { Building2, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import { useId, useState } from "react";
+import { z } from "zod";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+	getOrganizationJoinLinkPreview,
+	redeemOrganizationJoinLink,
+} from "@/features/organization/organization.functions";
+import { formatOrganizationRoleLabel } from "@/features/organization/organization.shared";
+import { resetQueryCache } from "@/integrations/tanstack-query/root-provider";
 import { authClient } from "@/lib/auth-client";
 
-export const Route = createFileRoute("/login")({
-	component: LoginPage,
+const loginSearchSchema = z.object({
+	joinToken: z.string().trim().min(1).optional(),
 });
 
 const inputBase =
 	"pl-10 h-11 bg-transparent border-gray-800 text-white placeholder:text-gray-600 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20 rounded-xl";
 
-function LoginForm() {
+export const Route = createFileRoute("/login")({
+	validateSearch: loginSearchSchema,
+	loaderDeps: ({ search }) => ({ joinToken: search.joinToken ?? null }),
+	loader: ({ deps }) =>
+		deps.joinToken
+			? getOrganizationJoinLinkPreview({
+					data: { token: deps.joinToken },
+				})
+			: null,
+	component: LoginPage,
+});
+
+function LoginForm(props: {
+	isCompletingJoin: boolean;
+	onAuthenticated: () => Promise<boolean>;
+}) {
 	const navigate = useNavigate();
 	const emailId = useId();
 	const passwordId = useId();
@@ -23,8 +45,8 @@ function LoginForm() {
 	const [isPending, setIsPending] = useState(false);
 	const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-	const handleLogin = async (e: React.FormEvent) => {
-		e.preventDefault();
+	const handleLogin = async (event: React.FormEvent) => {
+		event.preventDefault();
 		setIsPending(true);
 		setErrorMsg(null);
 
@@ -33,11 +55,16 @@ function LoginForm() {
 			password,
 		});
 
+		if (error) {
+			setIsPending(false);
+			setErrorMsg(error.message || "Credenciales inválidas.");
+			return;
+		}
+
+		const shouldContinue = await props.onAuthenticated();
 		setIsPending(false);
 
-		if (error) {
-			setErrorMsg(error.message || "Credenciales inválidas");
-		} else {
+		if (shouldContinue) {
 			navigate({ to: "/dashboard" });
 		}
 	};
@@ -45,23 +72,23 @@ function LoginForm() {
 	return (
 		<form className="space-y-6" onSubmit={handleLogin}>
 			<div className="space-y-2">
-				<Label
-					htmlFor={emailId}
-					className="text-xs font-semibold text-gray-200"
-				>
-					Correo electrónico <span className="text-red-500">*</span>
-				</Label>
+				<LabelWithRequired htmlFor={emailId}>
+					Correo electrónico
+				</LabelWithRequired>
 				<div className="relative">
-					<div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
+					<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
 						<Mail className="h-4 w-4" />
 					</div>
-					<Input
+					<input
 						id={emailId}
+						name="email"
 						type="email"
 						value={email}
-						onChange={(e) => setEmail(e.target.value)}
-						disabled={isPending}
-						placeholder="tu@email.com"
+						onChange={(event) => setEmail(event.target.value)}
+						disabled={isPending || props.isCompletingJoin}
+						placeholder="tu@negocio.com…"
+						autoComplete="email"
+						spellCheck={false}
 						className={inputBase}
 						required
 					/>
@@ -70,12 +97,7 @@ function LoginForm() {
 
 			<div className="space-y-2">
 				<div className="flex items-center justify-between">
-					<Label
-						htmlFor={passwordId}
-						className="text-xs font-semibold text-gray-200"
-					>
-						Contraseña <span className="text-red-500">*</span>
-					</Label>
+					<LabelWithRequired htmlFor={passwordId}>Contraseña</LabelWithRequired>
 					<Link
 						to="/"
 						className="text-xs text-[var(--color-voltage)] hover:underline"
@@ -84,24 +106,26 @@ function LoginForm() {
 					</Link>
 				</div>
 				<div className="relative">
-					<div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
+					<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
 						<Lock className="h-4 w-4" />
 					</div>
-					<Input
+					<input
 						id={passwordId}
+						name="password"
 						type={showPassword ? "text" : "password"}
 						value={password}
-						onChange={(e) => setPassword(e.target.value)}
-						disabled={isPending}
+						onChange={(event) => setPassword(event.target.value)}
+						disabled={isPending || props.isCompletingJoin}
 						placeholder="••••••••"
+						autoComplete="current-password"
 						className={`${inputBase} pr-10`}
 						required
 					/>
 					<button
 						type="button"
-						onClick={() => setShowPassword(!showPassword)}
-						disabled={isPending}
-						className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+						onClick={() => setShowPassword((currentValue) => !currentValue)}
+						disabled={isPending || props.isCompletingJoin}
+						className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 transition-colors hover:text-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
 						aria-label={
 							showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
 						}
@@ -115,22 +139,27 @@ function LoginForm() {
 				</div>
 			</div>
 
-			{errorMsg && (
-				<div className="text-red-500 text-sm font-medium mt-2">{errorMsg}</div>
-			)}
+			{errorMsg ? <InlineErrorMessage message={errorMsg} /> : null}
 
 			<Button
 				type="submit"
-				disabled={isPending}
-				className="w-full h-11 bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-semibold text-[15px] rounded-xl transition-all"
+				disabled={isPending || props.isCompletingJoin}
+				className="h-11 w-full rounded-xl bg-[var(--color-voltage)] text-[15px] font-semibold text-black hover:bg-[#c9e605]"
 			>
-				{isPending ? "Ingresando..." : "Ingresar"}
+				{props.isCompletingJoin
+					? "Completando acceso…"
+					: isPending
+						? "Ingresando…"
+						: "Ingresar"}
 			</Button>
 		</form>
 	);
 }
 
-function RegisterForm() {
+function RegisterForm(props: {
+	isCompletingJoin: boolean;
+	onAuthenticated: () => Promise<boolean>;
+}) {
 	const navigate = useNavigate();
 	const nameId = useId();
 	const emailId = useId();
@@ -144,20 +173,18 @@ function RegisterForm() {
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 	const [isPending, setIsPending] = useState(false);
 	const [errorMsg, setErrorMsg] = useState<string | null>(null);
-	const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-	const handleRegister = async (e: React.FormEvent) => {
-		e.preventDefault();
+	const handleRegister = async (event: React.FormEvent) => {
+		event.preventDefault();
 		setErrorMsg(null);
-		setSuccessMsg(null);
 
 		if (password.length < 8) {
-			setErrorMsg("La contraseña debe tener al menos 8 caracteres");
+			setErrorMsg("La contraseña debe tener al menos 8 caracteres.");
 			return;
 		}
 
 		if (password !== confirmPassword) {
-			setErrorMsg("Las contraseñas no coinciden");
+			setErrorMsg("Las contraseñas no coinciden.");
 			return;
 		}
 
@@ -169,12 +196,16 @@ function RegisterForm() {
 			name: name.trim() || email.split("@")[0],
 		});
 
+		if (error) {
+			setIsPending(false);
+			setErrorMsg(error.message || "No se pudo crear la cuenta.");
+			return;
+		}
+
+		const shouldContinue = await props.onAuthenticated();
 		setIsPending(false);
 
-		if (error) {
-			setErrorMsg(error.message || "Error al crear la cuenta");
-		} else {
-			setSuccessMsg("¡Cuenta creada! Redirigiendo...");
+		if (shouldContinue) {
 			navigate({ to: "/dashboard" });
 		}
 	};
@@ -182,43 +213,45 @@ function RegisterForm() {
 	return (
 		<form className="space-y-6" onSubmit={handleRegister}>
 			<div className="space-y-2">
-				<Label htmlFor={nameId} className="text-xs font-semibold text-gray-200">
+				<label htmlFor={nameId} className="text-xs font-semibold text-gray-200">
 					Nombre
-				</Label>
+				</label>
 				<div className="relative">
-					<div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
+					<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
 						<User className="h-4 w-4" />
 					</div>
-					<Input
+					<input
 						id={nameId}
+						name="name"
 						type="text"
 						value={name}
-						onChange={(e) => setName(e.target.value)}
-						disabled={isPending}
-						placeholder="Tu nombre"
+						onChange={(event) => setName(event.target.value)}
+						disabled={isPending || props.isCompletingJoin}
+						placeholder="Tu nombre…"
+						autoComplete="name"
 						className={inputBase}
 					/>
 				</div>
 			</div>
 
 			<div className="space-y-2">
-				<Label
-					htmlFor={emailId}
-					className="text-xs font-semibold text-gray-200"
-				>
-					Correo electrónico <span className="text-red-500">*</span>
-				</Label>
+				<LabelWithRequired htmlFor={emailId}>
+					Correo electrónico
+				</LabelWithRequired>
 				<div className="relative">
-					<div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
+					<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
 						<Mail className="h-4 w-4" />
 					</div>
-					<Input
+					<input
 						id={emailId}
+						name="email"
 						type="email"
 						value={email}
-						onChange={(e) => setEmail(e.target.value)}
-						disabled={isPending}
-						placeholder="tu@email.com"
+						onChange={(event) => setEmail(event.target.value)}
+						disabled={isPending || props.isCompletingJoin}
+						placeholder="tu@negocio.com…"
+						autoComplete="email"
+						spellCheck={false}
 						className={inputBase}
 						required
 					/>
@@ -226,33 +259,30 @@ function RegisterForm() {
 			</div>
 
 			<div className="space-y-2">
-				<Label
-					htmlFor={passwordId}
-					className="text-xs font-semibold text-gray-200"
-				>
-					Contraseña <span className="text-red-500">*</span>
-				</Label>
-				<p className="text-xs text-gray-500">Mínimo 8 caracteres</p>
+				<LabelWithRequired htmlFor={passwordId}>Contraseña</LabelWithRequired>
+				<p className="text-xs text-gray-500">Mínimo 8 caracteres.</p>
 				<div className="relative">
-					<div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
+					<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
 						<Lock className="h-4 w-4" />
 					</div>
-					<Input
+					<input
 						id={passwordId}
+						name="password"
 						type={showPassword ? "text" : "password"}
 						value={password}
-						onChange={(e) => setPassword(e.target.value)}
-						disabled={isPending}
+						onChange={(event) => setPassword(event.target.value)}
+						disabled={isPending || props.isCompletingJoin}
 						placeholder="••••••••"
+						autoComplete="new-password"
 						className={`${inputBase} pr-10`}
 						required
 						minLength={8}
 					/>
 					<button
 						type="button"
-						onClick={() => setShowPassword(!showPassword)}
-						disabled={isPending}
-						className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+						onClick={() => setShowPassword((currentValue) => !currentValue)}
+						disabled={isPending || props.isCompletingJoin}
+						className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 transition-colors hover:text-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
 						aria-label={
 							showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
 						}
@@ -267,32 +297,33 @@ function RegisterForm() {
 			</div>
 
 			<div className="space-y-2">
-				<Label
-					htmlFor={confirmId}
-					className="text-xs font-semibold text-gray-200"
-				>
-					Confirmar contraseña <span className="text-red-500">*</span>
-				</Label>
+				<LabelWithRequired htmlFor={confirmId}>
+					Confirmar contraseña
+				</LabelWithRequired>
 				<div className="relative">
-					<div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
+					<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
 						<Lock className="h-4 w-4" />
 					</div>
-					<Input
+					<input
 						id={confirmId}
+						name="confirmPassword"
 						type={showConfirmPassword ? "text" : "password"}
 						value={confirmPassword}
-						onChange={(e) => setConfirmPassword(e.target.value)}
-						disabled={isPending}
+						onChange={(event) => setConfirmPassword(event.target.value)}
+						disabled={isPending || props.isCompletingJoin}
 						placeholder="••••••••"
+						autoComplete="new-password"
 						className={`${inputBase} pr-10`}
 						required
 						minLength={8}
 					/>
 					<button
 						type="button"
-						onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-						disabled={isPending}
-						className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+						onClick={() =>
+							setShowConfirmPassword((currentValue) => !currentValue)
+						}
+						disabled={isPending || props.isCompletingJoin}
+						className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 transition-colors hover:text-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
 						aria-label={
 							showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"
 						}
@@ -306,100 +337,306 @@ function RegisterForm() {
 				</div>
 			</div>
 
-			{(errorMsg || successMsg) && (
-				<div
-					className={`text-sm font-medium mt-2 ${errorMsg ? "text-red-500" : "text-green-400"}`}
-				>
-					{errorMsg || successMsg}
-				</div>
-			)}
+			{errorMsg ? <InlineErrorMessage message={errorMsg} /> : null}
 
 			<Button
 				type="submit"
-				disabled={isPending}
-				className="w-full h-11 bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-semibold text-[15px] rounded-xl transition-all"
+				disabled={isPending || props.isCompletingJoin}
+				className="h-11 w-full rounded-xl bg-[var(--color-voltage)] text-[15px] font-semibold text-black hover:bg-[#c9e605]"
 			>
-				{isPending ? "Creando cuenta..." : "Crear cuenta"}
+				{props.isCompletingJoin
+					? "Completando acceso…"
+					: isPending
+						? "Creando cuenta…"
+						: "Crear cuenta"}
 			</Button>
 		</form>
 	);
 }
 
 function LoginPage() {
+	const navigate = useNavigate();
+	const search = Route.useSearch();
+	const joinPreview = Route.useLoaderData();
+	const { data: sessionData, isPending: isSessionPending } =
+		authClient.useSession();
 	const [mode, setMode] = useState<"login" | "register">("login");
+	const [joinError, setJoinError] = useState<string | null>(null);
+	const [isCompletingJoin, setIsCompletingJoin] = useState(false);
+
+	const finishJoinFlow = async () => {
+		if (!search.joinToken) {
+			return true;
+		}
+
+		setJoinError(null);
+		setIsCompletingJoin(true);
+
+		try {
+			const result = await redeemOrganizationJoinLink({
+				data: { token: search.joinToken },
+			});
+			await authClient.organization.setActive({
+				organizationId: result.organizationId,
+			});
+			await resetQueryCache();
+			return true;
+		} catch (error) {
+			setJoinError(
+				error instanceof Error
+					? error.message
+					: "No se pudo completar el acceso con este enlace.",
+			);
+			return false;
+		} finally {
+			setIsCompletingJoin(false);
+		}
+	};
+
+	const handleJoinWithCurrentAccount = async () => {
+		const shouldContinue = await finishJoinFlow();
+		if (shouldContinue) {
+			navigate({ to: "/dashboard" });
+		}
+	};
 
 	return (
 		<div className="app-safe-area flex min-h-[100dvh] w-full bg-[var(--color-void)] text-[var(--color-photon)]">
-			{/* Left Column */}
-			<div className="hidden lg:flex w-1/2 flex-col items-center justify-center bg-[var(--color-carbon)] relative overflow-hidden">
-				<div className="relative z-10 flex flex-col items-center text-center px-8">
-					<h1 className="text-6xl font-bold tracking-tight text-[var(--color-voltage)] mb-6">
+			<div className="relative hidden w-1/2 overflow-hidden bg-[var(--color-carbon)] lg:flex lg:flex-col lg:items-center lg:justify-center">
+				<div className="relative z-10 flex flex-col items-center px-8 text-center">
+					<h1 className="mb-6 text-6xl font-bold tracking-tight text-[var(--color-voltage)]">
 						Zentro
 					</h1>
-					<p className="text-xl text-gray-400 max-w-md">
+					<p className="max-w-md text-xl text-gray-400">
 						El sistema POS más inteligente para tu negocio
 					</p>
 				</div>
 			</div>
 
-			{/* Right Column */}
-			<div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-8 sm:p-12 md:p-16 lg:p-24 relative">
-				<div className="w-full max-w-[440px] space-y-8">
-					<div className="text-center space-y-3">
+			<div className="relative flex w-full flex-col items-center justify-center p-8 sm:p-12 md:p-16 lg:w-1/2 lg:p-24">
+				<div className="w-full max-w-[460px] space-y-8">
+					<div className="space-y-3 text-center">
 						<h2 className="text-3xl font-bold tracking-tight">
 							{mode === "login" ? "Inicia sesión" : "Crea tu cuenta"}{" "}
 							<span className="text-[var(--color-voltage)]">Zentro™</span>
 						</h2>
 						<p className="text-sm text-gray-400">
 							{mode === "login"
-								? "Ingresa tus credenciales para acceder"
-								: "Regístrate para empezar a vender más"}
+								? "Ingresa tus credenciales para acceder."
+								: "Regístrate para empezar a vender más."}
 						</p>
 					</div>
 
-					<div className="w-full flex bg-gray-900/50 border border-gray-800 p-1 rounded-xl mb-6">
-						<button
-							type="button"
-							onClick={() => setMode("login")}
-							className={`flex-1 rounded-lg py-2.5 text-sm font-medium transition-all duration-200 ${
-								mode === "login"
-									? "bg-[var(--color-voltage)] text-black shadow-sm"
-									: "text-gray-400 hover:text-gray-200 hover:bg-gray-800/50"
-							}`}
-						>
-							Iniciar sesión
-						</button>
-						<button
-							type="button"
-							onClick={() => setMode("register")}
-							className={`flex-1 rounded-lg py-2.5 text-sm font-medium transition-all duration-200 ${
-								mode === "register"
-									? "bg-[var(--color-voltage)] text-black shadow-sm"
-									: "text-gray-400 hover:text-gray-200 hover:bg-gray-800/50"
-							}`}
-						>
-							Registrarse
-						</button>
-					</div>
+					{search.joinToken ? (
+						<div className="space-y-3">
+							<JoinContextCard joinPreview={joinPreview} />
+							{joinError ? (
+								<Alert
+									variant="destructive"
+									className="border-red-500/20 bg-red-500/10 text-red-100"
+								>
+									<AlertTitle>No se pudo completar el acceso</AlertTitle>
+									<AlertDescription>{joinError}</AlertDescription>
+								</Alert>
+							) : null}
+						</div>
+					) : null}
 
-					<div className="mt-0">
-						{mode === "login" ? <LoginForm /> : <RegisterForm />}
-					</div>
+					{search.joinToken && sessionData ? (
+						<CardForSignedInUser
+							isSessionPending={isSessionPending}
+							isCompletingJoin={isCompletingJoin}
+							sessionName={sessionData.user.name}
+							sessionEmail={sessionData.user.email}
+							canJoin={Boolean(joinPreview?.canJoin)}
+							onJoin={handleJoinWithCurrentAccount}
+							onSwitchAccount={async () => {
+								await authClient.signOut();
+							}}
+						/>
+					) : (
+						<>
+							<div className="mb-6 flex w-full rounded-xl border border-gray-800 bg-gray-900/50 p-1">
+								<button
+									type="button"
+									onClick={() => setMode("login")}
+									className={`flex-1 rounded-lg py-2.5 text-sm font-medium transition-colors ${
+										mode === "login"
+											? "bg-[var(--color-voltage)] text-black shadow-sm"
+											: "text-gray-400 hover:bg-gray-800/50 hover:text-gray-200"
+									}`}
+								>
+									Iniciar sesión
+								</button>
+								<button
+									type="button"
+									onClick={() => setMode("register")}
+									className={`flex-1 rounded-lg py-2.5 text-sm font-medium transition-colors ${
+										mode === "register"
+											? "bg-[var(--color-voltage)] text-black shadow-sm"
+											: "text-gray-400 hover:bg-gray-800/50 hover:text-gray-200"
+									}`}
+								>
+									Registrarse
+								</button>
+							</div>
+
+							<div>
+								{mode === "login" ? (
+									<LoginForm
+										isCompletingJoin={isCompletingJoin}
+										onAuthenticated={finishJoinFlow}
+									/>
+								) : (
+									<RegisterForm
+										isCompletingJoin={isCompletingJoin}
+										onAuthenticated={finishJoinFlow}
+									/>
+								)}
+							</div>
+						</>
+					)}
 				</div>
 
-				{/* Footer Text */}
-				<div className="absolute bottom-8 left-0 w-full flex flex-col items-center justify-center gap-2 text-xs text-gray-500">
-					<p>2025 Zentro POS System Todos los derechos reservados.</p>
+				<div className="absolute bottom-8 left-0 flex w-full flex-col items-center justify-center gap-2 text-xs text-gray-500">
+					<p>2026 Zentro POS System. Todos los derechos reservados.</p>
 					<div className="flex gap-4">
-						<Link to="/" className="hover:text-gray-300 transition-colors">
+						<Link to="/" className="transition-colors hover:text-gray-300">
 							Privacidad
 						</Link>
-						<Link to="/" className="hover:text-gray-300 transition-colors">
+						<Link to="/" className="transition-colors hover:text-gray-300">
 							Términos
 						</Link>
 					</div>
 				</div>
 			</div>
+		</div>
+	);
+}
+
+function CardForSignedInUser(props: {
+	isSessionPending: boolean;
+	isCompletingJoin: boolean;
+	sessionName: string;
+	sessionEmail: string;
+	canJoin: boolean;
+	onJoin: () => Promise<void>;
+	onSwitchAccount: () => Promise<void>;
+}) {
+	return (
+		<div className="rounded-2xl border border-gray-800 bg-gray-900/40 p-6">
+			<div className="space-y-2">
+				<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+					Ya Iniciaste Sesión
+				</Badge>
+				<p className="text-lg font-semibold text-white">{props.sessionName}</p>
+				<p className="text-sm text-gray-400">{props.sessionEmail}</p>
+			</div>
+			<div className="mt-5 flex flex-col gap-3">
+				<Button
+					type="button"
+					onClick={() => void props.onJoin()}
+					disabled={
+						props.isSessionPending || props.isCompletingJoin || !props.canJoin
+					}
+					className="bg-[var(--color-voltage)] text-black hover:bg-[#c9e605]"
+				>
+					{props.isCompletingJoin
+						? "Entrando a la organización…"
+						: "Continuar con esta cuenta"}
+				</Button>
+				<Button
+					type="button"
+					variant="outline"
+					onClick={() => void props.onSwitchAccount()}
+					className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+				>
+					Usar otra cuenta
+				</Button>
+			</div>
+		</div>
+	);
+}
+
+function JoinContextCard(props: {
+	joinPreview: Awaited<
+		ReturnType<typeof getOrganizationJoinLinkPreview>
+	> | null;
+}) {
+	if (!props.joinPreview) {
+		return null;
+	}
+
+	if (!props.joinPreview.organization) {
+		return (
+			<Alert
+				variant="destructive"
+				className="border-red-500/20 bg-red-500/10 text-red-100"
+			>
+				<AlertTitle>Enlace no disponible</AlertTitle>
+				<AlertDescription>{props.joinPreview.message}</AlertDescription>
+			</Alert>
+		);
+	}
+
+	return (
+		<div className="rounded-2xl border border-gray-800 bg-gray-900/40 p-5">
+			<div className="flex items-start gap-3">
+				<div className="mt-0.5 rounded-xl bg-[var(--color-voltage)]/10 p-2 text-[var(--color-voltage)]">
+					<Building2 className="h-4 w-4" />
+				</div>
+				<div className="min-w-0 flex-1">
+					<p className="font-semibold text-white">
+						{props.joinPreview.organization.name}
+					</p>
+					<p className="text-sm text-gray-400">
+						/{props.joinPreview.organization.slug}
+					</p>
+					<div className="mt-3 flex flex-wrap gap-2">
+						<Badge
+							variant="outline"
+							className="border-sky-500/30 bg-sky-500/10 text-sky-200"
+						>
+							{formatOrganizationRoleLabel(props.joinPreview.role)}
+						</Badge>
+						{props.joinPreview.label ? (
+							<Badge
+								variant="outline"
+								className="border-gray-700 bg-transparent text-gray-300"
+							>
+								{props.joinPreview.label}
+							</Badge>
+						) : null}
+					</div>
+					<p className="mt-3 text-sm text-gray-400">
+						{props.joinPreview.canJoin
+							? "Cuando termines de iniciar sesión o crear tu cuenta entrarás directo a esta organización."
+							: props.joinPreview.message}
+					</p>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function LabelWithRequired(props: {
+	htmlFor: string;
+	children: React.ReactNode;
+}) {
+	return (
+		<label
+			htmlFor={props.htmlFor}
+			className="text-xs font-semibold text-gray-200"
+		>
+			{props.children} <span className="text-red-500">*</span>
+		</label>
+	);
+}
+
+function InlineErrorMessage(props: { message: string }) {
+	return (
+		<div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-200">
+			{props.message}
 		</div>
 	);
 }

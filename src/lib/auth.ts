@@ -4,6 +4,7 @@ import { admin } from "better-auth/plugins/admin";
 import { organization } from "better-auth/plugins/organization";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { getDb } from "#/db";
+import { canUserCreateOrganization } from "#/features/organization/organization-policy";
 
 function createAuth() {
 	return betterAuth({
@@ -20,7 +21,14 @@ function createAuth() {
 		emailAndPassword: {
 			enabled: true,
 		},
-		plugins: [tanstackStartCookies(), admin(), organization()],
+		plugins: [
+			tanstackStartCookies(),
+			admin(),
+			organization({
+				allowUserToCreateOrganization: (user) =>
+					canUserCreateOrganization({ role: user.role }),
+			}),
+		],
 	});
 }
 

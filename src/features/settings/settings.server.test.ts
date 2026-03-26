@@ -220,13 +220,13 @@ describe("settings.server", () => {
 			);
 			expect(cashMethod).toEqual({
 				id: "cash",
-				label: "Efectivo",
+				label: "Caja",
 				enabled: true,
 				requiresReference: false,
 			});
 			expect(cardMethod).toEqual({
 				id: "card",
-				label: "Tarjeta",
+				label: "Tarjeta personalizada",
 				enabled: false,
 				requiresReference: false,
 			});

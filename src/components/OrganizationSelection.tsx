@@ -1,19 +1,50 @@
 import { useRouter } from "@tanstack/react-router";
-import { AlertCircle, Building2, Loader2, Plus } from "lucide-react";
-import { useCallback, useEffect, useId, useState } from "react";
+import {
+	ArrowRight,
+	Building2,
+	Loader2,
+	Mail,
+	Plus,
+	ShieldAlert,
+	XCircle,
+} from "lucide-react";
+import { useEffect, useId, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useOrganizationSelectionData } from "@/features/organization/hooks/use-organization";
+import { formatOrganizationRoleLabel } from "@/features/organization/organization.shared";
 import { resetQueryCache } from "@/integrations/tanstack-query/root-provider";
 import { authClient } from "@/lib/auth-client";
+
+const dateTimeFormatter = new Intl.DateTimeFormat("es-CO", {
+	day: "numeric",
+	month: "short",
+	hour: "numeric",
+	minute: "2-digit",
+});
 
 export function OrganizationSelection() {
 	const router = useRouter();
 	const {
 		data: organizations,
-		isPending: isListPending,
-		refetch,
+		isPending: isOrganizationsPending,
+		refetch: refetchOrganizations,
 	} = authClient.useListOrganizations();
+	const {
+		data: selectionData,
+		isPending: isSelectionPending,
+		refetch: refetchSelectionData,
+	} = useOrganizationSelectionData();
 	const orgNameInputId = useId();
 	const orgSlugInputId = useId();
 	const [isCreating, setIsCreating] = useState(false);
@@ -23,13 +54,21 @@ export function OrganizationSelection() {
 	const [errorMsg, setErrorMsg] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isSelectingId, setIsSelectingId] = useState<string | null>(null);
+	const [isAcceptingInvitationId, setIsAcceptingInvitationId] = useState<
+		string | null
+	>(null);
+	const [isRejectingInvitationId, setIsRejectingInvitationId] = useState<
+		string | null
+	>(null);
 
 	useEffect(() => {
-		void refetch();
+		void refetchOrganizations();
+		void refetchSelectionData();
 
 		const handleVisibilityChange = () => {
 			if (document.visibilityState === "visible") {
-				void refetch();
+				void refetchOrganizations();
+				void refetchSelectionData();
 			}
 		};
 
@@ -38,9 +77,10 @@ export function OrganizationSelection() {
 		return () => {
 			document.removeEventListener("visibilitychange", handleVisibilityChange);
 		};
-	}, [refetch]);
+	}, [refetchOrganizations, refetchSelectionData]);
 
 	const handleSelect = async (orgId: string) => {
+		setErrorMsg(null);
 		setIsSelectingId(orgId);
 		try {
 			await authClient.organization.setActive({ organizationId: orgId });
@@ -51,88 +91,145 @@ export function OrganizationSelection() {
 		}
 	};
 
-	const handleSlugChange = useCallback(
-		(e: React.ChangeEvent<HTMLInputElement>) => {
-			// Only allow lowercase letters, numbers and hyphens
-			const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
-			setNewOrgSlug(value);
-			setSlugModified(true);
-		},
-		[],
-	);
+	const handleSlugChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+		const value = event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+		setNewOrgSlug(value);
+		setSlugModified(true);
+	};
 
-	const handleNameChange = useCallback(
-		(e: React.ChangeEvent<HTMLInputElement>) => {
-			const newName = e.target.value;
-			setNewOrgName(newName);
+	const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+		const nextName = event.target.value;
+		setNewOrgName(nextName);
 
-			// Only auto-update the slug if it hasn't been manually modified by the user
-			if (!slugModified) {
-				setNewOrgSlug(
-					newName
-						.toLowerCase()
-						.replace(/[^a-z0-9]+/g, "-")
-						.replace(/(^-|-$)+/g, ""),
-				);
-			}
-		},
-		[slugModified],
-	);
+		if (!slugModified) {
+			setNewOrgSlug(
+				nextName
+					.toLowerCase()
+					.replace(/[^a-z0-9]+/g, "-")
+					.replace(/(^-|-$)+/g, ""),
+			);
+		}
+	};
 
-	const handleCreate = async (e: React.FormEvent) => {
-		e.preventDefault();
+	const handleCreate = async (event: React.FormEvent) => {
+		event.preventDefault();
 		setErrorMsg(null);
 		setIsSubmitting(true);
 
 		try {
 			if (!newOrgName || !newOrgSlug) {
-				setErrorMsg("Por favor completa todos los campos");
+				setErrorMsg(
+					"Completa el nombre y el identificador antes de continuar.",
+				);
 				setIsSubmitting(false);
 				return;
 			}
 
-			// Check if slug is taken
 			const checkResult = await authClient.organization.checkSlug({
 				slug: newOrgSlug,
 			});
 
 			if (checkResult?.error) {
 				setErrorMsg(
-					checkResult.error.message || "Error al verificar el identificador.",
+					checkResult.error.message ||
+						"No fue posible validar el identificador de la organización.",
 				);
 				setIsSubmitting(false);
 				return;
 			}
 
 			if (checkResult?.data?.status === false) {
+				setErrorMsg("Ese identificador ya está en uso. Elige otro.");
+				setIsSubmitting(false);
+				return;
+			}
+
+			const result = await authClient.organization.create({
+				name: newOrgName,
+				slug: newOrgSlug,
+			});
+
+			if (result?.error) {
 				setErrorMsg(
-					"Este identificador (slug) ya está en uso. Por favor elige otro.",
+					result.error.message || "No se pudo crear la organización.",
 				);
 				setIsSubmitting(false);
 				return;
 			}
 
-			const { data, error } = await authClient.organization.create({
-				name: newOrgName,
-				slug: newOrgSlug,
-			});
-
-			if (error) {
-				setErrorMsg(error.message || "Error al crear la organización");
-			} else if (data) {
-				await refetch();
-				await authClient.organization.setActive({ organizationId: data.id });
+			if (result?.data) {
+				await refetchOrganizations();
+				await authClient.organization.setActive({
+					organizationId: result.data.id,
+				});
 				await resetQueryCache();
 				await router.invalidate();
 			}
 		} catch {
-			setErrorMsg("Ocurrió un error inesperado");
+			setErrorMsg("Ocurrió un error inesperado al crear la organización.");
 		}
 
 		setIsSubmitting(false);
 	};
 
-	if (isListPending) {
+	const handleAcceptInvitation = async (invitation: {
+		id: string;
+		organizationId: string;
+	}) => {
+		setErrorMsg(null);
+		setIsAcceptingInvitationId(invitation.id);
+
+		try {
+			const result = await authClient.organization.acceptInvitation({
+				invitationId: invitation.id,
+			});
+
+			if (result?.error) {
+				setErrorMsg(
+					result.error.message || "No se pudo aceptar la invitación.",
+				);
+				return;
+			}
+
+			await refetchOrganizations();
+			await refetchSelectionData();
+			await authClient.organization.setActive({
+				organizationId: invitation.organizationId,
+			});
+			await resetQueryCache();
+			await router.invalidate();
+		} catch {
+			setErrorMsg("No se pudo aceptar la invitación.");
+		} finally {
+			setIsAcceptingInvitationId(null);
+		}
+	};
+
+	const handleRejectInvitation = async (invitationId: string) => {
+		setErrorMsg(null);
+		setIsRejectingInvitationId(invitationId);
+
+		try {
+			const result = await authClient.organization.rejectInvitation({
+				invitationId,
+			});
+
+			if (result?.error) {
+				setErrorMsg(
+					result.error.message || "No se pudo rechazar la invitación.",
+				);
+				return;
+			}
+
+			await refetchSelectionData();
+		} catch {
+			setErrorMsg("No se pudo rechazar la invitación.");
+		} finally {
+			setIsRejectingInvitationId(null);
+		}
+	};
+
+	if (isOrganizationsPending || isSelectionPending) {
 		return (
 			<div className="app-safe-area flex min-h-[100dvh] w-full items-center justify-center bg-[var(--color-void)] text-[var(--color-photon)]">
 				<Loader2 className="h-8 w-8 animate-spin text-[var(--color-voltage)]" />
@@ -140,21 +237,52 @@ export function OrganizationSelection() {
 		);
 	}
 
+	const invitations = selectionData?.invitations ?? [];
+	const allowOrganizationCreation =
+		selectionData?.allowOrganizationCreation ?? true;
+
 	return (
-		<div className="app-safe-area flex min-h-[100dvh] w-full flex-col items-center justify-center bg-[var(--color-void)] text-[var(--color-photon)] p-4">
-			<div className="w-full max-w-md space-y-8">
-				<div className="text-center space-y-2">
-					<h2 className="text-3xl font-bold tracking-tight">
-						Selecciona tu Organización
-					</h2>
-					<p className="text-gray-400">
-						Elige un espacio de trabajo para continuar o crea uno nuevo
+		<div className="app-safe-area flex min-h-[100dvh] w-full items-center justify-center bg-[var(--color-void)] p-4 text-[var(--color-photon)] md:p-8">
+			<div className="w-full max-w-6xl space-y-8">
+				<div className="space-y-3 text-center">
+					<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+						Acceso a organizaciones
+					</Badge>
+					<h1 className="text-3xl font-bold tracking-tight text-balance md:text-4xl">
+						Elige Cómo Quieres Entrar
+					</h1>
+					<p className="mx-auto max-w-2xl text-sm text-gray-400 md:text-base">
+						Selecciona una organización existente, acepta una invitación en la
+						app o crea un nuevo espacio si tu cuenta todavía lo tiene
+						habilitado.
 					</p>
 				</div>
 
-				{!isCreating ? (
-					<div className="space-y-6">
-						<div className="space-y-3">
+				<div aria-live="polite">
+					{errorMsg ? (
+						<Alert
+							variant="destructive"
+							className="border-red-500/20 bg-red-500/10 text-red-100"
+						>
+							<AlertTitle>No se pudo completar la acción</AlertTitle>
+							<AlertDescription>{errorMsg}</AlertDescription>
+						</Alert>
+					) : null}
+				</div>
+
+				<div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
+						<CardHeader>
+							<CardTitle className="flex items-center gap-2">
+								<Building2 className="h-4 w-4 text-[var(--color-voltage)]" />
+								Tus Organizaciones
+							</CardTitle>
+							<CardDescription className="text-gray-400">
+								Entrar a un espacio existente mantiene intacto el selector
+								actual y te deja volver a cambiar cuando lo necesites.
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-3">
 							{organizations && organizations.length > 0 ? (
 								organizations.map(
 									(org: { id: string; name: string; slug: string }) => (
@@ -163,124 +291,288 @@ export function OrganizationSelection() {
 											type="button"
 											onClick={() => handleSelect(org.id)}
 											disabled={isSelectingId !== null}
-											className="w-full flex items-center justify-between p-4 rounded-xl border border-gray-800 bg-[var(--color-carbon)] hover:border-[var(--color-voltage)]/50 hover:bg-gray-800/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+											className="flex w-full items-center justify-between rounded-2xl border border-gray-800 bg-black/20 p-4 text-left transition-colors hover:border-[var(--color-voltage)]/40 hover:bg-black/30 disabled:cursor-not-allowed disabled:opacity-60"
 										>
-											<div className="flex items-center gap-3">
-												<div className="h-10 w-10 rounded-lg bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] flex items-center justify-center group-hover:bg-[var(--color-voltage)]/20 transition-colors">
+											<div className="flex min-w-0 items-center gap-3">
+												<div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]">
 													<Building2 className="h-5 w-5" />
 												</div>
-												<div className="text-left">
-													<p className="font-semibold text-white">{org.name}</p>
-													<p className="text-sm text-gray-400">/{org.slug}</p>
+												<div className="min-w-0">
+													<p className="truncate font-semibold text-white">
+														{org.name}
+													</p>
+													<p className="truncate text-sm text-gray-400">
+														/{org.slug}
+													</p>
 												</div>
 											</div>
-											{isSelectingId === org.id && (
+											{isSelectingId === org.id ? (
 												<Loader2 className="h-5 w-5 animate-spin text-[var(--color-voltage)]" />
+											) : (
+												<ArrowRight className="h-5 w-5 text-gray-500" />
 											)}
 										</button>
 									),
 								)
 							) : (
-								<div className="text-center p-8 border border-dashed border-gray-800 rounded-xl bg-[var(--color-carbon)]/50">
-									<p className="text-gray-400 mb-2">
-										No tienes ninguna organización aún
+								<div className="rounded-2xl border border-dashed border-gray-800 bg-black/10 p-8 text-center">
+									<p className="text-sm text-gray-300">
+										Tu cuenta aún no pertenece a ninguna organización.
+									</p>
+									<p className="mt-2 text-sm text-gray-500">
+										Usa una invitación o un join link para entrar sin tener que
+										crear una nueva.
 									</p>
 								</div>
 							)}
-						</div>
+						</CardContent>
+					</Card>
 
-						<Button
-							onClick={() => setIsCreating(true)}
-							variant="outline"
-							className="w-full h-12 border-dashed border-gray-700 hover:border-gray-500 hover:bg-gray-800/50 text-gray-300"
-						>
-							<Plus className="h-4 w-4 mr-2" />
-							Crear nueva organización
-						</Button>
-					</div>
-				) : (
-					<div className="bg-[var(--color-carbon)] border border-gray-800 rounded-2xl p-6 shadow-xl">
-						<form onSubmit={handleCreate} className="space-y-5">
-							<div className="space-y-4">
-								<div className="space-y-2">
-									<Label
-										htmlFor={orgNameInputId}
-										className="text-xs font-semibold text-gray-200"
-									>
-										Nombre de la Organización
-									</Label>
-									<Input
-										id={orgNameInputId}
-										value={newOrgName}
-										onChange={handleNameChange}
-										placeholder="Ej. Mi Tienda"
-										className="bg-gray-900/50 border-gray-800"
-										disabled={isSubmitting}
-									/>
-								</div>
+					<div className="space-y-6">
+						<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2">
+									<Mail className="h-4 w-4 text-[var(--color-voltage)]" />
+									Invitaciones Pendientes
+								</CardTitle>
+								<CardDescription className="text-gray-400">
+									Si ya te invitaron, puedes entrar directo desde aquí.
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="space-y-3">
+								{invitations.length > 0 ? (
+									invitations.map((invitation) => (
+										<div
+											key={invitation.id}
+											className="rounded-2xl border border-gray-800 bg-black/20 p-4"
+										>
+											<div className="flex items-start justify-between gap-3">
+												<div className="min-w-0">
+													<p className="truncate font-semibold text-white">
+														{invitation.organizationName}
+													</p>
+													<p className="truncate text-sm text-gray-400">
+														/{invitation.organizationSlug}
+													</p>
+												</div>
+												<Badge
+													variant="outline"
+													className="border-sky-500/30 bg-sky-500/10 text-sky-200"
+												>
+													{formatOrganizationRoleLabel(invitation.role)}
+												</Badge>
+											</div>
+											<p className="mt-3 text-xs text-gray-500">
+												Expira{" "}
+												{invitation.expiresAt
+													? dateTimeFormatter.format(invitation.expiresAt)
+													: "sin fecha"}
+											</p>
+											<div className="mt-4 flex flex-col gap-2 sm:flex-row">
+												<Button
+													type="button"
+													onClick={() => handleAcceptInvitation(invitation)}
+													disabled={
+														isAcceptingInvitationId !== null ||
+														isRejectingInvitationId !== null
+													}
+													className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
+												>
+													{isAcceptingInvitationId === invitation.id ? (
+														<>
+															<Loader2 className="h-4 w-4 animate-spin" />
+															Entrando…
+														</>
+													) : (
+														"Entrar Ahora"
+													)}
+												</Button>
+												<Button
+													type="button"
+													variant="outline"
+													onClick={() => handleRejectInvitation(invitation.id)}
+													disabled={
+														isAcceptingInvitationId !== null ||
+														isRejectingInvitationId !== null
+													}
+													className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+												>
+													{isRejectingInvitationId === invitation.id ? (
+														<>
+															<Loader2 className="h-4 w-4 animate-spin" />
+															Rechazando…
+														</>
+													) : (
+														"Rechazar"
+													)}
+												</Button>
+											</div>
+										</div>
+									))
+								) : (
+									<div className="rounded-2xl border border-dashed border-gray-800 bg-black/10 p-6 text-sm text-gray-400">
+										No hay invitaciones pendientes para esta cuenta.
+									</div>
+								)}
+							</CardContent>
+						</Card>
 
-								<div className="space-y-2">
-									<Label
-										htmlFor={orgSlugInputId}
-										className="text-xs font-semibold text-gray-200"
-									>
-										Identificador (Slug)
-									</Label>
-									<Input
-										id={orgSlugInputId}
-										value={newOrgSlug}
-										onChange={handleSlugChange}
-										placeholder="ej-mi-tienda"
-										className="bg-gray-900/50 border-gray-800"
-										disabled={isSubmitting}
-									/>
-									<p className="text-xs text-gray-500">
-										Este será el identificador único para tu organización.
-									</p>
-								</div>
-							</div>
-
-							{errorMsg && (
-								<div className="flex items-center gap-2 text-sm text-red-400 bg-red-400/10 p-3 rounded-lg border border-red-400/20">
-									<AlertCircle className="h-4 w-4 flex-shrink-0" />
-									<p>{errorMsg}</p>
-								</div>
-							)}
-
-							<div className="flex gap-3 pt-2">
-								<Button
-									type="button"
-									variant="ghost"
-									onClick={() => {
-										setIsCreating(false);
-										setErrorMsg(null);
-										setNewOrgName("");
-										setNewOrgSlug("");
-										setSlugModified(false);
-									}}
-									className="flex-1 border-gray-800 hover:bg-gray-800 hover:text-white"
-									disabled={isSubmitting}
-								>
-									Cancelar
-								</Button>
-								<Button
-									type="submit"
-									className="flex-1 bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-semibold"
-									disabled={isSubmitting}
-								>
-									{isSubmitting ? (
-										<>
-											<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-											Creando...
-										</>
+						{allowOrganizationCreation ? (
+							<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
+								<CardHeader>
+									<CardTitle className="flex items-center gap-2">
+										<Plus className="h-4 w-4 text-[var(--color-voltage)]" />
+										Crear Organización
+									</CardTitle>
+									<CardDescription className="text-gray-400">
+										Usa este flujo solo si no tienes invitación ni join link.
+									</CardDescription>
+								</CardHeader>
+								<CardContent>
+									{!isCreating ? (
+										<Button
+											type="button"
+											onClick={() => {
+												setErrorMsg(null);
+												setIsCreating(true);
+											}}
+											variant="outline"
+											className="h-12 w-full border-dashed border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+										>
+											<Plus className="h-4 w-4" />
+											Crear Nueva Organización
+										</Button>
 									) : (
-										"Crear y Continuar"
+										<form onSubmit={handleCreate} className="space-y-5">
+											<div className="space-y-2">
+												<Label htmlFor={orgNameInputId}>
+													Nombre de la organización
+												</Label>
+												<Input
+													id={orgNameInputId}
+													name="organizationName"
+													value={newOrgName}
+													onChange={handleNameChange}
+													placeholder="Ej. Tienda Principal…"
+													autoComplete="off"
+													className="border-gray-800 bg-black/30"
+													disabled={isSubmitting}
+												/>
+											</div>
+											<div className="space-y-2">
+												<Label htmlFor={orgSlugInputId}>
+													Identificador único
+												</Label>
+												<Input
+													id={orgSlugInputId}
+													name="organizationSlug"
+													value={newOrgSlug}
+													onChange={handleSlugChange}
+													placeholder="tienda-principal"
+													autoComplete="off"
+													className="border-gray-800 bg-black/30"
+													disabled={isSubmitting}
+												/>
+												<p className="text-xs text-gray-500">
+													Se usará en URLs y selección interna.
+												</p>
+											</div>
+											<div className="flex gap-3">
+												<Button
+													type="button"
+													variant="outline"
+													onClick={() => {
+														setIsCreating(false);
+														setNewOrgName("");
+														setNewOrgSlug("");
+														setSlugModified(false);
+														setErrorMsg(null);
+													}}
+													className="flex-1 border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+													disabled={isSubmitting}
+												>
+													Cancelar
+												</Button>
+												<Button
+													type="submit"
+													className="flex-1 bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
+													disabled={isSubmitting}
+												>
+													{isSubmitting ? (
+														<>
+															<Loader2 className="h-4 w-4 animate-spin" />
+															Creando…
+														</>
+													) : (
+														"Crear y Entrar"
+													)}
+												</Button>
+											</div>
+										</form>
 									)}
-								</Button>
-							</div>
-						</form>
+								</CardContent>
+							</Card>
+						) : (
+							<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
+								<CardHeader>
+									<CardTitle className="flex items-center gap-2">
+										<ShieldAlert className="h-4 w-4 text-amber-300" />
+										Creación Controlada
+									</CardTitle>
+									<CardDescription className="text-gray-400">
+										La cuenta no puede abrir organizaciones nuevas por sí sola.
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="space-y-4">
+									<Alert className="border-amber-500/20 bg-amber-500/10 text-amber-100">
+										<AlertTitle>Solicita acceso al admin</AlertTitle>
+										<AlertDescription>
+											{selectionData?.contactMessage}
+										</AlertDescription>
+									</Alert>
+									{selectionData?.contactHref ? (
+										<Button
+											asChild
+											variant="outline"
+											className="w-full border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+										>
+											<a
+												href={selectionData.contactHref}
+												target="_blank"
+												rel="noreferrer"
+											>
+												{selectionData.contactLabel}
+											</a>
+										</Button>
+									) : (
+										<div className="rounded-2xl border border-dashed border-gray-800 bg-black/10 p-4 text-sm text-gray-300">
+											{selectionData?.contactLabel ??
+												"Contactar al administrador"}
+										</div>
+									)}
+									<div className="rounded-2xl border border-gray-800 bg-black/10 p-4 text-sm text-gray-400">
+										Si recibes un join link o una invitación nueva, esta
+										pantalla se actualizará automáticamente cuando vuelvas a la
+										app.
+									</div>
+								</CardContent>
+							</Card>
+						)}
+
+						<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2">
+									<XCircle className="h-4 w-4 text-gray-400" />
+									Sin correo manual
+								</CardTitle>
+								<CardDescription className="text-gray-400">
+									El alta nueva se maneja dentro de la app. Los admins deben
+									compartir invitaciones internas o join links.
+								</CardDescription>
+							</CardHeader>
+						</Card>
 					</div>
-				)}
+				</div>
 			</div>
 		</div>
 	);

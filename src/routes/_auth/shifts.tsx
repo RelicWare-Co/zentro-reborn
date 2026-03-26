@@ -44,6 +44,10 @@ const shiftsSearchSchema = z.object({
 	q: z.string().optional(),
 	status: z.enum(["open", "closed"]).optional(),
 	cashierId: z.string().optional(),
+	terminalName: z.string().optional(),
+	paymentMethod: z.string().optional(),
+	differenceStatus: z.enum(["short", "over", "balanced"]).optional(),
+	hasMovements: z.enum(["yes", "no"]).optional(),
 	startDate: z.string().optional(),
 	endDate: z.string().optional(),
 	cursor: z.coerce.number().int().min(0).optional(),
@@ -76,6 +80,10 @@ export const Route = createFileRoute("/_auth/shifts")({
 				status: deps.status ?? null,
 				searchQuery: deps.q ?? null,
 				cashierId: deps.cashierId ?? null,
+				terminalName: deps.terminalName ?? null,
+				paymentMethod: deps.paymentMethod ?? null,
+				differenceStatus: deps.differenceStatus ?? null,
+				hasMovements: deps.hasMovements ?? null,
 				startDate: deps.startDate ?? null,
 				endDate: deps.endDate ?? null,
 			},
@@ -87,6 +95,10 @@ function ShiftsPage() {
 	const searchId = useId();
 	const statusId = useId();
 	const cashierId = useId();
+	const terminalId = useId();
+	const paymentMethodId = useId();
+	const differenceStatusId = useId();
+	const hasMovementsId = useId();
 	const startDateId = useId();
 	const endDateId = useId();
 	const navigate = useNavigate({ from: Route.fullPath });
@@ -99,6 +111,10 @@ function ShiftsPage() {
 		q: search.q ?? "",
 		status: search.status ?? "",
 		cashierId: search.cashierId ?? "",
+		terminalName: search.terminalName ?? "",
+		paymentMethod: search.paymentMethod ?? "",
+		differenceStatus: search.differenceStatus ?? "",
+		hasMovements: search.hasMovements ?? "",
 		startDate: search.startDate ?? "",
 		endDate: search.endDate ?? "",
 	}));
@@ -108,21 +124,33 @@ function ShiftsPage() {
 			q: search.q ?? "",
 			status: search.status ?? "",
 			cashierId: search.cashierId ?? "",
+			terminalName: search.terminalName ?? "",
+			paymentMethod: search.paymentMethod ?? "",
+			differenceStatus: search.differenceStatus ?? "",
+			hasMovements: search.hasMovements ?? "",
 			startDate: search.startDate ?? "",
 			endDate: search.endDate ?? "",
 		});
 	}, [
 		search.cashierId,
+		search.differenceStatus,
 		search.endDate,
+		search.hasMovements,
+		search.paymentMethod,
 		search.q,
 		search.startDate,
 		search.status,
+		search.terminalName,
 	]);
 
 	const activeFilterCount = [
 		search.q,
 		search.status,
 		search.cashierId,
+		search.terminalName,
+		search.paymentMethod,
+		search.differenceStatus,
+		search.hasMovements,
 		search.startDate,
 		search.endDate,
 	].filter(Boolean).length;
@@ -155,6 +183,12 @@ function ShiftsPage() {
 				q: normalizeFilterValue(draftFilters.q),
 				status: normalizeStatusFilterValue(draftFilters.status),
 				cashierId: normalizeFilterValue(draftFilters.cashierId),
+				terminalName: normalizeFilterValue(draftFilters.terminalName),
+				paymentMethod: normalizeFilterValue(draftFilters.paymentMethod),
+				differenceStatus: normalizeDifferenceFilterValue(
+					draftFilters.differenceStatus,
+				),
+				hasMovements: normalizeMovementFilterValue(draftFilters.hasMovements),
 				startDate: normalizeFilterValue(draftFilters.startDate),
 				endDate: normalizeFilterValue(draftFilters.endDate),
 				cursor: undefined,
@@ -169,6 +203,10 @@ function ShiftsPage() {
 			q: "",
 			status: "",
 			cashierId: "",
+			terminalName: "",
+			paymentMethod: "",
+			differenceStatus: "",
+			hasMovements: "",
 			startDate: "",
 			endDate: "",
 		});
@@ -292,7 +330,8 @@ function ShiftsPage() {
 								</CardTitle>
 								<CardDescription className="mt-1 text-gray-400">
 									Busca por cajero, terminal, notas o id del turno y acota el
-									historial por estado y fecha de apertura.
+									historial por estado, método involucrado, movimientos
+									manuales, diferencia de cierre y fecha de apertura.
 								</CardDescription>
 							</div>
 							{activeFilterCount > 0 ? (
@@ -312,7 +351,7 @@ function ShiftsPage() {
 								applyFilters();
 							}}
 						>
-							<div className="grid gap-4 xl:grid-cols-[1.4fr_repeat(4,minmax(0,1fr))]">
+							<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
 								<div className="space-y-2">
 									<label className="text-sm text-gray-400" htmlFor={searchId}>
 										Busqueda
@@ -381,6 +420,117 @@ function ShiftsPage() {
 													{cashier.name}
 												</SelectItem>
 											))}
+										</SelectContent>
+									</Select>
+								</FilterField>
+
+								<FilterField label="Terminal" htmlFor={terminalId}>
+									<Select
+										value={draftFilters.terminalName || ALL_FILTER_VALUE}
+										onValueChange={(value) =>
+											setDraftFilters((current) => ({
+												...current,
+												terminalName: value === ALL_FILTER_VALUE ? "" : value,
+											}))
+										}
+									>
+										<SelectTrigger
+											id={terminalId}
+											className="h-8 w-full border-gray-700 bg-black/20 text-white"
+										>
+											<SelectValue placeholder="Todas" />
+										</SelectTrigger>
+										<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+											<SelectItem value={ALL_FILTER_VALUE}>Todas</SelectItem>
+											{initialData.filterOptions.terminals.map((terminal) => (
+												<SelectItem key={terminal} value={terminal}>
+													{terminal}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</FilterField>
+
+								<FilterField label="Metodo" htmlFor={paymentMethodId}>
+									<Select
+										value={draftFilters.paymentMethod || ALL_FILTER_VALUE}
+										onValueChange={(value) =>
+											setDraftFilters((current) => ({
+												...current,
+												paymentMethod: value === ALL_FILTER_VALUE ? "" : value,
+											}))
+										}
+									>
+										<SelectTrigger
+											id={paymentMethodId}
+											className="h-8 w-full border-gray-700 bg-black/20 text-white"
+										>
+											<SelectValue placeholder="Todos" />
+										</SelectTrigger>
+										<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+											<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+											{initialData.filterOptions.paymentMethods.map(
+												(paymentMethod) => (
+													<SelectItem
+														key={paymentMethod.id}
+														value={paymentMethod.id}
+													>
+														{paymentMethod.label}
+													</SelectItem>
+												),
+											)}
+										</SelectContent>
+									</Select>
+								</FilterField>
+							</div>
+
+							<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+								<FilterField label="Diferencia" htmlFor={differenceStatusId}>
+									<Select
+										value={draftFilters.differenceStatus || ALL_FILTER_VALUE}
+										onValueChange={(value) =>
+											setDraftFilters((current) => ({
+												...current,
+												differenceStatus:
+													value === ALL_FILTER_VALUE ? "" : value,
+											}))
+										}
+									>
+										<SelectTrigger
+											id={differenceStatusId}
+											className="h-8 w-full border-gray-700 bg-black/20 text-white"
+										>
+											<SelectValue placeholder="Todas" />
+										</SelectTrigger>
+										<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+											<SelectItem value={ALL_FILTER_VALUE}>Todas</SelectItem>
+											<SelectItem value="short">Faltante</SelectItem>
+											<SelectItem value="over">Sobrante</SelectItem>
+											<SelectItem value="balanced">Cuadrada</SelectItem>
+										</SelectContent>
+									</Select>
+								</FilterField>
+
+								<FilterField label="Movimientos" htmlFor={hasMovementsId}>
+									<Select
+										value={draftFilters.hasMovements || ALL_FILTER_VALUE}
+										onValueChange={(value) =>
+											setDraftFilters((current) => ({
+												...current,
+												hasMovements: value === ALL_FILTER_VALUE ? "" : value,
+											}))
+										}
+									>
+										<SelectTrigger
+											id={hasMovementsId}
+											className="h-8 w-full border-gray-700 bg-black/20 text-white"
+										>
+											<SelectValue placeholder="Todos" />
+										</SelectTrigger>
+										<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+											<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+											<SelectItem value="yes">Con movimientos</SelectItem>
+											<SelectItem value="no">Sin movimientos</SelectItem>
 										</SelectContent>
 									</Select>
 								</FilterField>
@@ -857,6 +1007,22 @@ function normalizeFilterValue(value: string) {
 
 function normalizeStatusFilterValue(value: string) {
 	if (value === "open" || value === "closed") {
+		return value;
+	}
+
+	return undefined;
+}
+
+function normalizeDifferenceFilterValue(value: string) {
+	if (value === "short" || value === "over" || value === "balanced") {
+		return value;
+	}
+
+	return undefined;
+}
+
+function normalizeMovementFilterValue(value: string) {
+	if (value === "yes" || value === "no") {
 		return value;
 	}
 

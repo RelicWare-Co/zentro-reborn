@@ -28,12 +28,13 @@ export const PAYMENT_METHOD_CATALOG = [
 export const PAYMENT_METHOD_IDS = PAYMENT_METHOD_CATALOG.map(
 	(method) => method.id,
 );
+export const PAYMENT_METHOD_ID_PATTERN = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
 
 export type PaymentMethodCatalogId =
 	(typeof PAYMENT_METHOD_CATALOG)[number]["id"];
 
 export type OrganizationPaymentMethodSettings = {
-	id: PaymentMethodCatalogId;
+	id: string;
 	label: string;
 	enabled: boolean;
 	requiresReference: boolean;
@@ -80,6 +81,10 @@ export const DEFAULT_ORGANIZATION_SETTINGS: OrganizationSettings = {
 	},
 };
 
+const PAYMENT_METHOD_CATALOG_BY_ID = new Map(
+	PAYMENT_METHOD_CATALOG.map((method) => [method.id, method]),
+);
+
 function toSafeString(value: unknown, fallback: string) {
 	if (typeof value !== "string") {
 		return fallback;
@@ -114,10 +119,107 @@ function toBoolean(value: unknown, fallback: boolean) {
 	return typeof value === "boolean" ? value : fallback;
 }
 
+export function normalizePaymentMethodId(value: unknown) {
+	if (typeof value !== "string") {
+		return "";
+	}
+
+	return value
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "_")
+		.replace(/^_+|_+$/g, "")
+		.replace(/_+/g, "_")
+		.slice(0, 40);
+}
+
+export function formatPaymentMethodIdLabel(methodId: string) {
+	const normalizedMethodId = normalizePaymentMethodId(methodId);
+	const catalogMethod = PAYMENT_METHOD_CATALOG_BY_ID.get(normalizedMethodId);
+	if (catalogMethod) {
+		return catalogMethod.label;
+	}
+
+	const source = normalizedMethodId || methodId.trim().toLowerCase();
+	if (!source) {
+		return "Metodo de pago";
+	}
+
+	return source
+		.split("_")
+		.filter(Boolean)
+		.map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+		.join(" ");
+}
+
+export function comparePaymentMethodIds(left: string, right: string) {
+	const leftId = normalizePaymentMethodId(left);
+	const rightId = normalizePaymentMethodId(right);
+
+	if (leftId === "cash") return -1;
+	if (rightId === "cash") return 1;
+
+	return leftId.localeCompare(rightId, "es-CO");
+}
+
+export function buildPaymentMethodLabelMap(
+	paymentMethods: Array<{ id: string; label: string }>,
+) {
+	return Object.fromEntries(
+		paymentMethods.map((paymentMethod) => [
+			normalizePaymentMethodId(paymentMethod.id),
+			paymentMethod.label,
+		]),
+	);
+}
+
+export function buildPaymentMethodOptions(
+	configuredPaymentMethods: Array<{ id: string; label: string }>,
+	extraMethodIds: Iterable<string> = [],
+) {
+	const options: Array<{ id: string; label: string }> = [];
+	const seenMethodIds = new Set<string>();
+
+	const addOption = (methodId: string, label?: string) => {
+		const normalizedMethodId = normalizePaymentMethodId(methodId);
+		if (!normalizedMethodId || seenMethodIds.has(normalizedMethodId)) {
+			return;
+		}
+
+		options.push({
+			id: normalizedMethodId,
+			label: toSafeString(label, formatPaymentMethodIdLabel(normalizedMethodId)),
+		});
+		seenMethodIds.add(normalizedMethodId);
+	};
+
+	for (const paymentMethod of configuredPaymentMethods) {
+		addOption(paymentMethod.id, paymentMethod.label);
+	}
+
+	const extraOptions = [...extraMethodIds]
+		.map((methodId) => normalizePaymentMethodId(methodId))
+		.filter((methodId, index, collection) => {
+			return (
+				methodId.length > 0 &&
+				!seenMethodIds.has(methodId) &&
+				collection.indexOf(methodId) === index
+			);
+		})
+		.sort(comparePaymentMethodIds);
+
+	for (const paymentMethodId of extraOptions) {
+		addOption(paymentMethodId);
+	}
+
+	return options;
+}
+
 function normalizePaymentMethods(
 	value: unknown,
 ): OrganizationPaymentMethodSettings[] {
 	const rawMethodsById = new Map<string, Record<string, unknown>>();
+	const customMethodIds: string[] = [];
 
 	if (Array.isArray(value)) {
 		for (const rawMethod of value) {
@@ -125,34 +227,57 @@ function normalizePaymentMethods(
 				continue;
 			}
 
-			const methodId =
-				"id" in rawMethod && typeof rawMethod.id === "string"
-					? rawMethod.id
-					: null;
+			const methodId = normalizePaymentMethodId(
+				"id" in rawMethod ? rawMethod.id : null,
+			);
 			if (!methodId) {
 				continue;
+			}
+
+			if (
+				!rawMethodsById.has(methodId) &&
+				!PAYMENT_METHOD_CATALOG_BY_ID.has(methodId)
+			) {
+				customMethodIds.push(methodId);
 			}
 
 			rawMethodsById.set(methodId, rawMethod as Record<string, unknown>);
 		}
 	}
 
-	const methods = PAYMENT_METHOD_CATALOG.map((catalogMethod) => {
-		const rawMethod = rawMethodsById.get(catalogMethod.id);
+	const methods = [
+		...PAYMENT_METHOD_CATALOG.map((catalogMethod) => {
+			const rawMethod = rawMethodsById.get(catalogMethod.id);
 
-		return {
-			id: catalogMethod.id,
-			label: catalogMethod.label,
-			enabled: toBoolean(rawMethod?.enabled, catalogMethod.defaultEnabled),
-			requiresReference:
-				catalogMethod.id === "cash"
-					? false
-					: toBoolean(
-							rawMethod?.requiresReference,
-							catalogMethod.defaultRequiresReference,
-						),
-		};
-	});
+			return {
+				id: catalogMethod.id,
+				label: toSafeString(rawMethod?.label, catalogMethod.label),
+				enabled:
+					catalogMethod.id === "cash"
+						? true
+						: toBoolean(rawMethod?.enabled, catalogMethod.defaultEnabled),
+				requiresReference:
+					catalogMethod.id === "cash"
+						? false
+						: toBoolean(
+								rawMethod?.requiresReference,
+								catalogMethod.defaultRequiresReference,
+							),
+			};
+		}),
+		...customMethodIds.map((methodId) => {
+			const rawMethod = rawMethodsById.get(methodId);
+			return {
+				id: methodId,
+				label: toSafeString(rawMethod?.label, formatPaymentMethodIdLabel(methodId)),
+				enabled: toBoolean(rawMethod?.enabled, true),
+				requiresReference:
+					methodId === "cash"
+						? false
+						: toBoolean(rawMethod?.requiresReference, true),
+			};
+		}),
+	];
 
 	if (methods.some((method) => method.enabled)) {
 		return methods;
@@ -248,6 +373,10 @@ export function serializeOrganizationSettingsMetadata(
 	settings: OrganizationSettings,
 ) {
 	return JSON.stringify(normalizeOrganizationSettings(settings));
+}
+
+export function getAllPaymentMethods(settings: OrganizationSettings) {
+	return settings.pos.paymentMethods;
 }
 
 export function getEnabledPaymentMethods(settings: OrganizationSettings) {

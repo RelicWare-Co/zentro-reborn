@@ -1,3 +1,8 @@
+import {
+	buildPaymentMethodLabelMap,
+	formatPaymentMethodIdLabel,
+	normalizePaymentMethodId,
+} from "@/features/settings/settings.shared";
 import { parseMoneyInput } from "@/lib/utils";
 import type { CartItem, CartTotals } from "./types";
 
@@ -16,18 +21,30 @@ export function formatCurrency(amount: number): string {
  * Retorna el label legible para un método de pago
  */
 export function formatPaymentMethodLabel(method: string): string {
-	switch (method) {
-		case "cash":
-			return "Efectivo";
-		case "card":
-			return "Tarjeta";
-		case "transfer_nequi":
-			return "Nequi";
-		case "transfer_bancolombia":
-			return "Bancolombia";
-		default:
-			return method.replaceAll("_", " ");
+	const normalizedMethodId = normalizePaymentMethodId(method);
+	return formatPaymentMethodLabelWithMap(normalizedMethodId);
+}
+
+export function createPaymentMethodLabelMap(
+	paymentMethods: Array<{ id: string; label: string }>,
+) {
+	return buildPaymentMethodLabelMap(paymentMethods);
+}
+
+export function formatPaymentMethodLabelWithMap(
+	method: string,
+	paymentMethodLabels?: Record<string, string>,
+) {
+	const normalizedMethodId = normalizePaymentMethodId(method);
+
+	if (
+		paymentMethodLabels &&
+		Object.hasOwn(paymentMethodLabels, normalizedMethodId)
+	) {
+		return paymentMethodLabels[normalizedMethodId] ?? formatPaymentMethodIdLabel(method);
 	}
+
+	return formatPaymentMethodIdLabel(method);
 }
 
 /**

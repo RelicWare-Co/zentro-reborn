@@ -16,6 +16,12 @@ import {
 } from "./pos.server";
 
 const nullableString = z.string().trim().optional().nullable();
+const nullableNonNegativeInteger = z.coerce
+	.number()
+	.int()
+	.min(0)
+	.optional()
+	.nullable();
 
 const searchPosProductsInputSchema = z.object({
 	searchQuery: nullableString,
@@ -36,6 +42,11 @@ const listSalesInputSchema = z.object({
 	status: nullableString,
 	searchQuery: nullableString,
 	paymentMethod: nullableString,
+	cashierId: nullableString,
+	terminalName: nullableString,
+	balanceStatus: z.enum(["with_balance", "settled"]).optional().nullable(),
+	amountMin: nullableNonNegativeInteger,
+	amountMax: nullableNonNegativeInteger,
 	startDate: nullableString,
 	endDate: nullableString,
 });
@@ -46,6 +57,10 @@ const listShiftsInputSchema = z.object({
 	status: nullableString,
 	searchQuery: nullableString,
 	cashierId: nullableString,
+	terminalName: nullableString,
+	paymentMethod: nullableString,
+	differenceStatus: z.enum(["short", "over", "balanced"]).optional().nullable(),
+	hasMovements: z.enum(["yes", "no"]).optional().nullable(),
 	startDate: nullableString,
 	endDate: nullableString,
 });
@@ -183,6 +198,11 @@ export const listSales = createServerFn({ method: "GET" })
 			status: data.status ?? undefined,
 			searchQuery: data.searchQuery ?? undefined,
 			paymentMethod: data.paymentMethod ?? undefined,
+			cashierId: data.cashierId ?? undefined,
+			terminalName: data.terminalName ?? undefined,
+			balanceStatus: data.balanceStatus ?? undefined,
+			amountMin: data.amountMin ?? undefined,
+			amountMax: data.amountMax ?? undefined,
 			startDate: data.startDate ?? undefined,
 			endDate: data.endDate ?? undefined,
 		});
@@ -197,6 +217,10 @@ export const listShifts = createServerFn({ method: "GET" })
 			status: data.status ?? undefined,
 			searchQuery: data.searchQuery ?? undefined,
 			cashierId: data.cashierId ?? undefined,
+			terminalName: data.terminalName ?? undefined,
+			paymentMethod: data.paymentMethod ?? undefined,
+			differenceStatus: data.differenceStatus ?? undefined,
+			hasMovements: data.hasMovements ?? undefined,
 			startDate: data.startDate ?? undefined,
 			endDate: data.endDate ?? undefined,
 		});

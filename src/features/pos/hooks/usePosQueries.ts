@@ -67,6 +67,11 @@ type SalesListParams = {
 	status?: string | null;
 	searchQuery?: string | null;
 	paymentMethod?: string | null;
+	cashierId?: string | null;
+	terminalName?: string | null;
+	balanceStatus?: "with_balance" | "settled" | null;
+	amountMin?: number | null;
+	amountMax?: number | null;
 	startDate?: string | null;
 	endDate?: string | null;
 };
@@ -82,6 +87,11 @@ function getSalesListQueryKey(params: SalesListParams = {}) {
 		params.status ?? "all",
 		params.searchQuery ?? "",
 		params.paymentMethod ?? "all",
+		params.cashierId ?? "all",
+		params.terminalName ?? "all",
+		params.balanceStatus ?? "all",
+		params.amountMin ?? "none",
+		params.amountMax ?? "none",
 		params.startDate ?? "",
 		params.endDate ?? "",
 	] as const;
@@ -94,6 +104,11 @@ function getSalesListServerInput(params: SalesListParams = {}) {
 		status: params.status ?? null,
 		searchQuery: params.searchQuery ?? null,
 		paymentMethod: params.paymentMethod ?? null,
+		cashierId: params.cashierId ?? null,
+		terminalName: params.terminalName ?? null,
+		balanceStatus: params.balanceStatus ?? null,
+		amountMin: params.amountMin ?? null,
+		amountMax: params.amountMax ?? null,
 		startDate: params.startDate ?? null,
 		endDate: params.endDate ?? null,
 	};

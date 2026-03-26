@@ -168,6 +168,11 @@ export async function listShiftsForCurrentOrganization(
 	const endDateMs = parseDateBoundary(input.endDate);
 	const endDateExclusiveMs =
 		endDateMs === null ? null : endDateMs + 24 * 60 * 60 * 1000;
+	const totalDifferenceExpression = sql<number>`coalesce((
+		select sum(${shiftClosure.difference})
+		from ${shiftClosure}
+		where ${shiftClosure.shiftId} = ${shift.id}
+	), 0)`;
 
 	const whereConditions = [eq(shift.organizationId, organizationId)];
 	if (input.status) {
@@ -175,6 +180,9 @@ export async function listShiftsForCurrentOrganization(
 	}
 	if (input.cashierId) {
 		whereConditions.push(eq(shift.userId, input.cashierId));
+	}
+	if (input.terminalName) {
+		whereConditions.push(eq(shift.terminalName, input.terminalName));
 	}
 	if (trimmedSearchQuery) {
 		const searchPattern = `%${trimmedSearchQuery}%`;
@@ -187,6 +195,67 @@ export async function listShiftsForCurrentOrganization(
 			)`,
 		);
 	}
+	if (input.paymentMethod) {
+		whereConditions.push(
+			sql`(
+				exists (
+					select 1
+					from ${payment}
+					where ${payment.organizationId} = ${organizationId}
+						and ${payment.shiftId} = ${shift.id}
+						and ${payment.method} = ${input.paymentMethod}
+				)
+				or exists (
+					select 1
+					from ${cashMovement}
+					where ${cashMovement.organizationId} = ${organizationId}
+						and ${cashMovement.shiftId} = ${shift.id}
+						and ${cashMovement.paymentMethod} = ${input.paymentMethod}
+				)
+				or exists (
+					select 1
+					from ${shiftClosure}
+					where ${shiftClosure.shiftId} = ${shift.id}
+						and ${shiftClosure.paymentMethod} = ${input.paymentMethod}
+				)
+			)`,
+		);
+	}
+	if (input.hasMovements === "yes") {
+		whereConditions.push(
+			sql`exists (
+				select 1
+				from ${cashMovement}
+				where ${cashMovement.organizationId} = ${organizationId}
+					and ${cashMovement.shiftId} = ${shift.id}
+			)`,
+		);
+	}
+	if (input.hasMovements === "no") {
+		whereConditions.push(
+			sql`not exists (
+				select 1
+				from ${cashMovement}
+				where ${cashMovement.organizationId} = ${organizationId}
+					and ${cashMovement.shiftId} = ${shift.id}
+			)`,
+		);
+	}
+	if (input.differenceStatus === "over") {
+		whereConditions.push(sql`${totalDifferenceExpression} > 0`);
+	}
+	if (input.differenceStatus === "short") {
+		whereConditions.push(sql`${totalDifferenceExpression} < 0`);
+	}
+	if (input.differenceStatus === "balanced") {
+		whereConditions.push(
+			sql`exists (
+				select 1
+				from ${shiftClosure}
+				where ${shiftClosure.shiftId} = ${shift.id}
+			) and ${totalDifferenceExpression} = 0`,
+		);
+	}
 	if (startDateMs !== null) {
 		whereConditions.push(gte(shift.openedAt, new Date(startDateMs)));
 	}
@@ -194,42 +263,74 @@ export async function listShiftsForCurrentOrganization(
 		whereConditions.push(lt(shift.openedAt, new Date(endDateExclusiveMs)));
 	}
 
-	const [shiftRows, totalRows, cashierRows] = await Promise.all([
-		db
-			.select({
-				id: shift.id,
-				userId: shift.userId,
-				cashierName: user.name,
-				terminalName: shift.terminalName,
-				status: shift.status,
-				startingCash: shift.startingCash,
-				openedAt: shift.openedAt,
-				closedAt: shift.closedAt,
-				notes: shift.notes,
-			})
-			.from(shift)
-			.innerJoin(user, eq(user.id, shift.userId))
-			.where(and(...whereConditions))
-			.orderBy(desc(shift.openedAt), desc(shift.id))
-			.limit(limit + 1)
-			.offset(cursor),
-		db
-			.select({
-				total: sql<number>`count(*)`,
-			})
-			.from(shift)
-			.innerJoin(user, eq(user.id, shift.userId))
-			.where(and(...whereConditions)),
-		db
-			.selectDistinct({
-				id: user.id,
-				name: user.name,
-			})
-			.from(shift)
-			.innerJoin(user, eq(user.id, shift.userId))
-			.where(eq(shift.organizationId, organizationId))
-			.orderBy(asc(user.name)),
-	]);
+	const [shiftRows, totalRows, cashierRows, terminalRows, organizationRows] =
+		await Promise.all([
+			db
+				.select({
+					id: shift.id,
+					userId: shift.userId,
+					cashierName: user.name,
+					terminalName: shift.terminalName,
+					status: shift.status,
+					startingCash: shift.startingCash,
+					openedAt: shift.openedAt,
+					closedAt: shift.closedAt,
+					notes: shift.notes,
+				})
+				.from(shift)
+				.innerJoin(user, eq(user.id, shift.userId))
+				.where(and(...whereConditions))
+				.orderBy(desc(shift.openedAt), desc(shift.id))
+				.limit(limit + 1)
+				.offset(cursor),
+			db
+				.select({
+					total: sql<number>`count(*)`,
+				})
+				.from(shift)
+				.innerJoin(user, eq(user.id, shift.userId))
+				.where(and(...whereConditions)),
+			db
+				.selectDistinct({
+					id: user.id,
+					name: user.name,
+				})
+				.from(shift)
+				.innerJoin(user, eq(user.id, shift.userId))
+				.where(eq(shift.organizationId, organizationId))
+				.orderBy(asc(user.name)),
+			db
+				.selectDistinct({
+					name: shift.terminalName,
+				})
+				.from(shift)
+				.where(
+					and(
+						eq(shift.organizationId, organizationId),
+						sql`${shift.terminalName} is not null`,
+					),
+				)
+				.orderBy(asc(shift.terminalName)),
+			db
+				.select({
+					metadata: organization.metadata,
+				})
+				.from(organization)
+				.where(eq(organization.id, organizationId))
+				.limit(1),
+		]);
+	const organizationSettings = parseOrganizationSettingsMetadata(
+		organizationRows[0]?.metadata,
+	);
+	const paymentMethods = getEnabledPaymentMethods(organizationSettings).map(
+		(paymentMethod) => ({
+			id: paymentMethod.id,
+			label: paymentMethod.label,
+		}),
+	);
+	const terminalNames = terminalRows
+		.map((terminal) => terminal.name)
+		.filter((terminalName): terminalName is string => Boolean(terminalName));
 
 	const pageRows = shiftRows.slice(0, limit);
 	const hasMore = shiftRows.length > limit;
@@ -244,6 +345,8 @@ export async function listShiftsForCurrentOrganization(
 			nextCursor,
 			filterOptions: {
 				cashiers: cashierRows,
+				terminals: terminalNames,
+				paymentMethods,
 			},
 		};
 	}
@@ -514,6 +617,8 @@ export async function listShiftsForCurrentOrganization(
 		nextCursor,
 		filterOptions: {
 			cashiers: cashierRows,
+			terminals: terminalNames,
+			paymentMethods,
 		},
 	};
 }

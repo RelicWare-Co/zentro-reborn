@@ -60,11 +60,12 @@ const ALL_FILTER_VALUE = "all";
 const SALES_VIEW_VALUES = ["today", "history"] as const;
 const DEFAULT_SALES_VIEW = "today" as const;
 const SALE_STATUS_VALUES = ["completed", "credit", "cancelled"] as const;
-const SALE_PAYMENT_METHOD_VALUES = [
-	"cash",
-	"card",
-	"transfer_nequi",
-	"transfer_bancolombia",
+const SALE_BALANCE_STATUS_VALUES = ["with_balance", "settled"] as const;
+const DEFAULT_PAYMENT_METHOD_OPTIONS = [
+	{ id: "cash", label: "Efectivo" },
+	{ id: "card", label: "Tarjeta" },
+	{ id: "transfer_nequi", label: "Nequi" },
+	{ id: "transfer_bancolombia", label: "Bancolombia" },
 ] as const;
 const SALES_LOADING_FEEDBACK_DELAY_MS = 120;
 const SALES_LOADING_FEEDBACK_MIN_VISIBLE_MS = 420;
@@ -75,9 +76,12 @@ const salesSearchSchema = z.object({
 	view: z.enum(SALES_VIEW_VALUES).optional(),
 	q: z.string().optional(),
 	status: z.enum(["completed", "credit", "cancelled"]).optional(),
-	paymentMethod: z
-		.enum(["cash", "card", "transfer_nequi", "transfer_bancolombia"])
-		.optional(),
+	paymentMethod: z.string().optional(),
+	cashierId: z.string().optional(),
+	terminalName: z.string().optional(),
+	balanceStatus: z.enum(SALE_BALANCE_STATUS_VALUES).optional(),
+	amountMin: z.coerce.number().int().min(0).optional(),
+	amountMax: z.coerce.number().int().min(0).optional(),
 	startDate: z.string().optional(),
 	endDate: z.string().optional(),
 	cursor: z.coerce.number().int().min(0).optional(),
@@ -114,6 +118,11 @@ function SalesPage() {
 	const salesSearchId = useId();
 	const salesStatusId = useId();
 	const salesPaymentMethodId = useId();
+	const salesCashierId = useId();
+	const salesTerminalId = useId();
+	const salesBalanceStatusId = useId();
+	const salesAmountMinId = useId();
+	const salesAmountMaxId = useId();
 	const salesStartDateId = useId();
 	const salesEndDateId = useId();
 	const queryClient = useQueryClient();
@@ -129,7 +138,11 @@ function SalesPage() {
 	const salesListParams = buildSalesListParams(search, todayDate);
 	const salesQuery = useSalesList(salesListParams, initialSales);
 	const sales = salesQuery.data?.data ?? [];
+	const salesFilterOptions =
+		salesQuery.data?.filterOptions ?? initialSales.filterOptions;
 	const creditAccounts = creditAccountsSearchResult?.data ?? [];
+	const paymentMethodOptions =
+		posBootstrap?.settings.paymentMethods ?? DEFAULT_PAYMENT_METHOD_OPTIONS;
 	const pageSize = search.pageSize ?? DEFAULT_LIST_PARAMS.limit;
 	const cursor = search.cursor ?? DEFAULT_LIST_PARAMS.cursor;
 	const [selectedSaleId, setSelectedSaleId] = useState<string | null>(
@@ -140,6 +153,11 @@ function SalesPage() {
 		q: search.q ?? "",
 		status: search.status ?? "",
 		paymentMethod: search.paymentMethod ?? "",
+		cashierId: search.cashierId ?? "",
+		terminalName: search.terminalName ?? "",
+		balanceStatus: search.balanceStatus ?? "",
+		amountMin: search.amountMin !== undefined ? String(search.amountMin) : "",
+		amountMax: search.amountMax !== undefined ? String(search.amountMax) : "",
 		startDate: search.startDate ?? "",
 		endDate: search.endDate ?? "",
 	}));
@@ -171,15 +189,25 @@ function SalesPage() {
 			q: search.q ?? "",
 			status: search.status ?? "",
 			paymentMethod: search.paymentMethod ?? "",
+			cashierId: search.cashierId ?? "",
+			terminalName: search.terminalName ?? "",
+			balanceStatus: search.balanceStatus ?? "",
+			amountMin: search.amountMin !== undefined ? String(search.amountMin) : "",
+			amountMax: search.amountMax !== undefined ? String(search.amountMax) : "",
 			startDate: search.startDate ?? "",
 			endDate: search.endDate ?? "",
 		});
 	}, [
+		search.amountMax,
+		search.amountMin,
+		search.balanceStatus,
+		search.cashierId,
 		search.endDate,
 		search.paymentMethod,
 		search.q,
 		search.startDate,
 		search.status,
+		search.terminalName,
 	]);
 
 	useEffect(() => {
@@ -239,6 +267,11 @@ function SalesPage() {
 		search.q,
 		search.status,
 		search.paymentMethod,
+		search.cashierId,
+		search.terminalName,
+		search.balanceStatus,
+		search.amountMin,
+		search.amountMax,
 		...(isTodayView ? [] : [search.startDate, search.endDate]),
 	].filter(Boolean).length;
 	const isSalesViewRefreshing = isViewPending || salesQuery.isFetching;
@@ -375,6 +408,11 @@ function SalesPage() {
 			q: "",
 			status: "",
 			paymentMethod: "",
+			cashierId: "",
+			terminalName: "",
+			balanceStatus: "",
+			amountMin: "",
+			amountMax: "",
 			startDate: "",
 			endDate: "",
 		});
@@ -402,6 +440,11 @@ function SalesPage() {
 			q: search.q ?? "",
 			status: search.status ?? "",
 			paymentMethod: search.paymentMethod ?? "",
+			cashierId: search.cashierId ?? "",
+			terminalName: search.terminalName ?? "",
+			balanceStatus: search.balanceStatus ?? "",
+			amountMin: search.amountMin !== undefined ? String(search.amountMin) : "",
+			amountMax: search.amountMax !== undefined ? String(search.amountMax) : "",
 			startDate: search.startDate ?? "",
 			endDate: search.endDate ?? "",
 		});
@@ -559,13 +602,7 @@ function SalesPage() {
 							</div>
 
 							<div className="space-y-3">
-								<div
-									className={`grid gap-3 ${
-										isTodayView
-											? "md:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,180px))_minmax(220px,0.9fr)]"
-											: "md:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,180px))_repeat(2,minmax(0,150px))]"
-									}`}
-								>
+								<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
 									<div className="space-y-2">
 										<label
 											className="text-xs font-medium tracking-[0.16em] text-gray-500 uppercase"
@@ -642,18 +679,148 @@ function SalesPage() {
 											</SelectTrigger>
 											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
 												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-												<SelectItem value="cash">Efectivo</SelectItem>
-												<SelectItem value="card">Tarjeta</SelectItem>
-												<SelectItem value="transfer_nequi">Nequi</SelectItem>
-												<SelectItem value="transfer_bancolombia">
-													Bancolombia
-												</SelectItem>
+												{paymentMethodOptions.map((paymentMethod) => (
+													<SelectItem
+														key={paymentMethod.id}
+														value={paymentMethod.id}
+													>
+														{paymentMethod.label}
+													</SelectItem>
+												))}
 											</SelectContent>
 										</Select>
 									</FilterField>
 
+									<FilterField label="Cajero" htmlFor={salesCashierId}>
+										<Select
+											value={draftFilters.cashierId || ALL_FILTER_VALUE}
+											onValueChange={(value) =>
+												setDraftFilters((current) => ({
+													...current,
+													cashierId: value === ALL_FILTER_VALUE ? "" : value,
+												}))
+											}
+										>
+											<SelectTrigger
+												id={salesCashierId}
+												className="h-10 w-full border-gray-700 bg-black/20 text-white"
+											>
+												<SelectValue placeholder="Todos" />
+											</SelectTrigger>
+											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+												{salesFilterOptions.cashiers.map((cashier) => (
+													<SelectItem key={cashier.id} value={cashier.id}>
+														{cashier.name}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</FilterField>
+
+									<FilterField label="Terminal" htmlFor={salesTerminalId}>
+										<Select
+											value={draftFilters.terminalName || ALL_FILTER_VALUE}
+											onValueChange={(value) =>
+												setDraftFilters((current) => ({
+													...current,
+													terminalName: value === ALL_FILTER_VALUE ? "" : value,
+												}))
+											}
+										>
+											<SelectTrigger
+												id={salesTerminalId}
+												className="h-10 w-full border-gray-700 bg-black/20 text-white"
+											>
+												<SelectValue placeholder="Todas" />
+											</SelectTrigger>
+											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+												<SelectItem value={ALL_FILTER_VALUE}>Todas</SelectItem>
+												{salesFilterOptions.terminals.map((terminal) => (
+													<SelectItem key={terminal} value={terminal}>
+														{terminal}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</FilterField>
+								</div>
+
+								<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+									<FilterField
+										label="Estado de saldo"
+										htmlFor={salesBalanceStatusId}
+									>
+										<Select
+											value={draftFilters.balanceStatus || ALL_FILTER_VALUE}
+											onValueChange={(value) =>
+												setDraftFilters((current) => ({
+													...current,
+													balanceStatus:
+														value === ALL_FILTER_VALUE ? "" : value,
+												}))
+											}
+										>
+											<SelectTrigger
+												id={salesBalanceStatusId}
+												className="h-10 w-full border-gray-700 bg-black/20 text-white"
+											>
+												<SelectValue placeholder="Todos" />
+											</SelectTrigger>
+											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+												<SelectItem value="with_balance">
+													Con saldo pendiente
+												</SelectItem>
+												<SelectItem value="settled">Sin saldo</SelectItem>
+											</SelectContent>
+										</Select>
+									</FilterField>
+
+									<FilterField label="Monto mínimo" htmlFor={salesAmountMinId}>
+										<Input
+											id={salesAmountMinId}
+											name="amountMin"
+											autoComplete="off"
+											inputMode="numeric"
+											min={0}
+											step={500}
+											type="number"
+											value={draftFilters.amountMin}
+											onChange={(event) =>
+												setDraftFilters((current) => ({
+													...current,
+													amountMin: event.target.value,
+												}))
+											}
+											placeholder="Ej. 5000…"
+											className="h-10 border-gray-700 bg-black/20 text-white placeholder:text-gray-500"
+										/>
+									</FilterField>
+
+									<FilterField label="Monto máximo" htmlFor={salesAmountMaxId}>
+										<Input
+											id={salesAmountMaxId}
+											name="amountMax"
+											autoComplete="off"
+											inputMode="numeric"
+											min={0}
+											step={500}
+											type="number"
+											value={draftFilters.amountMax}
+											onChange={(event) =>
+												setDraftFilters((current) => ({
+													...current,
+													amountMax: event.target.value,
+												}))
+											}
+											placeholder="Ej. 25000…"
+											className="h-10 border-gray-700 bg-black/20 text-white placeholder:text-gray-500"
+										/>
+									</FilterField>
+
 									{isTodayView ? (
-										<div className="flex items-end">
+										<div className="flex items-end xl:col-span-2">
 											<div className="w-full rounded-2xl border border-dashed border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/5 px-4 py-2.5 text-sm text-gray-300">
 												<p className="font-medium text-white">
 													Fecha fija en hoy
@@ -894,6 +1061,11 @@ function buildSearchFromDraftFilters({
 		q: string;
 		status: string;
 		paymentMethod: string;
+		cashierId: string;
+		terminalName: string;
+		balanceStatus: string;
+		amountMin: string;
+		amountMax: string;
 		startDate: string;
 		endDate: string;
 	};
@@ -901,15 +1073,25 @@ function buildSearchFromDraftFilters({
 	pageSize: number;
 	search: Record<string, unknown>;
 }) {
+	const resolvedAmountRange = resolveNumericRangeFilters(
+		draftFilters.amountMin,
+		draftFilters.amountMax,
+	);
+
 	return {
 		...search,
 		view: activeView !== DEFAULT_SALES_VIEW ? activeView : undefined,
 		q: normalizeFilterValue(draftFilters.q),
 		status: normalizeEnumFilterValue(draftFilters.status, SALE_STATUS_VALUES),
-		paymentMethod: normalizeEnumFilterValue(
-			draftFilters.paymentMethod,
-			SALE_PAYMENT_METHOD_VALUES,
+		paymentMethod: normalizeFilterValue(draftFilters.paymentMethod),
+		cashierId: normalizeFilterValue(draftFilters.cashierId),
+		terminalName: normalizeFilterValue(draftFilters.terminalName),
+		balanceStatus: normalizeEnumFilterValue(
+			draftFilters.balanceStatus,
+			SALE_BALANCE_STATUS_VALUES,
 		),
+		amountMin: resolvedAmountRange.minimum ?? undefined,
+		amountMax: resolvedAmountRange.maximum ?? undefined,
 		startDate:
 			activeView === "today"
 				? undefined
@@ -930,6 +1112,10 @@ function buildSalesListParams(search: SalesSearch, todayDate: string) {
 		search.endDate,
 		todayDate,
 	);
+	const resolvedAmountRange = resolveNumericRangeFilters(
+		search.amountMin,
+		search.amountMax,
+	);
 
 	return {
 		limit: search.pageSize ?? DEFAULT_LIST_PARAMS.limit,
@@ -937,6 +1123,11 @@ function buildSalesListParams(search: SalesSearch, todayDate: string) {
 		searchQuery: search.q ?? null,
 		status: search.status ?? null,
 		paymentMethod: search.paymentMethod ?? null,
+		cashierId: search.cashierId ?? null,
+		terminalName: search.terminalName ?? null,
+		balanceStatus: search.balanceStatus ?? null,
+		amountMin: resolvedAmountRange.minimum,
+		amountMax: resolvedAmountRange.maximum,
 		startDate: resolvedDateFilters.startDate,
 		endDate: resolvedDateFilters.endDate,
 	};
@@ -951,6 +1142,11 @@ function areSalesSearchValuesEqual(
 		currentSearch.q === nextSearch.q &&
 		currentSearch.status === nextSearch.status &&
 		currentSearch.paymentMethod === nextSearch.paymentMethod &&
+		currentSearch.cashierId === nextSearch.cashierId &&
+		currentSearch.terminalName === nextSearch.terminalName &&
+		currentSearch.balanceStatus === nextSearch.balanceStatus &&
+		currentSearch.amountMin === nextSearch.amountMin &&
+		currentSearch.amountMax === nextSearch.amountMax &&
 		currentSearch.startDate === nextSearch.startDate &&
 		currentSearch.endDate === nextSearch.endDate &&
 		currentSearch.cursor === nextSearch.cursor &&
@@ -1175,6 +1371,52 @@ function formatItemCountLabel(itemCount: number) {
 function normalizeFilterValue(value: string) {
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeNonNegativeIntegerFilterValue(
+	value: number | string | null | undefined,
+) {
+	if (typeof value === "number") {
+		return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : null;
+	}
+
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		if (!trimmed) {
+			return null;
+		}
+
+		const parsedValue = Number(trimmed);
+		return Number.isFinite(parsedValue) && parsedValue >= 0
+			? Math.trunc(parsedValue)
+			: null;
+	}
+
+	return null;
+}
+
+function resolveNumericRangeFilters(
+	minimum: number | string | null | undefined,
+	maximum: number | string | null | undefined,
+) {
+	const normalizedMinimum = normalizeNonNegativeIntegerFilterValue(minimum);
+	const normalizedMaximum = normalizeNonNegativeIntegerFilterValue(maximum);
+
+	if (
+		normalizedMinimum !== null &&
+		normalizedMaximum !== null &&
+		normalizedMinimum > normalizedMaximum
+	) {
+		return {
+			minimum: normalizedMaximum,
+			maximum: normalizedMinimum,
+		};
+	}
+
+	return {
+		minimum: normalizedMinimum,
+		maximum: normalizedMaximum,
+	};
 }
 
 function normalizeEnumFilterValue<T extends readonly string[]>(

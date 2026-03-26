@@ -1182,6 +1182,141 @@ describe("pos server modules", () => {
 					customerName: "Cliente Historial",
 				}),
 			);
+
+			const pendingBalanceSales =
+				await salesHistoryServer.listSalesForCurrentOrganization({
+					balanceStatus: "with_balance",
+				});
+			expect(pendingBalanceSales.data).toHaveLength(1);
+			expect(pendingBalanceSales.data[0]).toEqual(
+				expect.objectContaining({
+					status: "credit",
+					terminalName: "Caja Historial",
+				}),
+			);
+
+			const settledSales =
+				await salesHistoryServer.listSalesForCurrentOrganization({
+					balanceStatus: "settled",
+					amountMin: 7000,
+				});
+			expect(settledSales.data).toHaveLength(1);
+			expect(settledSales.data[0]).toEqual(
+				expect.objectContaining({
+					status: "completed",
+					totalAmount: 8000,
+				}),
+			);
+
+			const cashierSales =
+				await salesHistoryServer.listSalesForCurrentOrganization({
+					cashierId: ctx.userId,
+					terminalName: "Caja Historial",
+				});
+			expect(cashierSales.data).toHaveLength(2);
+			expect(cashierSales.filterOptions.terminals).toContain("Caja Historial");
+			expect(cashierSales.filterOptions.cashiers).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						id: ctx.userId,
+					}),
+				]),
+			);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("lists shifts with advanced filters and filter options", async () => {
+		const { ctx, shiftsServer, salesServer } = await setupPosServers();
+		try {
+			const firstShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 5000,
+				terminalId: "terminal-1",
+				terminalName: "Caja Norte",
+			});
+			const cashProductId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Producto Efectivo",
+				price: 1000,
+				trackInventory: false,
+				stock: 0,
+			});
+
+			await salesServer.createPosSaleForCurrentOrganization({
+				shiftId: firstShift.id,
+				items: [{ productId: cashProductId, quantity: 1 }],
+				payments: [{ method: "cash", amount: 1000 }],
+			});
+			await shiftsServer.registerCashMovementForCurrentOrganization({
+				shiftId: firstShift.id,
+				type: "inflow",
+				paymentMethod: "cash",
+				amount: 200,
+				description: "Ingreso de caja",
+			});
+			await shiftsServer.closeShiftForCurrentOrganization({
+				shiftId: firstShift.id,
+				closures: [{ paymentMethod: "cash", actualAmount: 6100 }],
+			});
+
+			const secondShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 3000,
+				terminalId: "terminal-2",
+				terminalName: "Caja Sur",
+			});
+			const cardProductId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Producto Tarjeta",
+				price: 4000,
+				trackInventory: false,
+				stock: 0,
+			});
+
+			await salesServer.createPosSaleForCurrentOrganization({
+				shiftId: secondShift.id,
+				items: [{ productId: cardProductId, quantity: 1 }],
+				payments: [{ method: "card", amount: 4000 }],
+			});
+			await shiftsServer.closeShiftForCurrentOrganization({
+				shiftId: secondShift.id,
+				closures: [
+					{ paymentMethod: "cash", actualAmount: 3000 },
+					{ paymentMethod: "card", actualAmount: 4000 },
+				],
+			});
+
+			const shiftsWithMovements =
+				await shiftsServer.listShiftsForCurrentOrganization({
+					hasMovements: "yes",
+				});
+			expect(shiftsWithMovements.data).toHaveLength(1);
+			expect(shiftsWithMovements.data[0]?.id).toBe(firstShift.id);
+
+			const shortShifts = await shiftsServer.listShiftsForCurrentOrganization({
+				differenceStatus: "short",
+			});
+			expect(shortShifts.data).toHaveLength(1);
+			expect(shortShifts.data[0]?.id).toBe(firstShift.id);
+
+			const cardShifts = await shiftsServer.listShiftsForCurrentOrganization({
+				paymentMethod: "card",
+				terminalName: "Caja Sur",
+			});
+			expect(cardShifts.data).toHaveLength(1);
+			expect(cardShifts.data[0]?.id).toBe(secondShift.id);
+
+			expect(cardShifts.filterOptions.terminals).toEqual(
+				expect.arrayContaining(["Caja Norte", "Caja Sur"]),
+			);
+			expect(cardShifts.filterOptions.paymentMethods).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ id: "cash" }),
+					expect.objectContaining({ id: "card" }),
+				]),
+			);
 		} finally {
 			ctx.cleanup();
 		}

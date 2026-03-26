@@ -64,6 +64,11 @@ export type ListSalesInput = {
 	status?: string | null;
 	searchQuery?: string | null;
 	paymentMethod?: string | null;
+	cashierId?: string | null;
+	terminalName?: string | null;
+	balanceStatus?: "with_balance" | "settled" | null;
+	amountMin?: number | null;
+	amountMax?: number | null;
 	startDate?: string | null;
 	endDate?: string | null;
 };
@@ -74,6 +79,10 @@ export type ListShiftsInput = {
 	status?: string | null;
 	searchQuery?: string | null;
 	cashierId?: string | null;
+	terminalName?: string | null;
+	paymentMethod?: string | null;
+	differenceStatus?: "short" | "over" | "balanced" | null;
+	hasMovements?: "yes" | "no" | null;
 	startDate?: string | null;
 	endDate?: string | null;
 };

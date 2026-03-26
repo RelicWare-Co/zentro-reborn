@@ -1,9 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
-	type ColumnFiltersState,
 	flexRender,
 	getCoreRowModel,
-	getFilteredRowModel,
 	getPaginationRowModel,
 	getSortedRowModel,
 	useReactTable,
@@ -17,8 +15,17 @@ import {
 	Search,
 	Trash2,
 } from "lucide-react";
-import { useCallback, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { z } from "zod";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import {
 	Dialog,
 	DialogContent,
@@ -62,7 +69,34 @@ import {
 import { getProducts } from "@/features/products/products.functions";
 import { cn } from "@/lib/utils";
 
+const PRODUCT_TAB_VALUES = ["products", "categories"] as const;
+const PRODUCT_TYPE_VALUES = ["standard", "modifier"] as const;
+const INVENTORY_TRACKING_VALUES = ["tracked", "untracked"] as const;
+const PRODUCT_STOCK_STATUS_VALUES = [
+	"available",
+	"low",
+	"out",
+	"negative",
+	"untracked",
+] as const;
+const ALL_FILTER_VALUE = "all";
+const UNCATEGORIZED_FILTER_VALUE = "uncategorized";
+
+const productsSearchSchema = z.object({
+	tab: z.enum(PRODUCT_TAB_VALUES).optional(),
+	q: z.string().optional(),
+	categoryId: z.string().optional(),
+	productType: z.enum(PRODUCT_TYPE_VALUES).optional(),
+	inventoryTracking: z.enum(INVENTORY_TRACKING_VALUES).optional(),
+	stockStatus: z.enum(PRODUCT_STOCK_STATUS_VALUES).optional(),
+	priceMin: z.coerce.number().int().min(0).optional(),
+	priceMax: z.coerce.number().int().min(0).optional(),
+	costMin: z.coerce.number().int().min(0).optional(),
+	costMax: z.coerce.number().int().min(0).optional(),
+});
+
 export const Route = createFileRoute("/_auth/products")({
+	validateSearch: productsSearchSchema,
 	loader: () => getProducts(),
 	component: ProductsPage,
 });
@@ -74,9 +108,9 @@ const currencyFormatter = new Intl.NumberFormat("es-CO", {
 const normalizeSearchTerm = (value: string) => value.trim().toLowerCase();
 
 function ProductsPage() {
+	const navigate = useNavigate({ from: Route.fullPath });
+	const search = Route.useSearch();
 	const loaderProducts = Route.useLoaderData();
-	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-	const [globalFilter, setGlobalFilter] = useState("");
 	const [rowSelection, setRowSelection] = useState({});
 	const [isSheetOpen, setIsSheetOpen] = useState(false);
 	const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -113,6 +147,28 @@ function ProductsPage() {
 		null,
 	);
 
+	const activeTab = search.tab ?? "products";
+	const [draftFilters, setDraftFilters] = useState(() => ({
+		q: search.q ?? "",
+		categoryId: search.categoryId ?? "",
+		productType: search.productType ?? "",
+		inventoryTracking: search.inventoryTracking ?? "",
+		stockStatus: search.stockStatus ?? "",
+		priceMin: search.priceMin !== undefined ? String(search.priceMin) : "",
+		priceMax: search.priceMax !== undefined ? String(search.priceMax) : "",
+		costMin: search.costMin !== undefined ? String(search.costMin) : "",
+		costMax: search.costMax !== undefined ? String(search.costMax) : "",
+	}));
+
+	const productSearchId = useId();
+	const categoryFilterId = useId();
+	const productTypeId = useId();
+	const inventoryTrackingId = useId();
+	const stockStatusId = useId();
+	const priceMinId = useId();
+	const priceMaxId = useId();
+	const costMinId = useId();
+	const costMaxId = useId();
 	const categoryNameId = useId();
 	const categoryDescriptionId = useId();
 	const inventoryTypeId = useId();
@@ -125,6 +181,17 @@ function ProductsPage() {
 	const inventoryEntryPriceId = useId();
 
 	const { products, categories } = useProductsQueries(loaderProducts);
+	const activeFilterCount = [
+		search.q,
+		search.categoryId,
+		search.productType,
+		search.inventoryTracking,
+		search.stockStatus,
+		search.priceMin,
+		search.priceMax,
+		search.costMin,
+		search.costMax,
+	].filter(Boolean).length;
 	const trackedProducts = useMemo(
 		() => products.filter((product) => product.trackInventory),
 		[products],
@@ -146,6 +213,185 @@ function ProductsPage() {
 			)
 			.slice(0, 8);
 	}, [inventoryEntrySearch, trackedProducts]);
+
+	useEffect(() => {
+		setDraftFilters({
+			q: search.q ?? "",
+			categoryId: search.categoryId ?? "",
+			productType: search.productType ?? "",
+			inventoryTracking: search.inventoryTracking ?? "",
+			stockStatus: search.stockStatus ?? "",
+			priceMin: search.priceMin !== undefined ? String(search.priceMin) : "",
+			priceMax: search.priceMax !== undefined ? String(search.priceMax) : "",
+			costMin: search.costMin !== undefined ? String(search.costMin) : "",
+			costMax: search.costMax !== undefined ? String(search.costMax) : "",
+		});
+	}, [
+		search.categoryId,
+		search.costMax,
+		search.costMin,
+		search.inventoryTracking,
+		search.priceMax,
+		search.priceMin,
+		search.productType,
+		search.q,
+		search.stockStatus,
+	]);
+
+	const filteredProducts = useMemo(() => {
+		const query = normalizeSearchTerm(search.q ?? "");
+		const priceRange = resolveNumericRangeFilters(
+			search.priceMin,
+			search.priceMax,
+		);
+		const costRange = resolveNumericRangeFilters(
+			search.costMin,
+			search.costMax,
+		);
+
+		return products.filter((product) => {
+			if (query) {
+				const searchableFields = [
+					product.name,
+					product.sku,
+					product.barcode,
+					product.categoryName,
+				]
+					.filter(Boolean)
+					.map((field) => field?.toLowerCase() ?? "");
+
+				if (!searchableFields.some((field) => field.includes(query))) {
+					return false;
+				}
+			}
+
+			if (search.categoryId === UNCATEGORIZED_FILTER_VALUE) {
+				if (product.categoryId) {
+					return false;
+				}
+			} else if (
+				search.categoryId &&
+				product.categoryId !== search.categoryId
+			) {
+				return false;
+			}
+
+			if (search.productType === "modifier" && !product.isModifier) {
+				return false;
+			}
+			if (search.productType === "standard" && product.isModifier) {
+				return false;
+			}
+
+			if (search.inventoryTracking === "tracked" && !product.trackInventory) {
+				return false;
+			}
+			if (search.inventoryTracking === "untracked" && product.trackInventory) {
+				return false;
+			}
+
+			if (!matchesProductStockStatus(product, search.stockStatus)) {
+				return false;
+			}
+
+			if (priceRange.minimum !== null && product.price < priceRange.minimum) {
+				return false;
+			}
+			if (priceRange.maximum !== null && product.price > priceRange.maximum) {
+				return false;
+			}
+			if (costRange.minimum !== null && product.cost < costRange.minimum) {
+				return false;
+			}
+			if (costRange.maximum !== null && product.cost > costRange.maximum) {
+				return false;
+			}
+
+			return true;
+		});
+	}, [
+		products,
+		search.categoryId,
+		search.costMax,
+		search.costMin,
+		search.inventoryTracking,
+		search.priceMax,
+		search.priceMin,
+		search.productType,
+		search.q,
+		search.stockStatus,
+	]);
+
+	const applyFilters = () => {
+		const priceRange = resolveNumericRangeFilters(
+			draftFilters.priceMin,
+			draftFilters.priceMax,
+		);
+		const costRange = resolveNumericRangeFilters(
+			draftFilters.costMin,
+			draftFilters.costMax,
+		);
+
+		void navigate({
+			search: {
+				tab: activeTab !== "products" ? activeTab : undefined,
+				q: normalizeFilterValue(draftFilters.q),
+				categoryId: normalizeCategoryFilterValue(draftFilters.categoryId),
+				productType: normalizeEnumFilterValue(
+					draftFilters.productType,
+					PRODUCT_TYPE_VALUES,
+				),
+				inventoryTracking: normalizeEnumFilterValue(
+					draftFilters.inventoryTracking,
+					INVENTORY_TRACKING_VALUES,
+				),
+				stockStatus: normalizeEnumFilterValue(
+					draftFilters.stockStatus,
+					PRODUCT_STOCK_STATUS_VALUES,
+				),
+				priceMin: priceRange.minimum ?? undefined,
+				priceMax: priceRange.maximum ?? undefined,
+				costMin: costRange.minimum ?? undefined,
+				costMax: costRange.maximum ?? undefined,
+			},
+			replace: true,
+		});
+	};
+
+	const clearFilters = () => {
+		setDraftFilters({
+			q: "",
+			categoryId: "",
+			productType: "",
+			inventoryTracking: "",
+			stockStatus: "",
+			priceMin: "",
+			priceMax: "",
+			costMin: "",
+			costMax: "",
+		});
+		void navigate({
+			search: {
+				tab: activeTab !== "products" ? activeTab : undefined,
+			},
+			replace: true,
+		});
+	};
+
+	const handleTabChange = (value: string) => {
+		const nextTab = normalizeEnumFilterValue(value, PRODUCT_TAB_VALUES);
+		if (!nextTab || nextTab === activeTab) {
+			return;
+		}
+
+		void navigate({
+			search: {
+				...search,
+				tab: nextTab !== "products" ? nextTab : undefined,
+			},
+			replace: true,
+		});
+	};
 
 	const closeSheet = useCallback(() => {
 		setIsSheetOpen(false);
@@ -223,18 +469,13 @@ function ProductsPage() {
 	);
 
 	const table = useReactTable({
-		data: products,
+		data: filteredProducts,
 		columns,
 		getCoreRowModel: getCoreRowModel(),
 		getPaginationRowModel: getPaginationRowModel(),
 		getSortedRowModel: getSortedRowModel(),
-		getFilteredRowModel: getFilteredRowModel(),
-		onColumnFiltersChange: setColumnFilters,
-		onGlobalFilterChange: setGlobalFilter,
 		onRowSelectionChange: setRowSelection,
 		state: {
-			columnFilters,
-			globalFilter,
 			rowSelection,
 		},
 		initialState: {
@@ -243,6 +484,10 @@ function ProductsPage() {
 			},
 		},
 	});
+
+	useEffect(() => {
+		table.setPageIndex(0);
+	}, [table]);
 
 	const formError =
 		createProductMutation.error instanceof Error
@@ -478,14 +723,41 @@ function ProductsPage() {
 
 	return (
 		<main className="flex-1 p-6 md:p-8 lg:p-12 space-y-6 bg-[var(--color-void)] text-[var(--color-photon)] font-sans">
-			<div className="flex items-baseline gap-3">
-				<h1 className="text-3xl font-bold tracking-tight">Inventario</h1>
-				<span className="text-gray-400 text-sm">
-					({products.length} productos, {categories.length} categorías)
-				</span>
+			<div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+				<div className="flex items-baseline gap-3">
+					<h1 className="text-3xl font-bold tracking-tight">Inventario</h1>
+					<span className="text-gray-400 text-sm">
+						{activeFilterCount > 0
+							? `${filteredProducts.length} de ${products.length} productos visibles`
+							: `${products.length} productos, ${categories.length} categorías`}
+					</span>
+				</div>
+
+				<div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+					<Button
+						variant="outline"
+						className="bg-[var(--color-carbon)] border-gray-800 text-gray-300 hover:bg-white/5 hover:text-white rounded-lg px-4 py-2 h-10 w-full sm:w-auto shrink-0"
+						onClick={() => openInventoryEntryDialog()}
+					>
+						<PackagePlus className="w-4 h-4 mr-2" aria-hidden="true" />
+						Entrada de inventario
+					</Button>
+
+					<Button
+						className="bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-semibold rounded-lg px-4 py-2 h-10 w-full sm:w-auto shrink-0"
+						onClick={() => setIsSheetOpen(true)}
+					>
+						<Plus className="w-4 h-4 mr-2" aria-hidden="true" />
+						Agregar Producto
+					</Button>
+				</div>
 			</div>
 
-			<Tabs defaultValue="products" className="w-full">
+			<Tabs
+				value={activeTab}
+				onValueChange={handleTabChange}
+				className="w-full"
+			>
 				<TabsList className="bg-[var(--color-carbon)] border border-gray-800 text-gray-400 mb-6">
 					<TabsTrigger
 						value="products"
@@ -502,87 +774,315 @@ function ProductsPage() {
 				</TabsList>
 
 				<TabsContent value="products" className="space-y-6 mt-0">
-					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-						<div className="flex items-center gap-3 flex-wrap w-full sm:w-auto">
-							<div className="relative">
-								<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-								<Input
-									placeholder="Buscar en inventario"
-									value={globalFilter}
-									onChange={(e) => setGlobalFilter(e.target.value)}
-									className="pl-9 bg-[var(--color-carbon)] border-gray-800 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20 w-full sm:w-[250px] rounded-lg"
-								/>
+					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
+						<CardHeader>
+							<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+								<div>
+									<CardTitle className="flex items-center gap-2">
+										<Filter
+											className="h-4 w-4 text-[var(--color-voltage)]"
+											aria-hidden="true"
+										/>
+										Filtros
+									</CardTitle>
+									<CardDescription className="mt-1 text-gray-400">
+										Busca por nombre, SKU, código de barras o categoría y
+										restringe el inventario por tipo de producto, seguimiento,
+										estado de stock y rangos de precio o costo.
+									</CardDescription>
+								</div>
+								<div className="flex flex-wrap items-center gap-2">
+									{activeFilterCount > 0 ? (
+										<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+											{activeFilterCount} filtro
+											{activeFilterCount === 1 ? "" : "s"} activo
+											{activeFilterCount === 1 ? "" : "s"}
+										</Badge>
+									) : null}
+									<Badge className="border-gray-700 bg-black/20 text-gray-300 hover:bg-black/20">
+										{filteredProducts.length} resultado
+										{filteredProducts.length === 1 ? "" : "s"}
+									</Badge>
+								</div>
 							</div>
-
-							<Button
-								variant="outline"
-								className="bg-[var(--color-carbon)] border-gray-800 text-gray-300 hover:bg-white/5 hover:text-white rounded-lg"
-							>
-								<Filter className="h-4 w-4 mr-2" />
-								Filtrar
-							</Button>
-
-							<Select
-								value={
-									(table.getColumn("categoryName")?.getFilterValue() as
-										| string
-										| undefined) ?? "all"
-								}
-								onValueChange={(value) => {
-									table
-										.getColumn("categoryName")
-										?.setFilterValue(value === "all" ? undefined : value);
+						</CardHeader>
+						<CardContent>
+							<form
+								className="space-y-4"
+								onSubmit={(event) => {
+									event.preventDefault();
+									applyFilters();
 								}}
 							>
-								<SelectTrigger className="w-[160px] bg-[var(--color-carbon)] border-gray-800 text-gray-300 rounded-lg hidden sm:flex">
-									<SelectValue placeholder="Categoría" />
-								</SelectTrigger>
-								<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
-									<SelectItem value="all">Todas</SelectItem>
-									{categories.map((item) => (
-										<SelectItem key={item.id} value={item.name}>
-											{item.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
+								<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+									<div className="space-y-2 xl:col-span-2">
+										<label
+											className="text-sm text-gray-400"
+											htmlFor={productSearchId}
+										>
+											Busqueda
+										</label>
+										<div className="relative">
+											<Search
+												className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500"
+												aria-hidden="true"
+											/>
+											<Input
+												id={productSearchId}
+												name="q"
+												autoComplete="off"
+												placeholder="Nombre, SKU, código de barras o categoría…"
+												value={draftFilters.q}
+												onChange={(event) =>
+													setDraftFilters((current) => ({
+														...current,
+														q: event.target.value,
+													}))
+												}
+												className="pl-9 bg-black/20 border-gray-700 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20 rounded-lg"
+											/>
+										</div>
+									</div>
 
-						<div className="flex w-full sm:w-auto sm:ml-auto items-center gap-3">
-							<Button
-								variant="outline"
-								className="bg-[var(--color-carbon)] border-gray-800 text-gray-300 hover:bg-white/5 hover:text-white rounded-lg px-4 py-2 h-10 w-full sm:w-auto shrink-0"
-								onClick={() => openInventoryEntryDialog()}
-							>
-								<PackagePlus className="w-4 h-4 mr-2" />
-								Entrada de inventario
-							</Button>
+									<FilterField label="Categoria" htmlFor={categoryFilterId}>
+										<Select
+											value={draftFilters.categoryId || ALL_FILTER_VALUE}
+											onValueChange={(value) =>
+												setDraftFilters((current) => ({
+													...current,
+													categoryId: value === ALL_FILTER_VALUE ? "" : value,
+												}))
+											}
+										>
+											<SelectTrigger
+												id={categoryFilterId}
+												className="h-10 w-full bg-black/20 border-gray-700 text-white"
+											>
+												<SelectValue placeholder="Todas" />
+											</SelectTrigger>
+											<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+												<SelectItem value={ALL_FILTER_VALUE}>Todas</SelectItem>
+												<SelectItem value={UNCATEGORIZED_FILTER_VALUE}>
+													Sin categoría
+												</SelectItem>
+												{categories.map((item) => (
+													<SelectItem key={item.id} value={item.id}>
+														{item.name}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</FilterField>
 
-							<Button
-								className="bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-semibold rounded-lg px-4 py-2 h-10 w-full sm:w-auto shrink-0"
-								onClick={() => setIsSheetOpen(true)}
-							>
-								<Plus className="w-4 h-4 mr-2" />
-								Agregar Producto
-							</Button>
-						</div>
+									<FilterField label="Tipo" htmlFor={productTypeId}>
+										<Select
+											value={draftFilters.productType || ALL_FILTER_VALUE}
+											onValueChange={(value) =>
+												setDraftFilters((current) => ({
+													...current,
+													productType: value === ALL_FILTER_VALUE ? "" : value,
+												}))
+											}
+										>
+											<SelectTrigger
+												id={productTypeId}
+												className="h-10 w-full bg-black/20 border-gray-700 text-white"
+											>
+												<SelectValue placeholder="Todos" />
+											</SelectTrigger>
+											<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+												<SelectItem value="standard">
+													Producto normal
+												</SelectItem>
+												<SelectItem value="modifier">Modificador</SelectItem>
+											</SelectContent>
+										</Select>
+									</FilterField>
 
-						<ProductFormSheet
-							isOpen={isSheetOpen}
-							onOpenChange={(open) => {
-								if (!open) {
-									closeSheet();
-								} else {
-									setIsSheetOpen(true);
-								}
-							}}
-							editingProduct={editingProduct}
-							categories={categories}
-							onSave={handleSaveProduct}
-							isPending={isPending}
-							error={formError}
-						/>
-					</div>
+									<FilterField
+										label="Seguimiento"
+										htmlFor={inventoryTrackingId}
+									>
+										<Select
+											value={draftFilters.inventoryTracking || ALL_FILTER_VALUE}
+											onValueChange={(value) =>
+												setDraftFilters((current) => ({
+													...current,
+													inventoryTracking:
+														value === ALL_FILTER_VALUE ? "" : value,
+												}))
+											}
+										>
+											<SelectTrigger
+												id={inventoryTrackingId}
+												className="h-10 w-full bg-black/20 border-gray-700 text-white"
+											>
+												<SelectValue placeholder="Todos" />
+											</SelectTrigger>
+											<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+												<SelectItem value="tracked">Con inventario</SelectItem>
+												<SelectItem value="untracked">
+													Sin inventario
+												</SelectItem>
+											</SelectContent>
+										</Select>
+									</FilterField>
+								</div>
+
+								<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+									<FilterField label="Estado de stock" htmlFor={stockStatusId}>
+										<Select
+											value={draftFilters.stockStatus || ALL_FILTER_VALUE}
+											onValueChange={(value) =>
+												setDraftFilters((current) => ({
+													...current,
+													stockStatus: value === ALL_FILTER_VALUE ? "" : value,
+												}))
+											}
+										>
+											<SelectTrigger
+												id={stockStatusId}
+												className="h-10 w-full bg-black/20 border-gray-700 text-white"
+											>
+												<SelectValue placeholder="Todos" />
+											</SelectTrigger>
+											<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+												<SelectItem value="available">Disponible</SelectItem>
+												<SelectItem value="low">Stock bajo</SelectItem>
+												<SelectItem value="out">Sin stock</SelectItem>
+												<SelectItem value="negative">Stock negativo</SelectItem>
+												<SelectItem value="untracked">
+													Sin seguimiento
+												</SelectItem>
+											</SelectContent>
+										</Select>
+									</FilterField>
+
+									<FilterField label="Precio minimo" htmlFor={priceMinId}>
+										<Input
+											id={priceMinId}
+											name="priceMin"
+											autoComplete="off"
+											inputMode="numeric"
+											min={0}
+											step={500}
+											type="number"
+											value={draftFilters.priceMin}
+											onChange={(event) =>
+												setDraftFilters((current) => ({
+													...current,
+													priceMin: event.target.value,
+												}))
+											}
+											placeholder="Ej. 5000…"
+											className="h-10 bg-black/20 border-gray-700 text-white placeholder:text-gray-500"
+										/>
+									</FilterField>
+
+									<FilterField label="Precio maximo" htmlFor={priceMaxId}>
+										<Input
+											id={priceMaxId}
+											name="priceMax"
+											autoComplete="off"
+											inputMode="numeric"
+											min={0}
+											step={500}
+											type="number"
+											value={draftFilters.priceMax}
+											onChange={(event) =>
+												setDraftFilters((current) => ({
+													...current,
+													priceMax: event.target.value,
+												}))
+											}
+											placeholder="Ej. 25000…"
+											className="h-10 bg-black/20 border-gray-700 text-white placeholder:text-gray-500"
+										/>
+									</FilterField>
+
+									<FilterField label="Costo minimo" htmlFor={costMinId}>
+										<Input
+											id={costMinId}
+											name="costMin"
+											autoComplete="off"
+											inputMode="numeric"
+											min={0}
+											step={500}
+											type="number"
+											value={draftFilters.costMin}
+											onChange={(event) =>
+												setDraftFilters((current) => ({
+													...current,
+													costMin: event.target.value,
+												}))
+											}
+											placeholder="Ej. 2000…"
+											className="h-10 bg-black/20 border-gray-700 text-white placeholder:text-gray-500"
+										/>
+									</FilterField>
+
+									<FilterField label="Costo maximo" htmlFor={costMaxId}>
+										<Input
+											id={costMaxId}
+											name="costMax"
+											autoComplete="off"
+											inputMode="numeric"
+											min={0}
+											step={500}
+											type="number"
+											value={draftFilters.costMax}
+											onChange={(event) =>
+												setDraftFilters((current) => ({
+													...current,
+													costMax: event.target.value,
+												}))
+											}
+											placeholder="Ej. 12000…"
+											className="h-10 bg-black/20 border-gray-700 text-white placeholder:text-gray-500"
+										/>
+									</FilterField>
+								</div>
+
+								<div className="flex flex-col gap-3 sm:flex-row">
+									<Button
+										type="submit"
+										className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
+									>
+										<Filter className="h-4 w-4" aria-hidden="true" />
+										Aplicar filtros
+									</Button>
+									<Button
+										type="button"
+										variant="outline"
+										onClick={clearFilters}
+										className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+										disabled={activeFilterCount === 0}
+									>
+										Limpiar
+									</Button>
+								</div>
+							</form>
+						</CardContent>
+					</Card>
+
+					<ProductFormSheet
+						isOpen={isSheetOpen}
+						onOpenChange={(open) => {
+							if (!open) {
+								closeSheet();
+							} else {
+								setIsSheetOpen(true);
+							}
+						}}
+						editingProduct={editingProduct}
+						categories={categories}
+						onSave={handleSaveProduct}
+						isPending={isPending}
+						error={formError}
+					/>
 
 					<div className="bg-[var(--color-carbon)] rounded-xl border border-gray-800 overflow-x-auto">
 						<Table className="w-full whitespace-nowrap">
@@ -664,16 +1164,13 @@ function ProductsPage() {
 								</div>
 
 								<div className="hidden sm:block">
-									{table.getState().pagination.pageIndex *
-										table.getState().pagination.pageSize +
-										1}
-									-
-									{Math.min(
-										(table.getState().pagination.pageIndex + 1) *
-											table.getState().pagination.pageSize,
-										table.getFilteredRowModel().rows.length,
-									)}{" "}
-									de {table.getFilteredRowModel().rows.length} resultados
+									{filteredProducts.length === 0
+										? "0 de 0 resultados"
+										: `${table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}-${Math.min(
+												(table.getState().pagination.pageIndex + 1) *
+													table.getState().pagination.pageSize,
+												filteredProducts.length,
+											)} de ${filteredProducts.length} resultados`}
 								</div>
 							</div>
 
@@ -1199,4 +1696,121 @@ function ProductsPage() {
 			</Dialog>
 		</main>
 	);
+}
+
+function FilterField({
+	label,
+	htmlFor,
+	children,
+}: {
+	label: string;
+	htmlFor: string;
+	children: React.ReactNode;
+}) {
+	return (
+		<div className="space-y-2">
+			<label className="text-sm text-gray-400" htmlFor={htmlFor}>
+				{label}
+			</label>
+			{children}
+		</div>
+	);
+}
+
+function normalizeFilterValue(value: string) {
+	const trimmedValue = value.trim();
+	return trimmedValue.length > 0 ? trimmedValue : undefined;
+}
+
+function normalizeCategoryFilterValue(value: string) {
+	const normalizedValue = normalizeFilterValue(value);
+	if (!normalizedValue) {
+		return undefined;
+	}
+
+	return normalizedValue;
+}
+
+function normalizeNonNegativeIntegerFilterValue(
+	value: number | string | null | undefined,
+) {
+	if (typeof value === "number") {
+		return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : null;
+	}
+
+	if (typeof value === "string") {
+		const trimmedValue = value.trim();
+		if (!trimmedValue) {
+			return null;
+		}
+
+		const parsedValue = Number(trimmedValue);
+		return Number.isFinite(parsedValue) && parsedValue >= 0
+			? Math.trunc(parsedValue)
+			: null;
+	}
+
+	return null;
+}
+
+function resolveNumericRangeFilters(
+	minimum: number | string | null | undefined,
+	maximum: number | string | null | undefined,
+) {
+	const normalizedMinimum = normalizeNonNegativeIntegerFilterValue(minimum);
+	const normalizedMaximum = normalizeNonNegativeIntegerFilterValue(maximum);
+
+	if (
+		normalizedMinimum !== null &&
+		normalizedMaximum !== null &&
+		normalizedMinimum > normalizedMaximum
+	) {
+		return {
+			minimum: normalizedMaximum,
+			maximum: normalizedMinimum,
+		};
+	}
+
+	return {
+		minimum: normalizedMinimum,
+		maximum: normalizedMaximum,
+	};
+}
+
+function normalizeEnumFilterValue<T extends readonly string[]>(
+	value: string,
+	options: T,
+): T[number] | undefined {
+	const normalizedValue = normalizeFilterValue(value);
+	if (!normalizedValue) {
+		return undefined;
+	}
+
+	return options.includes(normalizedValue as T[number])
+		? (normalizedValue as T[number])
+		: undefined;
+}
+
+function matchesProductStockStatus(
+	product: Product,
+	stockStatus: string | undefined,
+) {
+	if (!stockStatus) {
+		return true;
+	}
+
+	switch (stockStatus) {
+		case "available":
+			return product.trackInventory && product.stock >= 10;
+		case "low":
+			return product.trackInventory && product.stock > 0 && product.stock < 10;
+		case "out":
+			return product.trackInventory && product.stock === 0;
+		case "negative":
+			return product.trackInventory && product.stock < 0;
+		case "untracked":
+			return !product.trackInventory;
+		default:
+			return true;
+	}
 }

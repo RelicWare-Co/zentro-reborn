@@ -1,5 +1,5 @@
 import "@tanstack/react-start/server-only";
-import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "#/db";
 import {
 	creditTransaction,
@@ -49,6 +49,36 @@ function parseDateBoundary(value: string | null | undefined) {
 	return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.getTime();
 }
 
+function resolveAmountRange(
+	minimum: number | null | undefined,
+	maximum: number | null | undefined,
+) {
+	const normalizedMinimum =
+		typeof minimum === "number" && Number.isFinite(minimum) && minimum >= 0
+			? Math.trunc(minimum)
+			: null;
+	const normalizedMaximum =
+		typeof maximum === "number" && Number.isFinite(maximum) && maximum >= 0
+			? Math.trunc(maximum)
+			: null;
+
+	if (
+		normalizedMinimum !== null &&
+		normalizedMaximum !== null &&
+		normalizedMinimum > normalizedMaximum
+	) {
+		return {
+			minimum: normalizedMaximum,
+			maximum: normalizedMinimum,
+		};
+	}
+
+	return {
+		minimum: normalizedMinimum,
+		maximum: normalizedMaximum,
+	};
+}
+
 export async function listSalesForCurrentOrganization(
 	input: ListSalesInput = {},
 ) {
@@ -58,18 +88,39 @@ export async function listSalesForCurrentOrganization(
 	const trimmedSearchQuery = input.searchQuery?.trim();
 	const startDateMs = parseDateBoundary(input.startDate);
 	const endDateMs = parseDateBoundary(input.endDate);
+	const amountRange = resolveAmountRange(input.amountMin, input.amountMax);
 	const endDateExclusiveMs =
 		endDateMs === null ? null : endDateMs + 24 * 60 * 60 * 1000;
+	const paidAmountExpression = sql<number>`coalesce((
+		select sum(${payment.amount})
+		from ${payment}
+		where ${payment.organizationId} = ${organizationId}
+			and ${payment.saleId} = ${sale.id}
+	), 0)`;
 
 	const baseWhereConditions = [eq(sale.organizationId, organizationId)];
 	if (input.status) {
 		baseWhereConditions.push(eq(sale.status, input.status));
+	}
+	if (input.cashierId) {
+		baseWhereConditions.push(eq(sale.userId, input.cashierId));
+	}
+	if (input.terminalName) {
+		baseWhereConditions.push(eq(shift.terminalName, input.terminalName));
 	}
 	if (startDateMs !== null) {
 		baseWhereConditions.push(gte(sale.createdAt, new Date(startDateMs)));
 	}
 	if (endDateExclusiveMs !== null) {
 		baseWhereConditions.push(lt(sale.createdAt, new Date(endDateExclusiveMs)));
+	}
+	if (amountRange.minimum !== null) {
+		baseWhereConditions.push(gte(sale.totalAmount, amountRange.minimum));
+	}
+	if (amountRange.maximum !== null) {
+		baseWhereConditions.push(
+			sql`${sale.totalAmount} <= ${amountRange.maximum}`,
+		);
 	}
 	if (input.paymentMethod) {
 		baseWhereConditions.push(sql`exists (
@@ -80,19 +131,30 @@ export async function listSalesForCurrentOrganization(
 				and ${payment.method} = ${input.paymentMethod}
 		)`);
 	}
+	if (input.balanceStatus === "with_balance") {
+		baseWhereConditions.push(
+			sql`${sale.status} <> 'cancelled' and ${paidAmountExpression} < ${sale.totalAmount}`,
+		);
+	}
+	if (input.balanceStatus === "settled") {
+		baseWhereConditions.push(
+			sql`(${sale.status} = 'cancelled' or ${paidAmountExpression} >= ${sale.totalAmount})`,
+		);
+	}
 
 	const searchCondition = trimmedSearchQuery
 		? sql`(
 			${sale.id} like ${`%${trimmedSearchQuery}%`}
 			or coalesce(${customer.name}, '') like ${`%${trimmedSearchQuery}%`}
 			or coalesce(${user.name}, '') like ${`%${trimmedSearchQuery}%`}
+			or coalesce(${shift.terminalName}, '') like ${`%${trimmedSearchQuery}%`}
 		)`
 		: null;
 	const salesWhereConditions = searchCondition
 		? [...baseWhereConditions, searchCondition]
 		: baseWhereConditions;
 
-	const [salesRows, totalRows] = await Promise.all([
+	const [salesRows, totalRows, cashierRows, terminalRows] = await Promise.all([
 		db
 			.select({
 				id: sale.id,
@@ -101,6 +163,7 @@ export async function listSalesForCurrentOrganization(
 				createdAt: sale.createdAt,
 				customerName: customer.name,
 				cashierName: user.name,
+				terminalName: shift.terminalName,
 			})
 			.from(sale)
 			.leftJoin(
@@ -111,31 +174,66 @@ export async function listSalesForCurrentOrganization(
 				),
 			)
 			.leftJoin(user, eq(user.id, sale.userId))
+			.leftJoin(
+				shift,
+				and(
+					eq(shift.id, sale.shiftId),
+					eq(shift.organizationId, organizationId),
+				),
+			)
 			.where(and(...salesWhereConditions))
 			.orderBy(desc(sale.createdAt), desc(sale.id))
 			.limit(limit + 1)
 			.offset(cursor),
-		searchCondition
-			? db
-					.select({
-						total: sql<number>`count(*)`,
-					})
-					.from(sale)
-					.leftJoin(
-						customer,
-						and(
-							eq(customer.id, sale.customerId),
-							eq(customer.organizationId, organizationId),
-						),
-					)
-					.leftJoin(user, eq(user.id, sale.userId))
-					.where(and(...salesWhereConditions))
-			: db
-					.select({
-						total: sql<number>`count(*)`,
-					})
-					.from(sale)
-					.where(and(...baseWhereConditions)),
+		db
+			.select({
+				total: sql<number>`count(*)`,
+			})
+			.from(sale)
+			.leftJoin(
+				customer,
+				and(
+					eq(customer.id, sale.customerId),
+					eq(customer.organizationId, organizationId),
+				),
+			)
+			.leftJoin(user, eq(user.id, sale.userId))
+			.leftJoin(
+				shift,
+				and(
+					eq(shift.id, sale.shiftId),
+					eq(shift.organizationId, organizationId),
+				),
+			)
+			.where(and(...salesWhereConditions)),
+		db
+			.selectDistinct({
+				id: user.id,
+				name: user.name,
+			})
+			.from(sale)
+			.innerJoin(user, eq(user.id, sale.userId))
+			.where(eq(sale.organizationId, organizationId))
+			.orderBy(asc(user.name)),
+		db
+			.selectDistinct({
+				name: shift.terminalName,
+			})
+			.from(sale)
+			.innerJoin(
+				shift,
+				and(
+					eq(shift.id, sale.shiftId),
+					eq(shift.organizationId, organizationId),
+				),
+			)
+			.where(
+				and(
+					eq(sale.organizationId, organizationId),
+					sql`${shift.terminalName} is not null`,
+				),
+			)
+			.orderBy(asc(shift.terminalName)),
 	]);
 
 	const pageRows = salesRows.slice(0, limit);
@@ -149,6 +247,14 @@ export async function listSalesForCurrentOrganization(
 			total: normalizeNumber(totalRows[0]?.total),
 			hasMore,
 			nextCursor,
+			filterOptions: {
+				cashiers: cashierRows,
+				terminals: terminalRows
+					.map((terminal) => terminal.name)
+					.filter((terminalName): terminalName is string =>
+						Boolean(terminalName),
+					),
+			},
 		};
 	}
 
@@ -222,6 +328,7 @@ export async function listSalesForCurrentOrganization(
 				status: row.status,
 				customerName: row.customerName,
 				cashierName: row.cashierName,
+				terminalName: row.terminalName,
 				createdAt: normalizeTimestamp(row.createdAt),
 				itemCount: itemCountBySaleId.get(row.id) ?? 0,
 				paidAmount,
@@ -235,6 +342,14 @@ export async function listSalesForCurrentOrganization(
 		total: normalizeNumber(totalRows[0]?.total),
 		hasMore,
 		nextCursor,
+		filterOptions: {
+			cashiers: cashierRows,
+			terminals: terminalRows
+				.map((terminal) => terminal.name)
+				.filter((terminalName): terminalName is string =>
+					Boolean(terminalName),
+				),
+		},
 	};
 }
 

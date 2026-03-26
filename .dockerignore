@@ -4,6 +4,13 @@ node_modules
 .tanstack
 dist
 .vite
+tsconfig.tsbuildinfo
+dev.db
+*.db
+*.sqlite
+*.sqlite3
+*.DS_Store
+.DS_Store
 
 .git
 .gitignore

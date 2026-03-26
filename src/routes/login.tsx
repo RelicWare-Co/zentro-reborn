@@ -329,7 +329,7 @@ function LoginPage() {
 	const [mode, setMode] = useState<"login" | "register">("login");
 
 	return (
-		<div className="flex min-h-screen w-full bg-[var(--color-void)] text-[var(--color-photon)]">
+		<div className="app-safe-area flex min-h-[100dvh] w-full bg-[var(--color-void)] text-[var(--color-photon)]">
 			{/* Left Column */}
 			<div className="hidden lg:flex w-1/2 flex-col items-center justify-center bg-[var(--color-carbon)] relative overflow-hidden">
 				<div className="relative z-10 flex flex-col items-center text-center px-8">

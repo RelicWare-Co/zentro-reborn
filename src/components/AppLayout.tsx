@@ -44,7 +44,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
 	if (isActiveOrgPending) {
 		return (
-			<div className="flex h-screen w-full items-center justify-center bg-[var(--color-void)] text-[var(--color-photon)]">
+			<div className="app-safe-area flex min-h-[100dvh] w-full items-center justify-center bg-[var(--color-void)] text-[var(--color-photon)]">
 				<Loader2 className="h-8 w-8 animate-spin text-[var(--color-voltage)]" />
 			</div>
 		);
@@ -55,7 +55,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 	}
 
 	return (
-		<div className="flex h-screen bg-[var(--color-void)] text-[var(--color-photon)] overflow-hidden">
+		<div className="app-safe-area flex min-h-[100dvh] bg-[var(--color-void)] text-[var(--color-photon)] overflow-hidden">
 			{/* Mobile Sidebar Overlay */}
 			{isSidebarOpen && (
 				<button
@@ -73,7 +73,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         ${isCollapsed ? "lg:w-20 w-64" : "w-64"} bg-[var(--color-carbon)] border-r border-gray-800
         transition-all duration-300 ease-in-out
         ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-        flex flex-col
+        flex flex-col pt-[var(--safe-area-top)] pb-[var(--safe-area-bottom)]
       `}
 			>
 				{/* Sidebar Header */}
@@ -186,7 +186,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 			</aside>
 
 			{/* Main Content */}
-			<div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
+			<div className="flex-1 flex min-h-0 flex-col min-w-0 overflow-y-auto">
 				{/* Mobile Header */}
 				<header className="lg:hidden h-16 flex items-center px-4 bg-[var(--color-carbon)] border-b border-gray-800">
 					<button

@@ -134,14 +134,14 @@ export function OrganizationSelection() {
 
 	if (isListPending) {
 		return (
-			<div className="flex h-screen w-full items-center justify-center bg-[var(--color-void)] text-[var(--color-photon)]">
+			<div className="app-safe-area flex min-h-[100dvh] w-full items-center justify-center bg-[var(--color-void)] text-[var(--color-photon)]">
 				<Loader2 className="h-8 w-8 animate-spin text-[var(--color-voltage)]" />
 			</div>
 		);
 	}
 
 	return (
-		<div className="flex min-h-screen w-full flex-col items-center justify-center bg-[var(--color-void)] text-[var(--color-photon)] p-4">
+		<div className="app-safe-area flex min-h-[100dvh] w-full flex-col items-center justify-center bg-[var(--color-void)] text-[var(--color-photon)] p-4">
 			<div className="w-full max-w-md space-y-8">
 				<div className="text-center space-y-2">
 					<h2 className="text-3xl font-bold tracking-tight">

@@ -16,7 +16,11 @@ import {
 	sanitizeMoneyInput,
 } from "@/lib/utils";
 import type { ActiveShift, ShiftCloseSummary } from "../../types";
-import { formatCurrency, formatPaymentMethodLabel } from "../../utils";
+import {
+	createPaymentMethodLabelMap,
+	formatCurrency,
+	formatPaymentMethodLabel,
+} from "../../utils";
 
 interface CloseShiftModalProps {
 	isOpen: boolean;
@@ -71,6 +75,9 @@ export function CloseShiftModal({
 
 	const cashSummary = shiftCloseSummary?.summaryByMethod.find(
 		(row) => row.paymentMethod === "cash",
+	);
+	const paymentMethodLabels = createPaymentMethodLabelMap(
+		shiftCloseSummary?.paymentMethods ?? [],
 	);
 	const movementSummary = shiftCloseSummary?.movements;
 	const movementItems = movementSummary?.items ?? [];
@@ -165,7 +172,10 @@ export function CloseShiftModal({
 												className="flex justify-between"
 											>
 												<span className="text-gray-300">
-													{formatPaymentMethodLabel(row.paymentMethod)}
+													{formatPaymentMethodLabel(
+														row.paymentMethod,
+														paymentMethodLabels,
+													)}
 												</span>
 												<span className="text-white font-medium tabular-nums">
 													{formatCurrency(row.expectedAmount)}
@@ -205,7 +215,10 @@ export function CloseShiftModal({
 												{formatMovementType(movement.type)}
 											</p>
 											<p className="text-xs text-gray-400">
-												{formatPaymentMethodLabel(movement.paymentMethod)}
+												{formatPaymentMethodLabel(
+													movement.paymentMethod,
+													paymentMethodLabels,
+												)}
 												{" · "}
 												{movement.description}
 											</p>
@@ -234,8 +247,11 @@ export function CloseShiftModal({
 										htmlFor={`closure-${row.paymentMethod}`}
 										className="text-sm font-medium text-gray-300"
 									>
-										{formatPaymentMethodLabel(row.paymentMethod)} (Esperado:{" "}
-										{formatCurrency(row.expectedAmount)})
+										{formatPaymentMethodLabel(
+											row.paymentMethod,
+											paymentMethodLabels,
+										)}{" "}
+										(Esperado: {formatCurrency(row.expectedAmount)})
 									</label>
 									<div className="relative">
 										<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">

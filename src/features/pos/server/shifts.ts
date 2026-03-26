@@ -25,6 +25,9 @@ import {
 	user,
 } from "#/db/schema";
 import {
+	buildPaymentMethodOptions,
+	comparePaymentMethodIds,
+	getAllPaymentMethods,
 	getEnabledPaymentMethods,
 	parseOrganizationSettingsMetadata,
 } from "#/features/settings/settings.shared";
@@ -263,70 +266,102 @@ export async function listShiftsForCurrentOrganization(
 		whereConditions.push(lt(shift.openedAt, new Date(endDateExclusiveMs)));
 	}
 
-	const [shiftRows, totalRows, cashierRows, terminalRows, organizationRows] =
-		await Promise.all([
-			db
-				.select({
-					id: shift.id,
-					userId: shift.userId,
-					cashierName: user.name,
-					terminalName: shift.terminalName,
-					status: shift.status,
-					startingCash: shift.startingCash,
-					openedAt: shift.openedAt,
-					closedAt: shift.closedAt,
-					notes: shift.notes,
-				})
-				.from(shift)
-				.innerJoin(user, eq(user.id, shift.userId))
-				.where(and(...whereConditions))
-				.orderBy(desc(shift.openedAt), desc(shift.id))
-				.limit(limit + 1)
-				.offset(cursor),
-			db
-				.select({
-					total: sql<number>`count(*)`,
-				})
-				.from(shift)
-				.innerJoin(user, eq(user.id, shift.userId))
-				.where(and(...whereConditions)),
-			db
-				.selectDistinct({
-					id: user.id,
-					name: user.name,
-				})
-				.from(shift)
-				.innerJoin(user, eq(user.id, shift.userId))
-				.where(eq(shift.organizationId, organizationId))
-				.orderBy(asc(user.name)),
-			db
-				.selectDistinct({
-					name: shift.terminalName,
-				})
-				.from(shift)
-				.where(
-					and(
-						eq(shift.organizationId, organizationId),
-						sql`${shift.terminalName} is not null`,
-					),
-				)
-				.orderBy(asc(shift.terminalName)),
-			db
-				.select({
-					metadata: organization.metadata,
-				})
-				.from(organization)
-				.where(eq(organization.id, organizationId))
-				.limit(1),
-		]);
+	const [
+		shiftRows,
+		totalRows,
+		cashierRows,
+		terminalRows,
+		organizationRows,
+		paymentRowsForFilters,
+		movementRowsForFilters,
+		closureRowsForFilters,
+	] = await Promise.all([
+		db
+			.select({
+				id: shift.id,
+				userId: shift.userId,
+				cashierName: user.name,
+				terminalName: shift.terminalName,
+				status: shift.status,
+				startingCash: shift.startingCash,
+				openedAt: shift.openedAt,
+				closedAt: shift.closedAt,
+				notes: shift.notes,
+			})
+			.from(shift)
+			.innerJoin(user, eq(user.id, shift.userId))
+			.where(and(...whereConditions))
+			.orderBy(desc(shift.openedAt), desc(shift.id))
+			.limit(limit + 1)
+			.offset(cursor),
+		db
+			.select({
+				total: sql<number>`count(*)`,
+			})
+			.from(shift)
+			.innerJoin(user, eq(user.id, shift.userId))
+			.where(and(...whereConditions)),
+		db
+			.selectDistinct({
+				id: user.id,
+				name: user.name,
+			})
+			.from(shift)
+			.innerJoin(user, eq(user.id, shift.userId))
+			.where(eq(shift.organizationId, organizationId))
+			.orderBy(asc(user.name)),
+		db
+			.selectDistinct({
+				name: shift.terminalName,
+			})
+			.from(shift)
+			.where(
+				and(
+					eq(shift.organizationId, organizationId),
+					sql`${shift.terminalName} is not null`,
+				),
+			)
+			.orderBy(asc(shift.terminalName)),
+		db
+			.select({
+				metadata: organization.metadata,
+			})
+			.from(organization)
+			.where(eq(organization.id, organizationId))
+			.limit(1),
+		db
+			.selectDistinct({
+				method: payment.method,
+			})
+			.from(payment)
+			.where(eq(payment.organizationId, organizationId))
+			.orderBy(asc(payment.method)),
+		db
+			.selectDistinct({
+				paymentMethod: cashMovement.paymentMethod,
+			})
+			.from(cashMovement)
+			.where(eq(cashMovement.organizationId, organizationId))
+			.orderBy(asc(cashMovement.paymentMethod)),
+		db
+			.selectDistinct({
+				paymentMethod: shiftClosure.paymentMethod,
+			})
+			.from(shiftClosure)
+			.innerJoin(shift, eq(shift.id, shiftClosure.shiftId))
+			.where(eq(shift.organizationId, organizationId))
+			.orderBy(asc(shiftClosure.paymentMethod)),
+	]);
 	const organizationSettings = parseOrganizationSettingsMetadata(
 		organizationRows[0]?.metadata,
 	);
-	const paymentMethods = getEnabledPaymentMethods(organizationSettings).map(
-		(paymentMethod) => ({
-			id: paymentMethod.id,
-			label: paymentMethod.label,
-		}),
+	const paymentMethods = buildPaymentMethodOptions(
+		getAllPaymentMethods(organizationSettings),
+		[
+			...paymentRowsForFilters.map((paymentRow) => paymentRow.method),
+			...movementRowsForFilters.map((movementRow) => movementRow.paymentMethod),
+			...closureRowsForFilters.map((closureRow) => closureRow.paymentMethod),
+		],
 	);
 	const terminalNames = terminalRows
 		.map((terminal) => terminal.name)
@@ -532,11 +567,8 @@ export async function listShiftsForCurrentOrganization(
 			const payments = paymentsByShift.get(row.id) ?? [];
 			const movements = movementsByShift.get(row.id) ?? [];
 			const closures = [...(closuresByShift.get(row.id) ?? [])].sort(
-				(left, right) => {
-					if (left.paymentMethod === "cash") return -1;
-					if (right.paymentMethod === "cash") return 1;
-					return left.paymentMethod.localeCompare(right.paymentMethod);
-				},
+				(left, right) =>
+					comparePaymentMethodIds(left.paymentMethod, right.paymentMethod),
 			);
 			const expectedByMethod = buildExpectedAmountsByMethod(
 				normalizeNumber(row.startingCash),
@@ -557,11 +589,9 @@ export async function listShiftsForCurrentOrganization(
 					method,
 					amount,
 				}))
-				.sort((left, right) => {
-					if (left.method === "cash") return -1;
-					if (right.method === "cash") return 1;
-					return right.amount - left.amount;
-				});
+				.sort((left, right) =>
+					comparePaymentMethodIds(left.method, right.method),
+				);
 			const operations = operationsByShift.get(row.id) ?? {
 				paidSalesCount: 0,
 				paidSalesAmount: 0,
@@ -821,16 +851,27 @@ export async function registerCashMovementForCurrentOrganization(
 	).toLowerCase();
 	const createdAt = resolveDate(input.createdAt, "createdAt");
 
-	const [targetShift] = await db
-		.select({ id: shift.id, userId: shift.userId, status: shift.status })
-		.from(shift)
-		.where(
-			and(
-				eq(shift.id, input.shiftId),
-				eq(shift.organizationId, organizationId),
-			),
-		)
-		.limit(1);
+	const [targetShift, organizationRow] = await Promise.all([
+		db
+			.select({ id: shift.id, userId: shift.userId, status: shift.status })
+			.from(shift)
+			.where(
+				and(
+					eq(shift.id, input.shiftId),
+					eq(shift.organizationId, organizationId),
+				),
+			)
+			.limit(1)
+			.then((rows) => rows[0]),
+		db
+			.select({
+				metadata: organization.metadata,
+			})
+			.from(organization)
+			.where(eq(organization.id, organizationId))
+			.limit(1)
+			.then((rows) => rows[0]),
+	]);
 
 	if (!targetShift) {
 		throw new Error("Turno no encontrado para la organización activa");
@@ -840,6 +881,15 @@ export async function registerCashMovementForCurrentOrganization(
 	}
 	if (targetShift.userId !== session.user.id) {
 		throw new Error("Solo el cajero del turno puede registrar movimientos");
+	}
+
+	const enabledPaymentMethodIds = new Set(
+		getEnabledPaymentMethods(
+			parseOrganizationSettingsMetadata(organizationRow?.metadata),
+		).map((paymentMethod) => paymentMethod.id),
+	);
+	if (!enabledPaymentMethodIds.has(paymentMethod)) {
+		throw new Error(`Método de pago no habilitado: ${paymentMethod}`);
 	}
 
 	const movementId = crypto.randomUUID();
@@ -870,21 +920,37 @@ export async function getShiftCloseSummaryForCurrentOrganization(
 ) {
 	const { organizationId } = await requireAuthContext();
 
-	const [targetShift] = await db
-		.select({
-			id: shift.id,
-			status: shift.status,
-			startingCash: shift.startingCash,
-			openedAt: shift.openedAt,
-			closedAt: shift.closedAt,
-		})
-		.from(shift)
-		.where(and(eq(shift.id, shiftId), eq(shift.organizationId, organizationId)))
-		.limit(1);
+	const [targetShift, organizationRow] = await Promise.all([
+		db
+			.select({
+				id: shift.id,
+				status: shift.status,
+				startingCash: shift.startingCash,
+				openedAt: shift.openedAt,
+				closedAt: shift.closedAt,
+			})
+			.from(shift)
+			.where(
+				and(eq(shift.id, shiftId), eq(shift.organizationId, organizationId)),
+			)
+			.limit(1)
+			.then((rows) => rows[0]),
+		db
+			.select({
+				metadata: organization.metadata,
+			})
+			.from(organization)
+			.where(eq(organization.id, organizationId))
+			.limit(1)
+			.then((rows) => rows[0]),
+	]);
 
 	if (!targetShift) {
 		throw new Error("Turno no encontrado para la organización activa");
 	}
+	const organizationSettings = parseOrganizationSettingsMetadata(
+		organizationRow?.metadata,
+	);
 
 	const [registeredPayments, registeredMovements, registeredClosures] =
 		await Promise.all([
@@ -970,11 +1036,7 @@ export async function getShiftCloseSummaryForCurrentOrganization(
 	);
 
 	const summaryByMethod = [...expectedByMethod.entries()]
-		.sort(([methodA], [methodB]) => {
-			if (methodA === "cash") return -1;
-			if (methodB === "cash") return 1;
-			return methodA.localeCompare(methodB);
-		})
+		.sort(([methodA], [methodB]) => comparePaymentMethodIds(methodA, methodB))
 		.map(([paymentMethod, expectedAmount]) => {
 			const closure = closureByMethod.get(paymentMethod);
 			return {
@@ -1000,6 +1062,14 @@ export async function getShiftCloseSummaryForCurrentOrganization(
 		},
 		summaryByMethod,
 		totalExpected,
+		paymentMethods: buildPaymentMethodOptions(
+			getAllPaymentMethods(organizationSettings),
+			[
+				...summaryByMethod.map((summaryRow) => summaryRow.paymentMethod),
+				...movementItems.map((movement) => movement.paymentMethod),
+				...registeredClosures.map((closure) => closure.paymentMethod),
+			],
+		),
 		movements: {
 			items: movementItems,
 			totals: {

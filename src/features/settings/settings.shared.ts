@@ -188,7 +188,10 @@ export function buildPaymentMethodOptions(
 
 		options.push({
 			id: normalizedMethodId,
-			label: toSafeString(label, formatPaymentMethodIdLabel(normalizedMethodId)),
+			label: toSafeString(
+				label,
+				formatPaymentMethodIdLabel(normalizedMethodId),
+			),
 		});
 		seenMethodIds.add(normalizedMethodId);
 	};
@@ -269,7 +272,10 @@ function normalizePaymentMethods(
 			const rawMethod = rawMethodsById.get(methodId);
 			return {
 				id: methodId,
-				label: toSafeString(rawMethod?.label, formatPaymentMethodIdLabel(methodId)),
+				label: toSafeString(
+					rawMethod?.label,
+					formatPaymentMethodIdLabel(methodId),
+				),
 				enabled: toBoolean(rawMethod?.enabled, true),
 				requiresReference:
 					methodId === "cash"

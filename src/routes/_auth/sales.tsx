@@ -49,7 +49,11 @@ import {
 } from "@/features/pos/hooks/usePosQueries";
 import { listSales } from "@/features/pos/pos.functions";
 import type { SaleListItem } from "@/features/pos/types";
-import { formatCurrency, formatPaymentMethodLabel } from "@/features/pos/utils";
+import {
+	createPaymentMethodLabelMap,
+	formatCurrency,
+	formatPaymentMethodLabel,
+} from "@/features/pos/utils";
 
 const DEFAULT_LIST_PARAMS = {
 	limit: 10,
@@ -61,12 +65,6 @@ const SALES_VIEW_VALUES = ["today", "history"] as const;
 const DEFAULT_SALES_VIEW = "today" as const;
 const SALE_STATUS_VALUES = ["completed", "credit", "cancelled"] as const;
 const SALE_BALANCE_STATUS_VALUES = ["with_balance", "settled"] as const;
-const DEFAULT_PAYMENT_METHOD_OPTIONS = [
-	{ id: "cash", label: "Efectivo" },
-	{ id: "card", label: "Tarjeta" },
-	{ id: "transfer_nequi", label: "Nequi" },
-	{ id: "transfer_bancolombia", label: "Bancolombia" },
-] as const;
 const SALES_LOADING_FEEDBACK_DELAY_MS = 120;
 const SALES_LOADING_FEEDBACK_MIN_VISIBLE_MS = 420;
 
@@ -141,8 +139,11 @@ function SalesPage() {
 	const salesFilterOptions =
 		salesQuery.data?.filterOptions ?? initialSales.filterOptions;
 	const creditAccounts = creditAccountsSearchResult?.data ?? [];
-	const paymentMethodOptions =
-		posBootstrap?.settings.paymentMethods ?? DEFAULT_PAYMENT_METHOD_OPTIONS;
+	const paymentMethodOptions = salesFilterOptions.paymentMethods;
+	const paymentMethodLabels = useMemo(
+		() => createPaymentMethodLabelMap(paymentMethodOptions),
+		[paymentMethodOptions],
+	);
 	const pageSize = search.pageSize ?? DEFAULT_LIST_PARAMS.limit;
 	const cursor = search.cursor ?? DEFAULT_LIST_PARAMS.cursor;
 	const [selectedSaleId, setSelectedSaleId] = useState<string | null>(
@@ -885,7 +886,10 @@ function SalesPage() {
 
 									<div className="space-y-2 [content-visibility:auto]">
 										{sales.map((sale) => {
-											const paymentSummary = formatPaymentSummary(sale);
+											const paymentSummary = formatPaymentSummary(
+												sale,
+												paymentMethodLabels,
+											);
 
 											return (
 												<button
@@ -1046,6 +1050,7 @@ function SalesPage() {
 				isLoading={saleDetailQuery.isFetching}
 				activeShiftId={posBootstrap?.activeShift?.id}
 				creditAccount={selectedSaleCreditAccount}
+				paymentMethodOptions={paymentMethodOptions}
 			/>
 		</>
 	);
@@ -1352,7 +1357,10 @@ function getSaleStatusBadgeClass(status: string) {
 	return "border-gray-700 bg-gray-800/80 text-gray-300 hover:bg-gray-800/80";
 }
 
-function formatPaymentSummary(sale: SaleListItem) {
+function formatPaymentSummary(
+	sale: SaleListItem,
+	paymentMethodLabels?: Record<string, string>,
+) {
 	if (sale.status === "cancelled") {
 		return "Venta anulada";
 	}
@@ -1361,7 +1369,11 @@ function formatPaymentSummary(sale: SaleListItem) {
 		return sale.status === "credit" ? "Venta a credito" : "Sin pagos";
 	}
 
-	return sale.paymentMethods.map(formatPaymentMethodLabel).join(" + ");
+	return sale.paymentMethods
+		.map((paymentMethod) =>
+			formatPaymentMethodLabel(paymentMethod, paymentMethodLabels),
+		)
+		.join(" + ");
 }
 
 function formatItemCountLabel(itemCount: number) {

@@ -3,6 +3,7 @@ import {
 	Building2,
 	CreditCard,
 	Package,
+	Plus,
 	Save,
 	Settings2,
 	Store,
@@ -30,6 +31,7 @@ import {
 import { getSettings } from "@/features/settings/settings.functions";
 import {
 	normalizeOrganizationSettings,
+	normalizePaymentMethodId,
 	type OrganizationPaymentMethodSettings,
 	type OrganizationSettings,
 } from "@/features/settings/settings.shared";
@@ -60,6 +62,15 @@ function SettingsPage() {
 	const defaultInterestRateId = useId();
 	const lowStockThresholdId = useId();
 	const defaultTaxRateId = useId();
+	const newPaymentMethodId = useId();
+	const [newPaymentMethodLabel, setNewPaymentMethodLabel] = useState("");
+	const [paymentMethodDraftError, setPaymentMethodDraftError] = useState<
+		string | null
+	>(null);
+	const newPaymentMethodSlug = useMemo(
+		() => normalizePaymentMethodId(newPaymentMethodLabel),
+		[newPaymentMethodLabel],
+	);
 
 	useEffect(() => {
 		setDraftSettings(normalizeOrganizationSettings(data.settings));
@@ -79,7 +90,7 @@ function SettingsPage() {
 	}, [hasChanges]);
 
 	const handlePaymentMethodChange = (
-		methodId: OrganizationPaymentMethodSettings["id"],
+		methodId: string,
 		updates: Partial<OrganizationPaymentMethodSettings>,
 	) => {
 		setDraftSettings((currentValue) => ({
@@ -105,6 +116,45 @@ function SettingsPage() {
 	const handleReset = () => {
 		setDraftSettings(normalizeOrganizationSettings(data.settings));
 		setShowSavedMessage(false);
+	};
+
+	const handleAddPaymentMethod = () => {
+		const trimmedLabel = newPaymentMethodLabel.trim();
+		if (!trimmedLabel || !newPaymentMethodSlug) {
+			setPaymentMethodDraftError(
+				"Escribe un nombre válido para crear el método de pago.",
+			);
+			return;
+		}
+
+		if (
+			draftSettings.pos.paymentMethods.some(
+				(paymentMethod) => paymentMethod.id === newPaymentMethodSlug,
+			)
+		) {
+			setPaymentMethodDraftError(
+				`Ya existe un método con el código ${newPaymentMethodSlug}.`,
+			);
+			return;
+		}
+
+		setDraftSettings((currentValue) => ({
+			...currentValue,
+			pos: {
+				...currentValue.pos,
+				paymentMethods: [
+					...currentValue.pos.paymentMethods,
+					{
+						id: newPaymentMethodSlug,
+						label: trimmedLabel,
+						enabled: true,
+						requiresReference: true,
+					},
+				],
+			},
+		}));
+		setNewPaymentMethodLabel("");
+		setPaymentMethodDraftError(null);
 	};
 
 	const handleSave = async () => {
@@ -264,8 +314,8 @@ function SettingsPage() {
 							<div>
 								<h3 className="font-medium text-white">Métodos de pago</h3>
 								<p className="mt-1 text-sm text-gray-400">
-									Los deshabilitados no aparecerán en el checkout para nuevas
-									ventas.
+									Los deshabilitados dejan de salir en nuevas operaciones, pero
+									se conservan para histórico, cierres y reportes.
 								</p>
 							</div>
 
@@ -276,14 +326,32 @@ function SettingsPage() {
 										className="rounded-2xl border border-gray-800 bg-black/20 p-4"
 									>
 										<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-											<div>
-												<p className="font-medium text-white">
-													{paymentMethod.label}
+											<div className="min-w-0 flex-1 space-y-3">
+												<div className="grid gap-2">
+													<Label htmlFor={`payment-method-${paymentMethod.id}`}>
+														Nombre visible
+													</Label>
+													<Input
+														id={`payment-method-${paymentMethod.id}`}
+														value={paymentMethod.label}
+														onChange={(event) =>
+															handlePaymentMethodChange(paymentMethod.id, {
+																label: event.target.value,
+															})
+														}
+														className="border-gray-700 bg-black/20"
+													/>
+												</div>
+												<p className="text-xs text-gray-500">
+													Código interno:{" "}
+													<span className="text-gray-400">
+														{paymentMethod.id}
+													</span>
 												</p>
 												<p className="text-sm text-gray-400">
 													{paymentMethod.id === "cash"
-														? "Siempre disponible para cierre de caja."
-														: "Puedes pedir referencia para validar el pago."}
+														? "Siempre activo para apertura, cambio y cierre."
+														: "Puedes exigir referencia y desactivarlo cuando ya no aplique para nuevas operaciones."}
 												</p>
 											</div>
 
@@ -291,6 +359,7 @@ function SettingsPage() {
 												<div className="flex items-center gap-3">
 													<Switch
 														checked={paymentMethod.enabled}
+														disabled={paymentMethod.id === "cash"}
 														onCheckedChange={(checked) =>
 															handlePaymentMethodChange(paymentMethod.id, {
 																enabled: checked,
@@ -318,6 +387,48 @@ function SettingsPage() {
 										</div>
 									</div>
 								))}
+							</div>
+
+							<div className="rounded-2xl border border-dashed border-gray-700 bg-black/10 p-4">
+								<div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+									<div className="space-y-2">
+										<Label htmlFor={newPaymentMethodId}>
+											Agregar método personalizado
+										</Label>
+										<Input
+											id={newPaymentMethodId}
+											value={newPaymentMethodLabel}
+											onChange={(event) => {
+												if (paymentMethodDraftError) {
+													setPaymentMethodDraftError(null);
+												}
+												setNewPaymentMethodLabel(event.target.value);
+											}}
+											placeholder="Ej. Daviplata, QR, Zelle"
+											className="border-gray-700 bg-black/20"
+										/>
+										<p className="text-xs text-gray-500">
+											Código interno:{" "}
+											<span className="text-gray-400">
+												{newPaymentMethodSlug || "Se genera automáticamente"}
+											</span>
+										</p>
+									</div>
+									<Button
+										type="button"
+										variant="outline"
+										onClick={handleAddPaymentMethod}
+										className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+									>
+										<Plus className="h-4 w-4" />
+										Agregar método
+									</Button>
+								</div>
+								{paymentMethodDraftError ? (
+									<p className="mt-3 text-sm text-red-400">
+										{paymentMethodDraftError}
+									</p>
+								) : null}
 							</div>
 						</div>
 					</CardContent>

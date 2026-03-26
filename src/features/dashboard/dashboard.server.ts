@@ -13,7 +13,12 @@ import {
 	shift,
 } from "#/db/schema";
 import { requireAuthContext } from "#/features/pos/server/auth-context";
-import { parseOrganizationSettingsMetadata } from "#/features/settings/settings.shared";
+import {
+	buildPaymentMethodLabelMap,
+	buildPaymentMethodOptions,
+	getAllPaymentMethods,
+	parseOrganizationSettingsMetadata,
+} from "#/features/settings/settings.shared";
 
 const TREND_DAYS = 7;
 const TOP_PRODUCTS_WINDOW_DAYS = 30;
@@ -58,6 +63,7 @@ export type DashboardOverview = {
 		method: string;
 		amount: number;
 	}>;
+	paymentMethodLabels: Record<string, string>;
 	topProducts: Array<{
 		productId: string;
 		name: string;
@@ -170,9 +176,10 @@ export async function getDashboardOverviewForCurrentOrganization(): Promise<Dash
 		.from(organization)
 		.where(eq(organization.id, organizationId))
 		.limit(1);
-	const lowStockThreshold = parseOrganizationSettingsMetadata(
+	const organizationSettings = parseOrganizationSettingsMetadata(
 		organizationRows[0]?.metadata,
-	).inventory.lowStockThreshold;
+	);
+	const lowStockThreshold = organizationSettings.inventory.lowStockThreshold;
 
 	const saleBaseClauses = [
 		eq(sale.organizationId, organizationId),
@@ -496,6 +503,12 @@ export async function getDashboardOverviewForCurrentOrganization(): Promise<Dash
 			method: row.method,
 			amount: normalizeNumber(row.amount),
 		})),
+		paymentMethodLabels: buildPaymentMethodLabelMap(
+			buildPaymentMethodOptions(
+				getAllPaymentMethods(organizationSettings),
+				paymentMixRows.map((row) => row.method),
+			),
+		),
 		topProducts: topProductsRows.map((row) => ({
 			productId: row.productId,
 			name: row.name,

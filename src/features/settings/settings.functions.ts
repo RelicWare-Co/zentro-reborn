@@ -5,8 +5,8 @@ import {
 	updateSettingsForCurrentOrganization,
 } from "./settings.server";
 import {
-	PAYMENT_METHOD_ID_PATTERN,
 	normalizePaymentMethodId,
+	PAYMENT_METHOD_ID_PATTERN,
 } from "./settings.shared";
 
 const paymentMethodIdSchema = z

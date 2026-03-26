@@ -450,6 +450,12 @@ describe("dashboard.server", () => {
 				{ method: "cash", amount: 10000 },
 				{ method: "card", amount: 5000 },
 			]);
+			expect(dashboard.paymentMethodLabels).toEqual(
+				expect.objectContaining({
+					cash: "Efectivo",
+					card: "Tarjeta",
+				}),
+			);
 			expect(dashboard.topProducts[0]).toEqual({
 				productId: lowStockProductId,
 				name: "Coca Cola",

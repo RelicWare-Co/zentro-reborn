@@ -4,6 +4,7 @@ import { db } from "#/db";
 import {
 	creditTransaction,
 	customer,
+	organization,
 	payment,
 	product,
 	sale,
@@ -12,6 +13,11 @@ import {
 	shift,
 	user,
 } from "#/db/schema";
+import {
+	buildPaymentMethodOptions,
+	getAllPaymentMethods,
+	parseOrganizationSettingsMetadata,
+} from "#/features/settings/settings.shared";
 import { requireAuthContext } from "./auth-context";
 import type { GetSaleByIdInput, ListSalesInput } from "./types";
 
@@ -154,7 +160,14 @@ export async function listSalesForCurrentOrganization(
 		? [...baseWhereConditions, searchCondition]
 		: baseWhereConditions;
 
-	const [salesRows, totalRows, cashierRows, terminalRows] = await Promise.all([
+	const [
+		salesRows,
+		totalRows,
+		cashierRows,
+		terminalRows,
+		paymentMethodRows,
+		organizationRows,
+	] = await Promise.all([
 		db
 			.select({
 				id: sale.id,
@@ -234,7 +247,28 @@ export async function listSalesForCurrentOrganization(
 				),
 			)
 			.orderBy(asc(shift.terminalName)),
+		db
+			.selectDistinct({
+				method: payment.method,
+			})
+			.from(payment)
+			.where(eq(payment.organizationId, organizationId))
+			.orderBy(asc(payment.method)),
+		db
+			.select({
+				metadata: organization.metadata,
+			})
+			.from(organization)
+			.where(eq(organization.id, organizationId))
+			.limit(1),
 	]);
+	const organizationSettings = parseOrganizationSettingsMetadata(
+		organizationRows[0]?.metadata,
+	);
+	const paymentMethods = buildPaymentMethodOptions(
+		getAllPaymentMethods(organizationSettings),
+		paymentMethodRows.map((paymentMethod) => paymentMethod.method),
+	);
 
 	const pageRows = salesRows.slice(0, limit);
 	const hasMore = salesRows.length > limit;
@@ -254,6 +288,7 @@ export async function listSalesForCurrentOrganization(
 					.filter((terminalName): terminalName is string =>
 						Boolean(terminalName),
 					),
+				paymentMethods,
 			},
 		};
 	}
@@ -349,6 +384,7 @@ export async function listSalesForCurrentOrganization(
 				.filter((terminalName): terminalName is string =>
 					Boolean(terminalName),
 				),
+			paymentMethods,
 		},
 	};
 }

@@ -43,7 +43,10 @@ import {
 import { printThermalReceipt } from "@/features/pos/printing/printThermalReceipt";
 import { buildSaleReceiptDocument } from "@/features/pos/printing/receiptDocuments";
 import type { Category, Product } from "@/features/pos/types";
-import { formatCurrency } from "@/features/pos/utils";
+import {
+	createPaymentMethodLabelMap,
+	formatCurrency,
+} from "@/features/pos/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export const Route = createFileRoute("/_auth/pos")({
@@ -82,6 +85,10 @@ function PosPage() {
 	const customers = customerSearchResult?.data ?? [];
 	const creditAccounts = creditAccountsSearchResult?.data ?? [];
 	const posSettings = bootstrap.settings;
+	const paymentMethodLabels = useMemo(
+		() => createPaymentMethodLabelMap(posSettings.paymentMethods),
+		[posSettings.paymentMethods],
+	);
 
 	// Credit account lookup
 	const customerById = useMemo(
@@ -163,12 +170,14 @@ function PosPage() {
 				totalAmount: payload.result.totalAmount,
 				paidAmount: payload.result.paidAmount,
 				balanceDue: payload.result.balanceDue,
+				paymentMethodLabels,
 			});
 
 			printThermalReceipt(receiptDocument);
 		},
 		[
 			activeShift?.terminalName,
+			paymentMethodLabels,
 			posSettings.defaultTerminalName,
 			selectedCustomer,
 		],

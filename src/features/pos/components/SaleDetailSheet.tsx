@@ -37,7 +37,11 @@ import {
 	buildSaleReceiptDocument,
 } from "@/features/pos/printing/receiptDocuments";
 import type { CreditAccount, SaleDetail } from "@/features/pos/types";
-import { formatCurrency, formatPaymentMethodLabel } from "@/features/pos/utils";
+import {
+	createPaymentMethodLabelMap,
+	formatCurrency,
+	formatPaymentMethodLabel,
+} from "@/features/pos/utils";
 import {
 	formatMoneyInput,
 	parseMoneyInput,
@@ -52,6 +56,13 @@ const dateTimeFormatter = new Intl.DateTimeFormat("es-CO", {
 	minute: "2-digit",
 });
 
+const DEFAULT_PAYMENT_METHOD_OPTIONS = [
+	{ id: "cash", label: "Efectivo" },
+	{ id: "card", label: "Tarjeta" },
+	{ id: "transfer_nequi", label: "Nequi" },
+	{ id: "transfer_bancolombia", label: "Bancolombia" },
+];
+
 export function SaleDetailSheet({
 	isOpen,
 	onOpenChange,
@@ -59,6 +70,7 @@ export function SaleDetailSheet({
 	isLoading,
 	activeShiftId,
 	creditAccount,
+	paymentMethodOptions = DEFAULT_PAYMENT_METHOD_OPTIONS,
 }: {
 	isOpen: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -66,16 +78,25 @@ export function SaleDetailSheet({
 	isLoading: boolean;
 	activeShiftId?: string;
 	creditAccount?: CreditAccount | null;
+	paymentMethodOptions?: Array<{ id: string; label: string }>;
 }) {
+	const paymentMethodLabels = useMemo(
+		() => createPaymentMethodLabelMap(paymentMethodOptions),
+		[paymentMethodOptions],
+	);
+
 	const handlePrintSale = useCallback(() => {
 		if (!sale) {
 			return;
 		}
 
 		printThermalReceipt(
-			buildSaleReceiptDocument(buildSaleReceiptPayload(sale)),
+			buildSaleReceiptDocument({
+				...buildSaleReceiptPayload(sale),
+				paymentMethodLabels,
+			}),
 		);
-	}, [sale]);
+	}, [paymentMethodLabels, sale]);
 
 	const handlePrintPayment = useCallback(
 		(payment: NonNullable<SaleDetail>["payments"][number]) => {
@@ -84,15 +105,16 @@ export function SaleDetailSheet({
 			}
 
 			printThermalReceipt(
-				buildPaymentReceiptDocument(
-					buildPaymentReceiptPayload({
+				buildPaymentReceiptDocument({
+					...buildPaymentReceiptPayload({
 						sale,
 						payment,
 					}),
-				),
+					paymentMethodLabels,
+				}),
 			);
 		},
-		[sale],
+		[paymentMethodLabels, sale],
 	);
 	const cancelSaleMutation = useCancelPosSaleMutation();
 	const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
@@ -275,7 +297,10 @@ export function SaleDetailSheet({
 														<div className="min-w-0">
 															<div className="flex flex-wrap items-center gap-2">
 																<p className="break-words font-medium text-white">
-																	{formatPaymentMethodLabel(payment.method)}
+																	{formatPaymentMethodLabel(
+																		payment.method,
+																		paymentMethodLabels,
+																	)}
 																</p>
 																<Badge
 																	className={getPaymentKindBadgeClass(
@@ -327,6 +352,8 @@ export function SaleDetailSheet({
 										sale={sale}
 										activeShiftId={activeShiftId}
 										creditAccount={creditAccount}
+										paymentMethodOptions={paymentMethodOptions}
+										paymentMethodLabels={paymentMethodLabels}
 									/>
 								) : null}
 
@@ -450,18 +477,27 @@ function CreditPaymentSection({
 	sale,
 	activeShiftId,
 	creditAccount,
+	paymentMethodOptions,
+	paymentMethodLabels,
 }: {
 	sale: NonNullable<SaleDetail>;
 	activeShiftId?: string;
 	creditAccount?: CreditAccount | null;
+	paymentMethodOptions: Array<{ id: string; label: string }>;
+	paymentMethodLabels: Record<string, string>;
 }) {
 	const amountId = useId();
 	const methodId = useId();
 	const referenceId = useId();
 	const notesId = useId();
 	const registerCreditPaymentMutation = useRegisterCreditPaymentMutation();
+	const defaultPaymentMethodId =
+		paymentMethodOptions.find((paymentMethod) => paymentMethod.id === "cash")
+			?.id ??
+		paymentMethodOptions[0]?.id ??
+		"cash";
 	const [amount, setAmount] = useState("");
-	const [method, setMethod] = useState("cash");
+	const [method, setMethod] = useState(defaultPaymentMethodId);
 	const [reference, setReference] = useState("");
 	const [notes, setNotes] = useState("");
 
@@ -473,10 +509,10 @@ function CreditPaymentSection({
 
 	useEffect(() => {
 		setAmount(maxPaymentAmount > 0 ? String(maxPaymentAmount) : "");
-		setMethod("cash");
+		setMethod(defaultPaymentMethodId);
 		setReference("");
 		setNotes("");
-	}, [maxPaymentAmount]);
+	}, [defaultPaymentMethodId, maxPaymentAmount]);
 
 	const parsedAmount = parseMoneyInput(amount);
 	const canSubmit =
@@ -526,6 +562,7 @@ function CreditPaymentSection({
 							remainingSaleBalance,
 							remainingAccountBalance: result.newBalance,
 							title: "Comprobante de abono",
+							paymentMethodLabels,
 						}),
 					);
 				},
@@ -615,12 +652,11 @@ function CreditPaymentSection({
 									<SelectValue placeholder="Selecciona un método" />
 								</SelectTrigger>
 								<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-									<SelectItem value="cash">Efectivo</SelectItem>
-									<SelectItem value="card">Tarjeta</SelectItem>
-									<SelectItem value="transfer_nequi">Nequi</SelectItem>
-									<SelectItem value="transfer_bancolombia">
-										Bancolombia
-									</SelectItem>
+									{paymentMethodOptions.map((paymentMethod) => (
+										<SelectItem key={paymentMethod.id} value={paymentMethod.id}>
+											{paymentMethod.label}
+										</SelectItem>
+									))}
 								</SelectContent>
 							</Select>
 						</div>

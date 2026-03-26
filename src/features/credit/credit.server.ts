@@ -5,6 +5,7 @@ import {
 	creditAccount,
 	creditTransaction,
 	customer,
+	organization,
 	payment,
 	sale,
 	shift,
@@ -16,6 +17,10 @@ import {
 	resolveDate,
 	toPositiveInteger,
 } from "#/features/pos/server/utils";
+import {
+	getEnabledPaymentMethods,
+	parseOrganizationSettingsMetadata,
+} from "#/features/settings/settings.shared";
 
 export type SearchCreditAccountsInput = {
 	searchQuery?: string | null;
@@ -209,6 +214,22 @@ export async function registerCreditPaymentForCurrentOrganization(
 		}
 		if (targetShift.userId !== session.user.id) {
 			throw new Error("Solo el cajero del turno puede registrar pagos");
+		}
+
+		const [organizationRow] = await tx
+			.select({
+				metadata: organization.metadata,
+			})
+			.from(organization)
+			.where(eq(organization.id, organizationId))
+			.limit(1);
+		const enabledPaymentMethodIds = new Set(
+			getEnabledPaymentMethods(
+				parseOrganizationSettingsMetadata(organizationRow?.metadata),
+			).map((paymentMethod) => paymentMethod.id),
+		);
+		if (!enabledPaymentMethodIds.has(method)) {
+			throw new Error(`Método de pago no habilitado: ${method}`);
 		}
 
 		const [accountRow] = await tx

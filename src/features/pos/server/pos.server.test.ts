@@ -96,6 +96,28 @@ async function insertCustomer(input: {
 	return id;
 }
 
+async function updateOrganizationPaymentMethods(input: {
+	db: TestDb;
+	organizationId: string;
+	paymentMethods: Array<{
+		id: string;
+		label: string;
+		enabled: boolean;
+		requiresReference: boolean;
+	}>;
+}) {
+	await input.db
+		.update(schema.organization)
+		.set({
+			metadata: JSON.stringify({
+				pos: {
+					paymentMethods: input.paymentMethods,
+				},
+			}),
+		})
+		.where(eq(schema.organization.id, input.organizationId));
+}
+
 describe("pos server modules", () => {
 	test("prevents opening multiple shifts for the same user", async () => {
 		const { ctx, shiftsServer } = await setupPosServers();
@@ -812,6 +834,31 @@ describe("pos server modules", () => {
 	test("orders shift close summary by method with cash first", async () => {
 		const { ctx, shiftsServer, salesServer } = await setupPosServers();
 		try {
+			await updateOrganizationPaymentMethods({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				paymentMethods: [
+					{
+						id: "cash",
+						label: "Efectivo",
+						enabled: true,
+						requiresReference: false,
+					},
+					{
+						id: "card",
+						label: "Tarjeta",
+						enabled: true,
+						requiresReference: true,
+					},
+					{
+						id: "zelle",
+						label: "Zelle",
+						enabled: true,
+						requiresReference: true,
+					},
+				],
+			});
+
 			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
 				startingCash: 1000,
 				terminalId: "terminal-1",
@@ -852,6 +899,32 @@ describe("pos server modules", () => {
 			).toEqual(["cash", "card", "zelle"]);
 			expect(summary.summaryByMethod[0]?.expectedAmount).toBe(1200);
 			expect(summary.totalExpected).toBe(2200);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("rejects sales with payment methods that are not enabled", async () => {
+		const { ctx, shiftsServer, salesServer } = await setupPosServers();
+		try {
+			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 1000,
+				terminalId: "terminal-1",
+				terminalName: "Caja 1",
+			});
+			const productId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				trackInventory: false,
+			});
+
+			await expect(
+				salesServer.createPosSaleForCurrentOrganization({
+					shiftId: openedShift.id,
+					items: [{ productId, quantity: 1 }],
+					payments: [{ method: "zelle", amount: 1000 }],
+				}),
+			).rejects.toThrow("Método de pago no habilitado: zelle");
 		} finally {
 			ctx.cleanup();
 		}
@@ -1230,6 +1303,31 @@ describe("pos server modules", () => {
 	test("lists shifts with advanced filters and filter options", async () => {
 		const { ctx, shiftsServer, salesServer } = await setupPosServers();
 		try {
+			await updateOrganizationPaymentMethods({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				paymentMethods: [
+					{
+						id: "cash",
+						label: "Efectivo",
+						enabled: true,
+						requiresReference: false,
+					},
+					{
+						id: "card",
+						label: "Tarjeta",
+						enabled: true,
+						requiresReference: true,
+					},
+					{
+						id: "qr_pay",
+						label: "Pago QR",
+						enabled: false,
+						requiresReference: true,
+					},
+				],
+			});
+
 			const firstShift = await shiftsServer.openShiftForCurrentOrganization({
 				startingCash: 5000,
 				terminalId: "terminal-1",
@@ -1315,6 +1413,7 @@ describe("pos server modules", () => {
 				expect.arrayContaining([
 					expect.objectContaining({ id: "cash" }),
 					expect.objectContaining({ id: "card" }),
+					expect.objectContaining({ id: "qr_pay", label: "Pago QR" }),
 				]),
 			);
 		} finally {

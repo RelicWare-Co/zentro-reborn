@@ -40,6 +40,7 @@ export function buildSaleReceiptDocument(input: {
 	totalAmount: number;
 	paidAmount: number;
 	balanceDue: number;
+	paymentMethodLabels?: Record<string, string>;
 }) {
 	const items: ThermalReceiptItem[] = input.items.map((item) => {
 		const secondaryLines = (item.modifiers ?? []).map(
@@ -92,7 +93,10 @@ export function buildSaleReceiptDocument(input: {
 				]}
 				items={items}
 				payments={input.payments.map((payment) => ({
-					label: formatPaymentMethodLabel(payment.method),
+					label: formatPaymentMethodLabel(
+						payment.method,
+						input.paymentMethodLabels,
+					),
 					amountLabel: formatCurrency(payment.amount),
 					secondaryLines: payment.reference
 						? [`Ref. ${payment.reference}`]
@@ -151,6 +155,7 @@ export function buildPaymentReceiptDocument(input: {
 	remainingSaleBalance?: number | null;
 	remainingAccountBalance?: number | null;
 	title?: string;
+	paymentMethodLabels?: Record<string, string>;
 }) {
 	const hasRemainingSaleBalance =
 		typeof input.remainingSaleBalance === "number";
@@ -190,7 +195,10 @@ export function buildPaymentReceiptDocument(input: {
 				]}
 				payments={[
 					{
-						label: formatPaymentMethodLabel(input.method),
+						label: formatPaymentMethodLabel(
+							input.method,
+							input.paymentMethodLabels,
+						),
 						amountLabel: formatCurrency(input.amount),
 						secondaryLines: [
 							...(input.reference ? [`Ref. ${input.reference}`] : []),

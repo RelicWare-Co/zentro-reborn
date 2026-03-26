@@ -31,6 +31,10 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { listShifts } from "@/features/pos/pos.functions";
+import {
+	createPaymentMethodLabelMap,
+	formatPaymentMethodLabel,
+} from "@/features/pos/utils";
 import { authClient } from "@/lib/auth-client";
 
 const DEFAULT_LIST_PARAMS = {
@@ -176,6 +180,10 @@ function ShiftsPage() {
 			},
 		);
 	}, [shifts]);
+	const paymentMethodLabels = useMemo(
+		() => createPaymentMethodLabelMap(initialData.filterOptions.paymentMethods),
+		[initialData.filterOptions.paymentMethods],
+	);
 
 	const applyFilters = () => {
 		void navigate({
@@ -683,7 +691,10 @@ function ShiftsPage() {
 													{shift.paymentBreakdown.map((paymentMethod) => (
 														<RowItem
 															key={`${shift.id}-${paymentMethod.method}`}
-															label={formatPaymentMethod(paymentMethod.method)}
+															label={formatPaymentMethod(
+																paymentMethod.method,
+																paymentMethodLabels,
+															)}
 															value={formatCurrency(paymentMethod.amount)}
 														/>
 													))}
@@ -712,6 +723,7 @@ function ShiftsPage() {
 																	<p className="text-sm text-gray-400">
 																		{formatPaymentMethod(
 																			movement.paymentMethod,
+																			paymentMethodLabels,
 																		)}{" "}
 																		· {movement.description}
 																	</p>
@@ -757,7 +769,10 @@ function ShiftsPage() {
 														>
 															<div className="flex items-center justify-between gap-3">
 																<p className="text-sm font-medium text-white">
-																	{formatPaymentMethod(closure.paymentMethod)}
+																	{formatPaymentMethod(
+																		closure.paymentMethod,
+																		paymentMethodLabels,
+																	)}
 																</p>
 																<p
 																	className={getDifferenceClassName(
@@ -944,22 +959,11 @@ function formatCount(value: number) {
 	return countFormatter.format(value);
 }
 
-function formatPaymentMethod(method: string) {
-	const labels: Record<string, string> = {
-		cash: "Efectivo",
-		card: "Tarjeta",
-		transfer: "Transferencia",
-		transfer_nequi: "Nequi",
-		transfer_bancolombia: "Bancolombia",
-	};
-
-	return (
-		labels[method] ??
-		method
-			.split("_")
-			.map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-			.join(" ")
-	);
+function formatPaymentMethod(
+	method: string,
+	paymentMethodLabels?: Record<string, string>,
+) {
+	return formatPaymentMethodLabel(method, paymentMethodLabels);
 }
 
 function formatMovementType(type: string) {

@@ -20,6 +20,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { getDashboardOverview } from "@/features/dashboard/dashboard.functions";
+import { formatPaymentMethodLabel } from "@/features/pos/utils";
 import { authClient } from "@/lib/auth-client";
 
 const currencyFormatter = new Intl.NumberFormat("es-CO", {
@@ -353,7 +354,10 @@ function DashboardPage() {
 											<div key={paymentMethod.method} className="space-y-1.5">
 												<div className="flex items-center justify-between text-sm">
 													<span className="text-gray-300">
-														{formatPaymentMethod(paymentMethod.method)}
+														{formatPaymentMethod(
+															paymentMethod.method,
+															data.paymentMethodLabels,
+														)}
 													</span>
 													<span className="text-gray-400">
 														{formatCurrency(paymentMethod.amount)}
@@ -371,7 +375,10 @@ function DashboardPage() {
 									<p className="text-xs text-gray-500">
 										Medio principal:{" "}
 										{primaryPaymentMethod
-											? formatPaymentMethod(primaryPaymentMethod.method)
+											? formatPaymentMethod(
+													primaryPaymentMethod.method,
+													data.paymentMethodLabels,
+												)
 											: "Sin registros"}
 									</p>
 								</div>
@@ -671,22 +678,11 @@ function formatShortDay(dateKey: string) {
 		.toUpperCase();
 }
 
-function formatPaymentMethod(method: string) {
-	const labels: Record<string, string> = {
-		cash: "Efectivo",
-		card: "Tarjeta",
-		transfer: "Transferencia",
-		transfer_nequi: "Nequi",
-		transfer_bancolombia: "Bancolombia",
-	};
-
-	return (
-		labels[method] ??
-		method
-			.split("_")
-			.map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-			.join(" ")
-	);
+function formatPaymentMethod(
+	method: string,
+	paymentMethodLabels?: Record<string, string>,
+) {
+	return formatPaymentMethodLabel(method, paymentMethodLabels);
 }
 
 function formatSaleStatus(status: string) {

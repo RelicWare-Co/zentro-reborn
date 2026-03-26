@@ -6,6 +6,7 @@ import {
 	creditTransaction,
 	customer,
 	inventoryMovement,
+	organization,
 	payment,
 	product,
 	sale,
@@ -13,6 +14,10 @@ import {
 	saleItemModifier,
 	shift,
 } from "#/db/schema";
+import {
+	getEnabledPaymentMethods,
+	parseOrganizationSettingsMetadata,
+} from "#/features/settings/settings.shared";
 import { requireAuthContext } from "./auth-context";
 import type { CancelSaleInput, CreatePosSaleInput } from "./types";
 import {
@@ -85,6 +90,19 @@ export async function createPosSaleForCurrentOrganization(
 		if (targetShift.userId !== session.user.id) {
 			throw new Error("Solo el cajero del turno puede registrar ventas");
 		}
+
+		const [organizationRow] = await tx
+			.select({
+				metadata: organization.metadata,
+			})
+			.from(organization)
+			.where(eq(organization.id, organizationId))
+			.limit(1);
+		const enabledPaymentMethodIds = new Set(
+			getEnabledPaymentMethods(
+				parseOrganizationSettingsMetadata(organizationRow?.metadata),
+			).map((paymentMethod) => paymentMethod.id),
+		);
 
 		if (customerId) {
 			const [existingCustomer] = await tx
@@ -306,6 +324,13 @@ export async function createPosSaleForCurrentOrganization(
 				reference: normalizeOptionalString(registeredPayment.reference),
 			}),
 		);
+		for (const registeredPayment of normalizedPayments) {
+			if (!enabledPaymentMethodIds.has(registeredPayment.method)) {
+				throw new Error(
+					`Método de pago no habilitado: ${registeredPayment.method}`,
+				);
+			}
+		}
 		const paidAmount = normalizedPayments.reduce(
 			(total, registeredPayment) => total + registeredPayment.amount,
 			0,

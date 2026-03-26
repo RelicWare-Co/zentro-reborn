@@ -23,6 +23,9 @@ interface CashMovementModalProps {
 	onClose: () => void;
 	movementType: string;
 	setMovementType: (value: CashMovementType) => void;
+	movementPaymentMethod: string;
+	setMovementPaymentMethod: (value: string) => void;
+	paymentMethodOptions: Array<{ id: string; label: string }>;
 	movementAmount: string;
 	setMovementAmount: (value: string) => void;
 	movementDescription: string;
@@ -39,6 +42,9 @@ export function CashMovementModal({
 	onClose,
 	movementType,
 	setMovementType,
+	movementPaymentMethod,
+	setMovementPaymentMethod,
+	paymentMethodOptions,
 	movementAmount,
 	setMovementAmount,
 	movementDescription,
@@ -50,6 +56,7 @@ export function CashMovementModal({
 	onConfirm,
 }: CashMovementModalProps) {
 	const movementTypeId = useId();
+	const movementPaymentMethodId = useId();
 	const movementAmountId = useId();
 	const movementDescriptionId = useId();
 
@@ -57,7 +64,7 @@ export function CashMovementModal({
 		<Dialog open={isOpen} onOpenChange={onClose}>
 			<DialogContent className="bg-[#151515] border-gray-800 text-white sm:max-w-[425px]">
 				<DialogHeader>
-					<DialogTitle>Movimiento de Caja</DialogTitle>
+					<DialogTitle>Movimiento del Turno</DialogTitle>
 				</DialogHeader>
 
 				<div className="grid gap-4 py-4">
@@ -90,6 +97,33 @@ export function CashMovementModal({
 								<SelectItem value="inflow">Ingreso (Entrada manual)</SelectItem>
 								<SelectItem value="expense">Gasto Operativo</SelectItem>
 								<SelectItem value="payout">Pago a Proveedor</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+
+					<div className="grid gap-2">
+						<label
+							htmlFor={movementPaymentMethodId}
+							className="text-sm font-medium text-gray-300"
+						>
+							Método Afectado
+						</label>
+						<Select
+							value={movementPaymentMethod}
+							onValueChange={setMovementPaymentMethod}
+						>
+							<SelectTrigger
+								id={movementPaymentMethodId}
+								className="h-10 w-full rounded-md border border-gray-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white focus:ring-[var(--color-voltage)] focus:ring-2"
+							>
+								<SelectValue placeholder="Método de Pago" />
+							</SelectTrigger>
+							<SelectContent className="bg-[#0a0a0a] border-gray-800 text-white">
+								{paymentMethodOptions.map((paymentMethod) => (
+									<SelectItem key={paymentMethod.id} value={paymentMethod.id}>
+										{paymentMethod.label}
+									</SelectItem>
+								))}
 							</SelectContent>
 						</Select>
 					</div>

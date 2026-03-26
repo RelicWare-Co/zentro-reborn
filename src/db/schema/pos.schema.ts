@@ -35,6 +35,7 @@ export const cashMovement = sqliteTable(
 			.notNull()
 			.references(() => shift.id, { onDelete: "cascade" }),
 		type: text("type").notNull(), // 'expense' (gasto operativo), 'payout' (proveedor), 'inflow' (ingreso manual)
+		paymentMethod: text("payment_method").notNull().default("cash"),
 		amount: integer("amount").notNull(),
 		description: text("description").notNull(),
 		createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),

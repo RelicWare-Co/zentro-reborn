@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
 	AlertTriangle,
 	ArrowRight,
 	CreditCard,
+	LogOut,
 	Package,
 	Receipt,
 	Store,
@@ -19,6 +20,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { getDashboardOverview } from "@/features/dashboard/dashboard.functions";
+import { authClient } from "@/lib/auth-client";
 
 const currencyFormatter = new Intl.NumberFormat("es-CO", {
 	style: "currency",
@@ -50,6 +52,7 @@ export const Route = createFileRoute("/_auth/dashboard")({
 });
 
 function DashboardPage() {
+	const navigate = useNavigate({ from: Route.fullPath });
 	const data = Route.useLoaderData();
 	const todayRevenueChange = getPercentChange(
 		data.stats.todayRevenue,
@@ -121,6 +124,18 @@ function DashboardPage() {
 							<Package className="h-4 w-4" />
 							Ver inventario
 						</Link>
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						onClick={async () => {
+							await authClient.signOut();
+							void navigate({ to: "/login" });
+						}}
+						className="border-gray-700 bg-[var(--color-carbon)] text-gray-200 hover:bg-white/5 hover:text-white"
+					>
+						<LogOut className="h-4 w-4" />
+						Cerrar sesión
 					</Button>
 				</div>
 			</section>

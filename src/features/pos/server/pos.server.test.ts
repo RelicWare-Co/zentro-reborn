@@ -393,12 +393,14 @@ describe("pos server modules", () => {
 			await shiftsServer.registerCashMovementForCurrentOrganization({
 				shiftId: openedShift.id,
 				type: "inflow",
+				paymentMethod: "cash",
 				amount: 2000,
 				description: "Ingreso extra",
 			});
 			await shiftsServer.registerCashMovementForCurrentOrganization({
 				shiftId: openedShift.id,
 				type: "expense",
+				paymentMethod: "cash",
 				amount: 500,
 				description: "Compra insumos",
 			});
@@ -411,6 +413,29 @@ describe("pos server modules", () => {
 				(row: { paymentMethod: string }) => row.paymentMethod === "cash",
 			);
 			expect(cashSummary?.expectedAmount).toBe(12500);
+			expect(summary.movements.totals).toEqual({
+				inflow: 2000,
+				expense: 500,
+				payout: 0,
+				net: 1500,
+			});
+			expect(summary.movements.items).toHaveLength(2);
+			expect(summary.movements.items).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						type: "inflow",
+						paymentMethod: "cash",
+						amount: 2000,
+						description: "Ingreso extra",
+					}),
+					expect.objectContaining({
+						type: "expense",
+						paymentMethod: "cash",
+						amount: 500,
+						description: "Compra insumos",
+					}),
+				]),
+			);
 
 			const closeResult = await shiftsServer.closeShiftForCurrentOrganization({
 				shiftId: openedShift.id,
@@ -418,6 +443,75 @@ describe("pos server modules", () => {
 			});
 			expect(closeResult.closures).toHaveLength(1);
 			expect(closeResult.closures[0]?.difference).toBe(-100);
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("applies movements to non-cash payment methods in shift close summary", async () => {
+		const { ctx, shiftsServer, salesServer } = await setupPosServers();
+		try {
+			const openedShift = await shiftsServer.openShiftForCurrentOrganization({
+				startingCash: 5000,
+				terminalId: "terminal-1",
+				terminalName: "Caja 1",
+			});
+
+			const productId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				price: 4000,
+				trackInventory: false,
+			});
+			await salesServer.createPosSaleForCurrentOrganization({
+				shiftId: openedShift.id,
+				items: [{ productId, quantity: 1 }],
+				payments: [{ method: "card", amount: 4000 }],
+			});
+
+			await shiftsServer.registerCashMovementForCurrentOrganization({
+				shiftId: openedShift.id,
+				type: "inflow",
+				paymentMethod: "card",
+				amount: 700,
+				description: "Ajuste terminal tarjeta",
+			});
+			await shiftsServer.registerCashMovementForCurrentOrganization({
+				shiftId: openedShift.id,
+				type: "expense",
+				paymentMethod: "card",
+				amount: 200,
+				description: "Comisión reversada manualmente",
+			});
+
+			const summary =
+				await shiftsServer.getShiftCloseSummaryForCurrentOrganization(
+					openedShift.id,
+				);
+			const cashSummary = summary.summaryByMethod.find(
+				(row: { paymentMethod: string }) => row.paymentMethod === "cash",
+			);
+			const cardSummary = summary.summaryByMethod.find(
+				(row: { paymentMethod: string }) => row.paymentMethod === "card",
+			);
+
+			expect(cashSummary?.expectedAmount).toBe(5000);
+			expect(cardSummary?.expectedAmount).toBe(4500);
+			expect(summary.totalExpected).toBe(9500);
+			expect(summary.movements.items).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						type: "inflow",
+						paymentMethod: "card",
+						amount: 700,
+					}),
+					expect.objectContaining({
+						type: "expense",
+						paymentMethod: "card",
+						amount: 200,
+					}),
+				]),
+			);
 		} finally {
 			ctx.cleanup();
 		}
@@ -440,6 +534,7 @@ describe("pos server modules", () => {
 				shiftsServer.registerCashMovementForCurrentOrganization({
 					shiftId: openedShift.id,
 					type: "inflow",
+					paymentMethod: "cash",
 					amount: 1000,
 					description: "Ingreso tardío",
 				}),
@@ -741,6 +836,7 @@ describe("pos server modules", () => {
 			await shiftsServer.registerCashMovementForCurrentOrganization({
 				shiftId: openedShift.id,
 				type: "inflow",
+				paymentMethod: "cash",
 				amount: 200,
 				description: "Fondo adicional",
 			});

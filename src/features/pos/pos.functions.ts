@@ -70,6 +70,7 @@ const openShiftInputSchema = z.object({
 const registerCashMovementInputSchema = z.object({
 	shiftId: z.string().trim().min(1),
 	type: z.enum(["expense", "payout", "inflow"]),
+	paymentMethod: z.string().trim().min(1),
 	amount: z.coerce.number().int().positive(),
 	description: z.string().trim().min(1),
 	createdAt: z.coerce.number().int().min(0).optional(),

@@ -12,6 +12,7 @@ export type OpenShiftInput = {
 export type RegisterCashMovementInput = {
 	shiftId: string;
 	type: CashMovementType;
+	paymentMethod: string;
 	amount: number;
 	description: string;
 	createdAt?: number;

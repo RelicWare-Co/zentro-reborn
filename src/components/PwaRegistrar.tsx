@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { clearRuntimeCaches } from "@/lib/app-build";
 
 const SERVICE_WORKER_URL = "/sw.js";
 
@@ -9,11 +10,7 @@ export function PwaRegistrar() {
 		}
 
 		if (!import.meta.env.PROD) {
-			void navigator.serviceWorker.getRegistrations().then((registrations) => {
-				for (const registration of registrations) {
-					void registration.unregister();
-				}
-			});
+			void clearRuntimeCaches();
 			return;
 		}
 

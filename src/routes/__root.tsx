@@ -20,6 +20,10 @@ interface MyRouterContext {
 }
 
 const THEME_INIT_SCRIPT = `(function(){try{var stored=window.localStorage.getItem('theme');var mode=(stored==='light'||stored==='dark'||stored==='auto')?stored:'auto';var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var resolved=mode==='auto'?(prefersDark?'dark':'light'):mode;var root=document.documentElement;root.classList.remove('light','dark');root.classList.add(resolved);if(mode==='auto'){root.removeAttribute('data-theme')}else{root.setAttribute('data-theme',mode)}root.style.colorScheme=resolved;}catch(e){}})();`;
+const DEV_SERVICE_WORKER_RESET_SCRIPT = import.meta.env.PROD
+	? ""
+	: `(function(){try{if(!('serviceWorker'in navigator)){return}var key='zentro:dev-sw-reset';navigator.serviceWorker.getRegistrations().then(function(registrations){if(registrations.length===0){sessionStorage.removeItem(key);return}return Promise.all(registrations.map(function(registration){return registration.unregister()})).then(function(){if(!('caches'in window)){return}return caches.keys().then(function(cacheKeys){return Promise.all(cacheKeys.map(function(cacheKey){return caches.delete(cacheKey)}))})}).then(function(){if(navigator.serviceWorker.controller&&sessionStorage.getItem(key)!=='done'){sessionStorage.setItem(key,'done');window.location.reload()}})}).catch(function(){})}catch(e){}})();`;
+const BOOTSTRAP_INIT_SCRIPT = `${THEME_INIT_SCRIPT}${DEV_SERVICE_WORKER_RESET_SCRIPT}`;
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	head: () => ({
@@ -62,20 +66,20 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				name: "apple-mobile-web-app-title",
 				content: SITE_TITLE,
 			},
-				{
-					name: "format-detection",
-					content: "telephone=no",
-				},
-				{
-					name: "app-release-id",
-					content: APP_BUILD_INFO.releaseId,
-				},
-				{
-					name: "app-build-id",
-					content: APP_BUILD_INFO.buildId,
-				},
-			],
-			links: [
+			{
+				name: "format-detection",
+				content: "telephone=no",
+			},
+			{
+				name: "app-release-id",
+				content: APP_BUILD_INFO.releaseId,
+			},
+			{
+				name: "app-build-id",
+				content: APP_BUILD_INFO.buildId,
+			},
+		],
+		links: [
 			{
 				rel: "stylesheet",
 				href: appCss,
@@ -102,7 +106,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 		<html lang="es-CO" suppressHydrationWarning>
 			<head>
 				{/** biome-ignore lint/security/noDangerouslySetInnerHtml: required for theme initialization */}
-				<script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+				<script dangerouslySetInnerHTML={{ __html: BOOTSTRAP_INIT_SCRIPT }} />
 				<HeadContent />
 			</head>
 			<body className="min-h-screen bg-[var(--color-void)] font-sans text-[var(--color-photon)] antialiased [overflow-wrap:anywhere] selection:bg-[rgba(79,184,178,0.24)]">

@@ -1,15 +1,19 @@
 // TODO: migrate to LibSQL and update tests accordingly.
 import { Database } from "bun:sqlite";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { faker } from "@faker-js/faker";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import * as schema from "#/db/schema";
 
-const MIGRATION_FILE_PATH = resolve(
-	process.cwd(),
-	"drizzle/0000_grey_demogoblin.sql",
-);
+const MIGRATIONS_DIR_PATH = resolve(process.cwd(), "drizzle");
+
+function getMigrationFilePaths() {
+	return readdirSync(MIGRATIONS_DIR_PATH)
+		.filter((fileName) => fileName.endsWith(".sql"))
+		.sort()
+		.map((fileName) => resolve(MIGRATIONS_DIR_PATH, fileName));
+}
 
 export function createTestDatabase(fileName = "test.db") {
 	const dbPath = resolve(process.cwd(), fileName);
@@ -19,7 +23,9 @@ export function createTestDatabase(fileName = "test.db") {
 
 	const sqlite = new Database(dbPath, { create: true });
 	sqlite.exec("PRAGMA foreign_keys = ON;");
-	sqlite.exec(readFileSync(MIGRATION_FILE_PATH, "utf8"));
+	for (const migrationFilePath of getMigrationFilePaths()) {
+		sqlite.exec(readFileSync(migrationFilePath, "utf8"));
+	}
 
 	const db = drizzle(sqlite, { schema });
 

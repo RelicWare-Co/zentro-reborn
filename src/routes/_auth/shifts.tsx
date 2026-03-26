@@ -4,6 +4,7 @@ import {
 	CircleDollarSign,
 	Clock3,
 	Filter,
+	LogOut,
 	Receipt,
 	Search,
 	Store,
@@ -30,6 +31,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { listShifts } from "@/features/pos/pos.functions";
+import { authClient } from "@/lib/auth-client";
 
 const DEFAULT_LIST_PARAMS = {
 	limit: 10,
@@ -232,6 +234,18 @@ function ShiftsPage() {
 							Ver dashboard
 							<ArrowRight className="h-4 w-4" />
 						</Link>
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						onClick={async () => {
+							await authClient.signOut();
+							void navigate({ to: "/login" });
+						}}
+						className="border-gray-700 bg-[var(--color-carbon)] text-gray-200 hover:bg-white/5 hover:text-white"
+					>
+						<LogOut className="h-4 w-4" />
+						Cerrar sesión
 					</Button>
 				</div>
 			</section>
@@ -546,7 +560,10 @@ function ShiftsPage() {
 																		{formatMovementType(movement.type)}
 																	</p>
 																	<p className="text-sm text-gray-400">
-																		{movement.description}
+																		{formatPaymentMethod(
+																			movement.paymentMethod,
+																		)}{" "}
+																		· {movement.description}
 																	</p>
 																	<p className="mt-1 text-xs text-gray-500">
 																		{dateTimeFormatter.format(

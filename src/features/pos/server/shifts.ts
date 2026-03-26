@@ -75,7 +75,7 @@ function buildExpectedAmountsByMethod(
 		saleId?: string | null;
 		saleTotalAmount?: number | null;
 	}>,
-	movements: Array<{ type: string; amount: number }>,
+	movements: Array<{ type: string; paymentMethod: string; amount: number }>,
 ) {
 	const expectedByMethod = new Map<string, number>();
 	const salePaymentStats = new Map<
@@ -130,15 +130,22 @@ function buildExpectedAmountsByMethod(
 		);
 	}
 
-	let expectedCash = (expectedByMethod.get("cash") ?? 0) + startingCash;
+	expectedByMethod.set(
+		"cash",
+		(expectedByMethod.get("cash") ?? 0) + startingCash,
+	);
+
 	for (const movement of movements) {
+		const paymentMethod = movement.paymentMethod || "cash";
+		const currentAmount = expectedByMethod.get(paymentMethod) ?? 0;
+
 		switch (movement.type) {
 			case "inflow":
-				expectedCash += movement.amount;
+				expectedByMethod.set(paymentMethod, currentAmount + movement.amount);
 				break;
 			case "expense":
 			case "payout":
-				expectedCash -= movement.amount;
+				expectedByMethod.set(paymentMethod, currentAmount - movement.amount);
 				break;
 			default:
 				throw new Error(
@@ -147,7 +154,6 @@ function buildExpectedAmountsByMethod(
 		}
 	}
 
-	expectedByMethod.set("cash", expectedCash);
 	return expectedByMethod;
 }
 
@@ -282,6 +288,7 @@ export async function listShiftsForCurrentOrganization(
 				id: cashMovement.id,
 				shiftId: cashMovement.shiftId,
 				type: cashMovement.type,
+				paymentMethod: cashMovement.paymentMethod,
 				amount: cashMovement.amount,
 				description: cashMovement.description,
 				createdAt: cashMovement.createdAt,
@@ -378,6 +385,7 @@ export async function listShiftsForCurrentOrganization(
 		Array<{
 			id: string;
 			type: string;
+			paymentMethod: string;
 			amount: number;
 			description: string;
 			createdAt: number;
@@ -388,6 +396,7 @@ export async function listShiftsForCurrentOrganization(
 		current.push({
 			id: row.id,
 			type: row.type,
+			paymentMethod: row.paymentMethod,
 			amount: normalizeNumber(row.amount),
 			description: row.description,
 			createdAt: toTimestamp(row.createdAt) ?? 0,
@@ -436,6 +445,7 @@ export async function listShiftsForCurrentOrganization(
 				})),
 				movements.map((movementRow) => ({
 					type: movementRow.type,
+					paymentMethod: movementRow.paymentMethod,
 					amount: movementRow.amount,
 				})),
 			);
@@ -700,6 +710,10 @@ export async function registerCashMovementForCurrentOrganization(
 
 	const amount = toPositiveInteger(input.amount, "amount");
 	const description = normalizeRequiredString(input.description, "description");
+	const paymentMethod = normalizeRequiredString(
+		input.paymentMethod,
+		"paymentMethod",
+	).toLowerCase();
 	const createdAt = resolveDate(input.createdAt, "createdAt");
 
 	const [targetShift] = await db
@@ -729,6 +743,7 @@ export async function registerCashMovementForCurrentOrganization(
 		organizationId,
 		shiftId: input.shiftId,
 		type: input.type,
+		paymentMethod,
 		amount,
 		description,
 		createdAt,
@@ -738,6 +753,7 @@ export async function registerCashMovementForCurrentOrganization(
 		id: movementId,
 		shiftId: input.shiftId,
 		type: input.type,
+		paymentMethod,
 		amount,
 		description,
 		createdAt: createdAt.getTime(),
@@ -784,14 +800,21 @@ export async function getShiftCloseSummaryForCurrentOrganization(
 					),
 				),
 			db
-				.select({ type: cashMovement.type, amount: cashMovement.amount })
+				.select({
+					type: cashMovement.type,
+					paymentMethod: cashMovement.paymentMethod,
+					amount: cashMovement.amount,
+					description: cashMovement.description,
+					createdAt: cashMovement.createdAt,
+				})
 				.from(cashMovement)
 				.where(
 					and(
 						eq(cashMovement.organizationId, organizationId),
 						eq(cashMovement.shiftId, shiftId),
 					),
-				),
+				)
+				.orderBy(desc(cashMovement.createdAt)),
 			db
 				.select({
 					paymentMethod: shiftClosure.paymentMethod,
@@ -808,6 +831,35 @@ export async function getShiftCloseSummaryForCurrentOrganization(
 		registeredPayments,
 		registeredMovements,
 	);
+	const movementTotals = {
+		inflow: 0,
+		expense: 0,
+		payout: 0,
+	};
+	const movementItems = registeredMovements.map((movement) => {
+		const normalizedAmount = normalizeNumber(movement.amount);
+		switch (movement.type) {
+			case "inflow":
+				movementTotals.inflow += normalizedAmount;
+				break;
+			case "expense":
+				movementTotals.expense += normalizedAmount;
+				break;
+			case "payout":
+				movementTotals.payout += normalizedAmount;
+				break;
+			default:
+				break;
+		}
+
+		return {
+			type: movement.type,
+			paymentMethod: movement.paymentMethod,
+			amount: normalizedAmount,
+			description: movement.description,
+			createdAt: toTimestamp(movement.createdAt) ?? 0,
+		};
+	});
 	const closureByMethod = new Map(
 		registeredClosures.map((closure) => [closure.paymentMethod, closure]),
 	);
@@ -843,6 +895,16 @@ export async function getShiftCloseSummaryForCurrentOrganization(
 		},
 		summaryByMethod,
 		totalExpected,
+		movements: {
+			items: movementItems,
+			totals: {
+				...movementTotals,
+				net:
+					movementTotals.inflow -
+					movementTotals.expense -
+					movementTotals.payout,
+			},
+		},
 		registeredClosures,
 	};
 }
@@ -928,7 +990,11 @@ export async function closeShiftForCurrentOrganization(input: CloseShiftInput) {
 					),
 				),
 			tx
-				.select({ type: cashMovement.type, amount: cashMovement.amount })
+				.select({
+					type: cashMovement.type,
+					paymentMethod: cashMovement.paymentMethod,
+					amount: cashMovement.amount,
+				})
 				.from(cashMovement)
 				.where(
 					and(

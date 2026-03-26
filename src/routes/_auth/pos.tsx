@@ -1,6 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ShoppingCart } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+	useCallback,
+	useDeferredValue,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Drawer,
@@ -30,7 +36,10 @@ import { usePosCart } from "@/features/pos/hooks/usePosCart";
 import { usePosCheckout } from "@/features/pos/hooks/usePosCheckout";
 import { usePosBootstrap } from "@/features/pos/hooks/usePosQueries";
 import { usePosShift } from "@/features/pos/hooks/usePosShift";
-import { getPosBootstrap } from "@/features/pos/pos.functions";
+import {
+	getPosBootstrap,
+	searchPosProducts,
+} from "@/features/pos/pos.functions";
 import { printThermalReceipt } from "@/features/pos/printing/printThermalReceipt";
 import { buildSaleReceiptDocument } from "@/features/pos/printing/receiptDocuments";
 import type { Category, Product } from "@/features/pos/types";
@@ -52,11 +61,12 @@ function PosPage() {
 	const [isShiftRequiredDialogOpen, setIsShiftRequiredDialogOpen] =
 		useState(false);
 	const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+	const deferredSearchQuery = useDeferredValue(searchQuery);
 
 	// Data queries
 	const { data: bootstrap = bootstrapData } = usePosBootstrap(bootstrapData);
 	const { data: productSearchResult, isFetching: isProductsFetching } =
-		usePosProducts(activeCategoryId, searchQuery);
+		usePosProducts(activeCategoryId, deferredSearchQuery);
 	const { data: customerSearchResult } = usePosCustomers();
 	const { data: creditAccountsSearchResult } = useCreditAccounts();
 
@@ -97,7 +107,7 @@ function PosPage() {
 
 	// Hooks
 	const cart = usePosCart();
-	const shift = usePosShift(activeShift);
+	const shift = usePosShift(activeShift, posSettings.paymentMethods);
 	const handleSaleCreated = useCallback(
 		(payload: {
 			result: {
@@ -209,6 +219,10 @@ function PosPage() {
 		setSearchQuery(query);
 	}, []);
 
+	const clearSearchQuery = useCallback(() => {
+		setSearchQuery("");
+	}, []);
+
 	const handleCustomerChange = useCallback((customerId: string) => {
 		setSelectedCustomerId(customerId);
 	}, []);
@@ -234,6 +248,59 @@ function PosPage() {
 		setIsMobileCartOpen(false);
 		checkout.setIsCheckoutModalOpen(true);
 	}, [checkout.setIsCheckoutModalOpen]);
+
+	const handleBarcodeScan = useCallback(
+		async (rawValue: string) => {
+			const normalizedValue = rawValue.trim().toLowerCase();
+			if (!normalizedValue) {
+				return false;
+			}
+
+			const result = await searchPosProducts({
+				data: {
+					searchQuery: rawValue,
+					categoryId: null,
+					limit: 20,
+					cursor: 0,
+				},
+			});
+
+			const matchedProduct =
+				result.data.find((product) => {
+					const normalizedBarcode = product.barcode?.trim().toLowerCase();
+					const normalizedSku = product.sku?.trim().toLowerCase();
+
+					return (
+						normalizedBarcode === normalizedValue ||
+						normalizedSku === normalizedValue
+					);
+				}) ?? null;
+
+			if (!matchedProduct) {
+				return false;
+			}
+
+			if (!activeShift) {
+				setIsShiftRequiredDialogOpen(true);
+				return false;
+			}
+
+			cart.addToCart(matchedProduct, []);
+			setSearchQuery("");
+			return true;
+		},
+		[activeShift, cart],
+	);
+
+	const shouldAutoFocusSearch =
+		!isMobileCartOpen &&
+		!shift.isShiftOpenModalOpen &&
+		!shift.isCashMovementModalOpen &&
+		!shift.isCloseShiftModalOpen &&
+		!modifierModal.isModifierModalOpen &&
+		!createCustomer.isCreateCustomerModalOpen &&
+		!isShiftRequiredDialogOpen &&
+		!checkout.isCheckoutModalOpen;
 
 	return (
 		<div className="flex flex-col h-full w-full bg-[var(--color-void)] text-[var(--color-photon)] overflow-hidden">
@@ -262,9 +329,12 @@ function PosPage() {
 					products={filteredProducts}
 					isLoading={isProductsFetching}
 					isActiveShift={Boolean(activeShift)}
+					shouldAutoFocusSearch={shouldAutoFocusSearch}
 					getProductQuantity={cart.getProductQuantity}
 					onCategoryChange={handleCategoryChange}
 					onSearchChange={handleSearchChange}
+					onClearSearch={clearSearchQuery}
+					onBarcodeScan={handleBarcodeScan}
 					onProductSelect={handleProductSelect}
 				/>
 
@@ -363,6 +433,9 @@ function PosPage() {
 				onClose={() => shift.setIsCashMovementModalOpen(false)}
 				movementType={shift.movementType}
 				setMovementType={shift.setMovementType}
+				movementPaymentMethod={shift.movementPaymentMethod}
+				setMovementPaymentMethod={shift.setMovementPaymentMethod}
+				paymentMethodOptions={posSettings.paymentMethods}
 				movementAmount={shift.movementAmount}
 				setMovementAmount={shift.setMovementAmount}
 				movementDescription={shift.movementDescription}

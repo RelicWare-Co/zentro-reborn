@@ -201,6 +201,7 @@ export function useRegisterCashMovementMutation() {
 		mutationFn: (payload: {
 			shiftId: string;
 			type: "expense" | "payout" | "inflow";
+			paymentMethod: string;
 			amount: number;
 			description: string;
 		}) =>

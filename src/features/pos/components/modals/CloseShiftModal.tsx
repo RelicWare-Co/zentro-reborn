@@ -72,6 +72,15 @@ export function CloseShiftModal({
 	const cashSummary = shiftCloseSummary?.summaryByMethod.find(
 		(row) => row.paymentMethod === "cash",
 	);
+	const movementSummary = shiftCloseSummary?.movements;
+	const movementItems = movementSummary?.items ?? [];
+	const nonCashSummaryRows =
+		shiftCloseSummary?.summaryByMethod.filter(
+			(row) => row.paymentMethod !== "cash",
+		) ?? [];
+	const hasMovementItems = movementItems.length > 0;
+	const shouldShowSeparatorBeforeTotal =
+		hasMovementItems || nonCashSummaryRows.length > 0;
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
@@ -102,23 +111,72 @@ export function CloseShiftModal({
 										{formatCurrency(cashSummary?.expectedAmount ?? 0)}
 									</span>
 								</div>
-								<Separator className="my-2 border-gray-700" />
-								{shiftCloseSummary.summaryByMethod
-									.filter((row) => row.paymentMethod !== "cash")
-									.map((row) => (
-										<div
-											key={`expected-${row.paymentMethod}`}
-											className="flex justify-between"
-										>
-											<span className="text-gray-300">
-												{formatPaymentMethodLabel(row.paymentMethod)}
-											</span>
-											<span className="text-white font-medium tabular-nums">
-												{formatCurrency(row.expectedAmount)}
-											</span>
+								{hasMovementItems ? (
+									<>
+										<Separator className="my-2 border-gray-700" />
+										<div className="space-y-2">
+											<p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+												Movimientos de caja
+											</p>
+											<div className="flex justify-between">
+												<span className="text-gray-300">Ingresos manuales</span>
+												<span className="font-medium tabular-nums text-emerald-400">
+													+{formatCurrency(movementSummary.totals.inflow)}
+												</span>
+											</div>
+											<div className="flex justify-between">
+												<span className="text-gray-300">Gastos operativos</span>
+												<span className="font-medium tabular-nums text-red-400">
+													-{formatCurrency(movementSummary.totals.expense)}
+												</span>
+											</div>
+											<div className="flex justify-between">
+												<span className="text-gray-300">Pagos a proveedor</span>
+												<span className="font-medium tabular-nums text-red-400">
+													-{formatCurrency(movementSummary.totals.payout)}
+												</span>
+											</div>
+											<div className="flex justify-between">
+												<span className="text-gray-300">Ajuste neto</span>
+												<span
+													className={`font-medium tabular-nums ${
+														movementSummary.totals.net >= 0
+															? "text-emerald-400"
+															: "text-red-400"
+													}`}
+												>
+													{movementSummary.totals.net >= 0 ? "+" : ""}
+													{formatCurrency(movementSummary.totals.net)}
+												</span>
+											</div>
 										</div>
-									))}
-								<Separator className="my-2 border-gray-700" />
+									</>
+								) : (
+									<p className="text-xs text-gray-500">
+										No hay movimientos de caja registrados en este turno.
+									</p>
+								)}
+								{nonCashSummaryRows.length > 0 ? (
+									<>
+										<Separator className="my-2 border-gray-700" />
+										{nonCashSummaryRows.map((row) => (
+											<div
+												key={`expected-${row.paymentMethod}`}
+												className="flex justify-between"
+											>
+												<span className="text-gray-300">
+													{formatPaymentMethodLabel(row.paymentMethod)}
+												</span>
+												<span className="text-white font-medium tabular-nums">
+													{formatCurrency(row.expectedAmount)}
+												</span>
+											</div>
+										))}
+									</>
+								) : null}
+								{shouldShowSeparatorBeforeTotal ? (
+									<Separator className="my-2 border-gray-700" />
+								) : null}
 								<div className="flex justify-between text-base">
 									<span className="text-gray-200 font-semibold">
 										Total Esperado
@@ -130,6 +188,43 @@ export function CloseShiftModal({
 							</div>
 						)}
 					</div>
+
+					{hasMovementItems ? (
+						<div className="bg-[#0a0a0a] rounded-lg p-4 border border-gray-800">
+							<h4 className="text-sm font-medium text-gray-400 mb-3">
+								Detalle de Movimientos
+							</h4>
+							<div className="space-y-2">
+								{movementItems.map((movement) => (
+									<div
+										key={`${movement.type}-${movement.paymentMethod}-${movement.createdAt}-${movement.description}`}
+										className="flex items-start justify-between gap-3 rounded-md border border-gray-800/80 bg-black/20 px-3 py-2"
+									>
+										<div className="min-w-0">
+											<p className="text-sm font-medium text-white">
+												{formatMovementType(movement.type)}
+											</p>
+											<p className="text-xs text-gray-400">
+												{formatPaymentMethodLabel(movement.paymentMethod)}
+												{" · "}
+												{movement.description}
+											</p>
+										</div>
+										<span
+											className={`shrink-0 text-sm font-semibold tabular-nums ${
+												movement.type === "inflow"
+													? "text-emerald-400"
+													: "text-red-400"
+											}`}
+										>
+											{movement.type === "inflow" ? "+" : "-"}
+											{formatCurrency(movement.amount)}
+										</span>
+									</div>
+								))}
+							</div>
+						</div>
+					) : null}
 
 					{shiftCloseSummary && (
 						<div className="grid gap-3">
@@ -235,4 +330,14 @@ export function CloseShiftModal({
 			</DialogContent>
 		</Dialog>
 	);
+}
+
+function formatMovementType(type: string) {
+	const labels: Record<string, string> = {
+		inflow: "Ingreso manual",
+		expense: "Gasto operativo",
+		payout: "Pago a proveedor",
+	};
+
+	return labels[type] ?? type;
 }

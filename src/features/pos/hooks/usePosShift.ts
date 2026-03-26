@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { parseMoneyInput } from "@/lib/utils";
 import type { ActiveShift } from "../types";
 import {
@@ -8,7 +8,21 @@ import {
 	useShiftCloseSummary,
 } from "./usePosQueries";
 
-export function usePosShift(activeShift: ActiveShift | null) {
+function getDefaultMovementPaymentMethodId(
+	paymentMethodOptions: Array<{ id: string }>,
+) {
+	return (
+		paymentMethodOptions.find((paymentMethod) => paymentMethod.id === "cash")
+			?.id ??
+		paymentMethodOptions[0]?.id ??
+		"cash"
+	);
+}
+
+export function usePosShift(
+	activeShift: ActiveShift | null,
+	paymentMethodOptions: Array<{ id: string }>,
+) {
 	// Modals state
 	const [isShiftOpenModalOpen, setIsShiftOpenModalOpen] = useState(false);
 	const [isCashMovementModalOpen, setIsCashMovementModalOpen] = useState(false);
@@ -20,6 +34,9 @@ export function usePosShift(activeShift: ActiveShift | null) {
 
 	// Cash movement form state
 	const [movementType, setMovementType] = useState("inflow");
+	const [movementPaymentMethod, setMovementPaymentMethod] = useState(
+		getDefaultMovementPaymentMethodId(paymentMethodOptions),
+	);
 	const [movementAmount, setMovementAmount] = useState("");
 	const [movementDescription, setMovementDescription] = useState("");
 
@@ -36,6 +53,18 @@ export function usePosShift(activeShift: ActiveShift | null) {
 
 	const { data: shiftCloseSummary, isFetching: isShiftSummaryFetching } =
 		useShiftCloseSummary(activeShift?.id, isCloseShiftModalOpen);
+
+	useEffect(() => {
+		const defaultMovementMethod =
+			getDefaultMovementPaymentMethodId(paymentMethodOptions);
+		const hasCurrentMethod = paymentMethodOptions.some(
+			(paymentMethod) => paymentMethod.id === movementPaymentMethod,
+		);
+
+		if (!hasCurrentMethod) {
+			setMovementPaymentMethod(defaultMovementMethod);
+		}
+	}, [movementPaymentMethod, paymentMethodOptions]);
 
 	// Open shift handler
 	const handleOpenShift = useCallback(() => {
@@ -77,6 +106,7 @@ export function usePosShift(activeShift: ActiveShift | null) {
 			{
 				shiftId: activeShift.id,
 				type: movementType as "expense" | "payout" | "inflow",
+				paymentMethod: movementPaymentMethod,
 				amount: parsedAmount,
 				description: movementDescription.trim(),
 			},
@@ -86,6 +116,9 @@ export function usePosShift(activeShift: ActiveShift | null) {
 					setMovementAmount("");
 					setMovementDescription("");
 					setMovementType("inflow");
+					setMovementPaymentMethod(
+						getDefaultMovementPaymentMethodId(paymentMethodOptions),
+					);
 				},
 			},
 		);
@@ -93,7 +126,9 @@ export function usePosShift(activeShift: ActiveShift | null) {
 		activeShift,
 		movementAmount,
 		movementDescription,
+		movementPaymentMethod,
 		movementType,
+		paymentMethodOptions,
 		registerCashMovementMutation,
 	]);
 
@@ -147,6 +182,7 @@ export function usePosShift(activeShift: ActiveShift | null) {
 
 	const canRegisterCashMovement =
 		Boolean(activeShift) &&
+		movementPaymentMethod.trim().length > 0 &&
 		movementDescription.trim().length > 0 &&
 		parseMoneyInput(movementAmount) > 0;
 
@@ -179,6 +215,8 @@ export function usePosShift(activeShift: ActiveShift | null) {
 		// Form states - Cash movement
 		movementType,
 		setMovementType,
+		movementPaymentMethod,
+		setMovementPaymentMethod,
 		movementAmount,
 		setMovementAmount,
 		movementDescription,

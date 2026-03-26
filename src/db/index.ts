@@ -22,7 +22,6 @@ export class DBInstance {
       databaseUrl: Environment.databaseUrl,
       authToken: Environment.authToken,
     };
-    DBInstance.dbIstance;
     this.db = this.connection();
   }
 

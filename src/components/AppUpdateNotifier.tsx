@@ -71,14 +71,14 @@ export function AppUpdateNotifier() {
 				return;
 			}
 
-				if (nextBuild.releaseId !== APP_BUILD_INFO.releaseId) {
-					setAvailableBuild((currentBuild) =>
-						currentBuild?.releaseId === nextBuild.releaseId
-							? currentBuild
-							: nextBuild,
-					);
-				}
-			};
+			if (nextBuild.releaseId !== APP_BUILD_INFO.releaseId) {
+				setAvailableBuild((currentBuild) =>
+					currentBuild?.releaseId === nextBuild.releaseId
+						? currentBuild
+						: nextBuild,
+				);
+			}
+		};
 
 		void checkForUpdates();
 
@@ -127,23 +127,21 @@ export function AppUpdateNotifier() {
 						<p className="text-sm leading-6 text-gray-200">
 							Hay una versión más reciente de Zentro lista para cargar.
 						</p>
-							{updateLabel ? (
-								<p className="text-xs text-gray-400">
-									Release detectada: {updateLabel}
-								</p>
-							) : null}
+						{updateLabel ? (
+							<p className="text-xs text-gray-400">
+								Release detectada: {updateLabel}
+							</p>
+						) : null}
 					</div>
 
-						<div className="flex shrink-0 items-center gap-2">
-							<button
-								type="button"
-								onClick={() =>
-									setDismissedReleaseId(availableBuild.releaseId)
-								}
-								className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:border-white/20 hover:text-white"
-							>
-								Más tarde
-							</button>
+					<div className="flex shrink-0 items-center gap-2">
+						<button
+							type="button"
+							onClick={() => setDismissedReleaseId(availableBuild.releaseId)}
+							className="rounded-full border border-white/10 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:border-white/20 hover:text-white"
+						>
+							Más tarde
+						</button>
 						<button
 							type="button"
 							onClick={async () => {

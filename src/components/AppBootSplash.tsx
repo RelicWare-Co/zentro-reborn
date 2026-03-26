@@ -35,8 +35,8 @@ export function AppBootSplash() {
 							Iniciando tu espacio de trabajo…
 						</h1>
 						<p className="max-w-sm text-sm leading-6 text-gray-400">
-							Estamos preparando la interfaz, la sesión y el contexto
-							operativo para continuar.
+							Estamos preparando la interfaz, la sesión y el contexto operativo
+							para continuar.
 						</p>
 					</div>
 				</div>

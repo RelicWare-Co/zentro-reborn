@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { AppUpdateNotifier } from "../components/AppUpdateNotifier";
+import { DefaultCatchBoundary } from "../components/DefaultCatchBoundary";
 import { DeploymentSkewProtection } from "../components/DeploymentSkewProtection";
 import { PwaRegistrar } from "../components/PwaRegistrar";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
@@ -26,6 +27,7 @@ const DEV_SERVICE_WORKER_RESET_SCRIPT = import.meta.env.PROD
 const BOOTSTRAP_INIT_SCRIPT = `${THEME_INIT_SCRIPT}${DEV_SERVICE_WORKER_RESET_SCRIPT}`;
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+	errorComponent: DefaultCatchBoundary,
 	head: () => ({
 		meta: [
 			{

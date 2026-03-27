@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +7,7 @@ import {
 	Select,
 	SelectContent,
 	SelectItem,
+	SelectSeparator,
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
@@ -41,6 +43,8 @@ export const EMPTY_PRODUCT_FORM = {
 
 type Category = Awaited<ReturnType<typeof getCategories>>[number];
 
+const ADD_CATEGORY_VALUE = "__add_category__";
+
 interface ProductFormSheetProps {
 	isOpen: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -61,6 +65,7 @@ interface ProductFormSheetProps {
 	}) => Promise<void>;
 	isPending: boolean;
 	error: string | null;
+	onOpenCategoryDialog?: () => void;
 }
 
 export function ProductFormSheet({
@@ -71,6 +76,7 @@ export function ProductFormSheet({
 	onSave,
 	isPending,
 	error,
+	onOpenCategoryDialog,
 }: ProductFormSheetProps) {
 	const [productForm, setProductForm] = useState(EMPTY_PRODUCT_FORM);
 
@@ -300,12 +306,16 @@ export function ProductFormSheet({
 										</Label>
 										<Select
 											value={productForm.categoryId || "none"}
-											onValueChange={(value) =>
+											onValueChange={(value) => {
+												if (value === ADD_CATEGORY_VALUE) {
+													onOpenCategoryDialog?.();
+													return;
+												}
 												setProductForm((prev) => ({
 													...prev,
 													categoryId: value === "none" ? "" : value,
-												}))
-											}
+												}));
+											}}
 										>
 											<SelectTrigger
 												id={categoryId}
@@ -320,6 +330,20 @@ export function ProductFormSheet({
 														{item.name}
 													</SelectItem>
 												))}
+												{onOpenCategoryDialog && (
+													<>
+														<SelectSeparator className="bg-gray-700" />
+														<SelectItem
+															value={ADD_CATEGORY_VALUE}
+															className="text-[var(--color-voltage)] focus:bg-[var(--color-voltage)]/10 focus:text-[var(--color-voltage)]"
+														>
+															<span className="flex items-center gap-2">
+																<Plus className="w-4 h-4" />
+																Agregar categoría
+															</span>
+														</SelectItem>
+													</>
+												)}
 											</SelectContent>
 										</Select>
 									</div>

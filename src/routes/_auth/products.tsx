@@ -13,7 +13,6 @@ import {
 	PackagePlus,
 	Plus,
 	Search,
-	Trash2,
 } from "lucide-react";
 import {
 	useCallback,
@@ -65,6 +64,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { CategoryDialog } from "@/features/products/components/category-dialog";
 import { DeleteProductDialog } from "@/features/products/components/delete-product-dialog";
 import { ProductFormSheet } from "@/features/products/components/product-form-sheet";
 import { getProductsColumns } from "@/features/products/components/products-table-columns";
@@ -124,9 +124,8 @@ function ProductsPage() {
 	const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 	const [productToDelete, setProductToDelete] = useState<string | null>(null);
 	const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
-	const [selectedCategoryId, setSelectedCategoryId] = useState("");
-	const [categoryName, setCategoryName] = useState("");
-	const [categoryDescription, setCategoryDescription] = useState("");
+	const [selectedCategoryForDialog, setSelectedCategoryForDialog] =
+		useState<Category | null>(null);
 	const [isInventoryDialogOpen, setIsInventoryDialogOpen] = useState(false);
 	const [selectedProductForInventory, setSelectedProductForInventory] =
 		useState<Product | null>(null);
@@ -177,8 +176,6 @@ function ProductsPage() {
 	const priceMaxId = useId();
 	const costMinId = useId();
 	const costMaxId = useId();
-	const categoryNameId = useId();
-	const categoryDescriptionId = useId();
 	const inventoryTypeId = useId();
 	const inventoryQuantityId = useId();
 	const inventoryNotesId = useId();
@@ -428,13 +425,11 @@ function ProductsPage() {
 		createProductMutation,
 		updateProductMutation,
 		deleteProductMutation,
-		createCategoryMutation,
-		updateCategoryMutation,
-		deleteCategoryMutation,
 		registerInventoryMovementMutation,
 	} = useProductsMutations({
-		onSuccess: () => {
-			closeSheet();
+		onCreateProductSuccess: closeSheet,
+		onUpdateProductSuccess: closeSheet,
+		onDeleteProductSuccess: () => {
 			setProductToDelete(null);
 		},
 	});
@@ -522,15 +517,6 @@ function ProductsPage() {
 				? updateProductMutation.error.message
 				: null;
 
-	const categoryFormError =
-		createCategoryMutation.error instanceof Error
-			? createCategoryMutation.error.message
-			: updateCategoryMutation.error instanceof Error
-				? updateCategoryMutation.error.message
-				: deleteCategoryMutation.error instanceof Error
-					? deleteCategoryMutation.error.message
-					: null;
-
 	const inventoryMovementError =
 		registerInventoryMovementMutation.error instanceof Error
 			? registerInventoryMovementMutation.error.message
@@ -568,11 +554,6 @@ function ProductsPage() {
 		}
 	};
 
-	const selectedCategory = useMemo(
-		() => categories.find((item) => item.id === selectedCategoryId) ?? null,
-		[categories, selectedCategoryId],
-	);
-
 	const inventoryEntryQuantityValue = Number(inventoryEntryQuantity);
 	const normalizedInventoryEntryQuantity =
 		Number.isFinite(inventoryEntryQuantityValue) &&
@@ -594,54 +575,21 @@ function ProductsPage() {
 		updateProductMutation.isPending;
 
 	const openCreateCategoryDialog = () => {
-		setSelectedCategoryId("");
-		setCategoryName("");
-		setCategoryDescription("");
+		setSelectedCategoryForDialog(null);
 		setIsCategoryDialogOpen(true);
 	};
 
 	const openEditCategoryDialog = (category: Category) => {
-		setSelectedCategoryId(category.id);
-		setCategoryName(category.name);
-		setCategoryDescription(category.description ?? "");
+		setSelectedCategoryForDialog(category);
 		setIsCategoryDialogOpen(true);
 	};
 
-	const handleCreateCategory = async () => {
-		await createCategoryMutation.mutateAsync({
-			name: categoryName,
-			description: categoryDescription || null,
-		});
-		setSelectedCategoryId("");
-		setCategoryName("");
-		setCategoryDescription("");
-		setIsCategoryDialogOpen(false);
-	};
-
-	const handleUpdateCategory = async () => {
-		if (!selectedCategoryId) {
-			return;
+	const handleCategoryDialogOpenChange = useCallback((open: boolean) => {
+		setIsCategoryDialogOpen(open);
+		if (!open) {
+			setSelectedCategoryForDialog(null);
 		}
-
-		await updateCategoryMutation.mutateAsync({
-			id: selectedCategoryId,
-			name: categoryName,
-			description: categoryDescription || null,
-		});
-		setIsCategoryDialogOpen(false);
-	};
-
-	const handleDeleteCategory = async () => {
-		if (!selectedCategoryId) {
-			return;
-		}
-
-		await deleteCategoryMutation.mutateAsync(selectedCategoryId);
-		setSelectedCategoryId("");
-		setCategoryName("");
-		setCategoryDescription("");
-		setIsCategoryDialogOpen(false);
-	};
+	}, []);
 
 	const handleRegisterInventoryMovement = async () => {
 		if (!selectedProductForInventory) {
@@ -1337,6 +1285,7 @@ function ProductsPage() {
 						onSave={handleSaveProduct}
 						isPending={isPending}
 						error={formError}
+						onOpenCategoryDialog={openCreateCategoryDialog}
 					/>
 
 					<div className="bg-[var(--color-carbon)] rounded-xl border border-gray-800 overflow-x-auto">
@@ -1512,79 +1461,11 @@ function ProductsPage() {
 				isPending={deleteProductMutation.isPending}
 			/>
 
-			<Dialog
+			<CategoryDialog
 				open={isCategoryDialogOpen}
-				onOpenChange={setIsCategoryDialogOpen}
-			>
-				<DialogContent className="bg-[var(--color-carbon)] border-gray-800 text-white sm:max-w-[480px]">
-					<DialogHeader>
-						<DialogTitle>
-							{selectedCategory ? "Editar Categoría" : "Crear Categoría"}
-						</DialogTitle>
-					</DialogHeader>
-					<div className="space-y-4 py-2">
-						<div className="grid gap-2">
-							<Label htmlFor={categoryNameId}>Nombre</Label>
-							<Input
-								id={categoryNameId}
-								value={categoryName}
-								onChange={(event) => setCategoryName(event.target.value)}
-								placeholder="Nombre de la categoría"
-								className="bg-black/20 border-gray-700"
-							/>
-						</div>
-						<div className="grid gap-2">
-							<Label htmlFor={categoryDescriptionId}>Descripción</Label>
-							<Textarea
-								id={categoryDescriptionId}
-								value={categoryDescription}
-								onChange={(event) => setCategoryDescription(event.target.value)}
-								placeholder="Opcional"
-								className="min-h-[72px] bg-black/20 border-gray-700"
-							/>
-						</div>
-						{categoryFormError && (
-							<p className="text-sm text-red-400">{categoryFormError}</p>
-						)}
-					</div>
-					<DialogFooter className="gap-2 sm:justify-between">
-						{selectedCategory ? (
-							<Button
-								variant="outline"
-								onClick={handleDeleteCategory}
-								disabled={deleteCategoryMutation.isPending}
-								className="border-red-900/40 text-red-400 hover:bg-red-900/20"
-							>
-								<Trash2 className="w-4 h-4 mr-2" />
-								Eliminar
-							</Button>
-						) : (
-							<span />
-						)}
-						<div className="flex gap-2">
-							<Button
-								variant="ghost"
-								onClick={() => setIsCategoryDialogOpen(false)}
-							>
-								Cancelar
-							</Button>
-							<Button
-								onClick={
-									selectedCategory ? handleUpdateCategory : handleCreateCategory
-								}
-								disabled={
-									!categoryName.trim() ||
-									createCategoryMutation.isPending ||
-									updateCategoryMutation.isPending
-								}
-								className="bg-[var(--color-voltage)] text-black hover:bg-[#c9e605]"
-							>
-								{selectedCategory ? "Save" : "Create"}
-							</Button>
-						</div>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+				onOpenChange={handleCategoryDialogOpenChange}
+				selectedCategory={selectedCategoryForDialog}
+			/>
 
 			<Dialog
 				open={isInventoryEntryDialogOpen}

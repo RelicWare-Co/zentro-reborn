@@ -13,9 +13,30 @@ import {
 
 export type Product = Awaited<ReturnType<typeof getProducts>>[number];
 export type Category = Awaited<ReturnType<typeof getCategories>>[number];
+type CreateProductResult = Awaited<ReturnType<typeof createProduct>>;
+type UpdateProductResult = Awaited<ReturnType<typeof updateProduct>>;
+type DeleteProductResult = Awaited<ReturnType<typeof deleteProduct>>;
+type CreateCategoryResult = Awaited<ReturnType<typeof createCategory>>;
+type UpdateCategoryResult = Awaited<ReturnType<typeof updateCategory>>;
+type DeleteCategoryResult = Awaited<ReturnType<typeof deleteCategory>>;
+type RegisterInventoryMovementResult = Awaited<
+	ReturnType<typeof registerInventoryMovement>
+>;
 
 export const PRODUCT_QUERY_KEY = ["products"];
 export const CATEGORY_QUERY_KEY = ["product-categories"];
+
+type ProductsMutationsOptions = {
+	onCreateProductSuccess?: (data: CreateProductResult) => void;
+	onUpdateProductSuccess?: (data: UpdateProductResult) => void;
+	onDeleteProductSuccess?: (data: DeleteProductResult) => void;
+	onCreateCategorySuccess?: (data: CreateCategoryResult) => void;
+	onUpdateCategorySuccess?: (data: UpdateCategoryResult) => void;
+	onDeleteCategorySuccess?: (data: DeleteCategoryResult) => void;
+	onRegisterInventoryMovementSuccess?: (
+		data: RegisterInventoryMovementResult,
+	) => void;
+};
 
 export function useProductsQueries(initialProducts?: Product[]) {
 	const { data: products = initialProducts ?? [] } = useQuery({
@@ -32,12 +53,18 @@ export function useProductsQueries(initialProducts?: Product[]) {
 	return { products, categories };
 }
 
-export function useProductsMutations(options?: { onSuccess?: () => void }) {
+export function useProductsMutations(options?: ProductsMutationsOptions) {
 	const queryClient = useQueryClient();
 
-	const handleSuccess = async () => {
-		options?.onSuccess?.();
+	const invalidateProducts = async () => {
 		await queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEY });
+	};
+
+	const invalidateProductsAndCategories = async () => {
+		await Promise.all([
+			queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEY }),
+			queryClient.invalidateQueries({ queryKey: CATEGORY_QUERY_KEY }),
+		]);
 	};
 
 	const createProductMutation = useMutation({
@@ -53,7 +80,10 @@ export function useProductsMutations(options?: { onSuccess?: () => void }) {
 			trackInventory: boolean;
 			isModifier: boolean;
 		}) => createProduct({ data: payload }),
-		onSuccess: handleSuccess,
+		onSuccess: async (data) => {
+			options?.onCreateProductSuccess?.(data);
+			await invalidateProducts();
+		},
 	});
 
 	const updateProductMutation = useMutation({
@@ -70,23 +100,26 @@ export function useProductsMutations(options?: { onSuccess?: () => void }) {
 			trackInventory: boolean;
 			isModifier: boolean;
 		}) => updateProduct({ data: payload }),
-		onSuccess: handleSuccess,
+		onSuccess: async (data) => {
+			options?.onUpdateProductSuccess?.(data);
+			await invalidateProducts();
+		},
 	});
 
 	const deleteProductMutation = useMutation({
 		mutationFn: (id: string) => deleteProduct({ data: { id } }),
-		onSuccess: handleSuccess,
+		onSuccess: async (data) => {
+			options?.onDeleteProductSuccess?.(data);
+			await invalidateProducts();
+		},
 	});
 
 	const createCategoryMutation = useMutation({
 		mutationFn: (payload: { name: string; description: string | null }) =>
 			createCategory({ data: payload }),
-		onSuccess: async () => {
-			options?.onSuccess?.();
-			await Promise.all([
-				queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEY }),
-				queryClient.invalidateQueries({ queryKey: CATEGORY_QUERY_KEY }),
-			]);
+		onSuccess: async (data) => {
+			options?.onCreateCategorySuccess?.(data);
+			await invalidateProductsAndCategories();
 		},
 	});
 
@@ -96,23 +129,17 @@ export function useProductsMutations(options?: { onSuccess?: () => void }) {
 			name?: string;
 			description?: string | null;
 		}) => updateCategory({ data: payload }),
-		onSuccess: async () => {
-			options?.onSuccess?.();
-			await Promise.all([
-				queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEY }),
-				queryClient.invalidateQueries({ queryKey: CATEGORY_QUERY_KEY }),
-			]);
+		onSuccess: async (data) => {
+			options?.onUpdateCategorySuccess?.(data);
+			await invalidateProductsAndCategories();
 		},
 	});
 
 	const deleteCategoryMutation = useMutation({
 		mutationFn: (id: string) => deleteCategory({ data: { id } }),
-		onSuccess: async () => {
-			options?.onSuccess?.();
-			await Promise.all([
-				queryClient.invalidateQueries({ queryKey: PRODUCT_QUERY_KEY }),
-				queryClient.invalidateQueries({ queryKey: CATEGORY_QUERY_KEY }),
-			]);
+		onSuccess: async (data) => {
+			options?.onDeleteCategorySuccess?.(data);
+			await invalidateProductsAndCategories();
 		},
 	});
 
@@ -124,7 +151,10 @@ export function useProductsMutations(options?: { onSuccess?: () => void }) {
 			restockMode?: "add_to_stock" | "set_as_total";
 			notes: string | null;
 		}) => registerInventoryMovement({ data: payload }),
-		onSuccess: handleSuccess,
+		onSuccess: async (data) => {
+			options?.onRegisterInventoryMovementSuccess?.(data);
+			await invalidateProducts();
+		},
 	});
 
 	return {

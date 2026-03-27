@@ -1,6 +1,6 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { AlertTriangle, Home, RefreshCcw } from "lucide-react";
-
+import { OrganizationSelection } from "./OrganizationSelection";
 import { Button } from "./ui/button";
 
 interface DefaultCatchBoundaryProps {
@@ -13,6 +13,10 @@ export function DefaultCatchBoundary({
 	reset,
 }: DefaultCatchBoundaryProps) {
 	const router = useRouter();
+
+	if (error?.message === "No hay una organización activa") {
+		return <OrganizationSelection />;
+	}
 
 	const handleReset = () => {
 		if (reset) {

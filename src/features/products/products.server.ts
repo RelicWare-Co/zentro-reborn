@@ -1,9 +1,8 @@
 import "@tanstack/react-start/server-only";
-import { getRequest } from "@tanstack/react-start/server";
 import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
 import { db } from "#/db";
-import { category, inventoryMovement, member, product } from "#/db/schema";
-import { auth } from "#/lib/auth";
+import { category, inventoryMovement, product } from "#/db/schema";
+import { requireAuthContext } from "#/features/pos/server/auth-context";
 
 export type CreateProductInput = {
 	name: string;
@@ -52,8 +51,6 @@ export type UpdateCategoryInput = {
 	description?: string | null;
 };
 
-type AuthSession = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
-
 function normalizeOptionalString(value?: string | null) {
 	if (value == null) {
 		return null;
@@ -91,46 +88,6 @@ function resolveDate(input?: number) {
 	return new Date(Math.round(input));
 }
 
-async function requireSession(): Promise<AuthSession> {
-	const session = await auth.api.getSession({
-		headers: getRequest().headers,
-	});
-
-	if (!session) {
-		throw new Error("No autorizado");
-	}
-
-	return session;
-}
-
-async function resolveOrganizationId(session: AuthSession) {
-	const activeOrganizationId = session.session.activeOrganizationId;
-	if (activeOrganizationId) {
-		return activeOrganizationId;
-	}
-
-	const [membership] = await db
-		.select({
-			organizationId: member.organizationId,
-		})
-		.from(member)
-		.where(eq(member.userId, session.user.id))
-		.orderBy(asc(member.createdAt), asc(member.id))
-		.limit(1);
-
-	if (!membership) {
-		return null;
-	}
-
-	return membership.organizationId;
-}
-
-async function getAuthContext() {
-	const session = await requireSession();
-	const organizationId = await resolveOrganizationId(session);
-	return { session, organizationId };
-}
-
 async function assertCategoryFromOrganization(
 	organizationId: string,
 	categoryId?: string | null,
@@ -161,8 +118,7 @@ async function assertCategoryFromOrganization(
 }
 
 export async function getProductsForCurrentOrganization() {
-	const { organizationId } = await getAuthContext();
-	if (!organizationId) return [];
+	const { organizationId } = await requireAuthContext();
 
 	const rows = await db
 		.select({
@@ -207,8 +163,7 @@ export async function getProductsForCurrentOrganization() {
 }
 
 export async function getCategoriesForCurrentOrganization() {
-	const { organizationId } = await getAuthContext();
-	if (!organizationId) return [];
+	const { organizationId } = await requireAuthContext();
 
 	return db
 		.select({
@@ -224,8 +179,7 @@ export async function getCategoriesForCurrentOrganization() {
 export async function createCategoryForCurrentOrganization(
 	input: CreateCategoryInput,
 ) {
-	const { organizationId } = await getAuthContext();
-	if (!organizationId) throw new Error("No hay una organización activa");
+	const { organizationId } = await requireAuthContext();
 	const normalizedName = input.name.trim();
 	if (!normalizedName) {
 		throw new Error("El nombre de la categoría es obligatorio");
@@ -246,8 +200,7 @@ export async function createCategoryForCurrentOrganization(
 export async function updateCategoryForCurrentOrganization(
 	input: UpdateCategoryInput,
 ) {
-	const { organizationId } = await getAuthContext();
-	if (!organizationId) throw new Error("No hay una organización activa");
+	const { organizationId } = await requireAuthContext();
 
 	const updates: Partial<typeof category.$inferInsert> = {};
 	if (input.name !== undefined) {
@@ -284,8 +237,7 @@ export async function updateCategoryForCurrentOrganization(
 }
 
 export async function deleteCategoryForCurrentOrganization(id: string) {
-	const { organizationId } = await getAuthContext();
-	if (!organizationId) throw new Error("No hay una organización activa");
+	const { organizationId } = await requireAuthContext();
 
 	const deletedCategories = await db
 		.delete(category)
@@ -304,8 +256,7 @@ export async function deleteCategoryForCurrentOrganization(id: string) {
 export async function createProductForCurrentOrganization(
 	input: CreateProductInput,
 ) {
-	const { organizationId } = await getAuthContext();
-	if (!organizationId) throw new Error("No hay una organización activa");
+	const { organizationId } = await requireAuthContext();
 	const resolvedCategoryId = await assertCategoryFromOrganization(
 		organizationId,
 		input.categoryId,
@@ -334,8 +285,7 @@ export async function createProductForCurrentOrganization(
 export async function updateProductForCurrentOrganization(
 	input: UpdateProductInput,
 ) {
-	const { organizationId } = await getAuthContext();
-	if (!organizationId) throw new Error("No hay una organización activa");
+	const { organizationId } = await requireAuthContext();
 
 	const updates: Partial<typeof product.$inferInsert> = {};
 	if (input.name !== undefined) {
@@ -404,8 +354,7 @@ export async function updateProductForCurrentOrganization(
 export async function registerInventoryMovementForCurrentOrganization(
 	input: RegisterInventoryMovementInput,
 ) {
-	const { session, organizationId } = await getAuthContext();
-	if (!organizationId) throw new Error("No hay una organización activa");
+	const { session, organizationId } = await requireAuthContext();
 
 	const normalizedType = input.type;
 	const baseQuantity = toInteger(input.quantity, "quantity");
@@ -502,8 +451,7 @@ export async function registerInventoryMovementForCurrentOrganization(
 }
 
 export async function deleteProductForCurrentOrganization(id: string) {
-	const { organizationId } = await getAuthContext();
-	if (!organizationId) throw new Error("No hay una organización activa");
+	const { organizationId } = await requireAuthContext();
 
 	const deletedProducts = await db
 		.update(product)

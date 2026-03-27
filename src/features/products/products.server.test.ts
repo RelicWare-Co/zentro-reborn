@@ -415,4 +415,34 @@ describe("products.server", () => {
 			ctx.cleanup();
 		}
 	});
+
+	test("requires an active organization instead of falling back to another membership", async () => {
+		const ctx = await createBackendTestContext("products-no-active-org");
+		mockBackendRuntime({
+			db: ctx.db,
+			authContext: {
+				...ctx.authContext,
+				organizationId: ctx.organizationId,
+				session: {
+					...ctx.authContext.session,
+					session: { activeOrganizationId: null },
+				},
+			},
+		});
+		const server = await import("./products.server");
+
+		try {
+			await expect(server.getProductsForCurrentOrganization()).rejects.toThrow(
+				"No hay una organización activa",
+			);
+			await expect(
+				server.createProductForCurrentOrganization({
+					name: "Sin Organizacion",
+					price: 1000,
+				}),
+			).rejects.toThrow("No hay una organización activa");
+		} finally {
+			ctx.cleanup();
+		}
+	});
 });

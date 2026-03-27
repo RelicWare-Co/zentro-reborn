@@ -49,7 +49,13 @@ export function mockBackendRuntime(input: {
 }) {
 	mock.module("#/db", () => ({ db: input.db }));
 	mock.module("#/features/pos/server/auth-context", () => ({
-		requireAuthContext: async () => input.authContext,
+		requireAuthContext: async () => {
+			if (!input.authContext.session.session.activeOrganizationId) {
+				throw new Error("No hay una organización activa");
+			}
+
+			return input.authContext;
+		},
 	}));
 	mock.module("#/lib/auth", () => ({
 		auth: {

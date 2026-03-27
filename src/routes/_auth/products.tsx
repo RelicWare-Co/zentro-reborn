@@ -732,16 +732,16 @@ function ProductsPage() {
 				onValueChange={handleTabChange}
 				className="w-full"
 			>
-				<TabsList className="bg-black/20 border border-gray-800 flex w-full p-1.5 rounded-xl gap-1 mb-6">
+				<TabsList className="inline-flex bg-black/20 border border-gray-800 p-1 rounded-full mb-6 !h-auto">
 					<TabsTrigger
 						value="products"
-						className="flex-1 rounded-lg py-2.5 px-8 text-sm font-semibold text-gray-400 transition-all [&[data-state=active]]:bg-[var(--color-voltage)] [&[data-state=active]]:text-black [&[data-state=active]]:shadow-md [&[data-state=active]:hover]:text-black [&:not([data-state=active])]:hover:bg-white/5 [&:not([data-state=active])]:hover:text-gray-200 border-transparent"
+						className="inline-flex items-center justify-center min-h-[40px] !rounded-full px-6 py-1.5 text-sm font-medium text-gray-400 bg-transparent transition-all duration-200 ease-in-out data-[state=active]:!bg-gray-800/80 data-[state=active]:!text-white data-[state=active]:!shadow-sm data-[state=active]:!border-transparent hover:text-gray-200 !border-transparent outline-none !h-auto"
 					>
 						Productos
 					</TabsTrigger>
 					<TabsTrigger
 						value="categories"
-						className="flex-1 rounded-lg py-2.5 px-8 text-sm font-semibold text-gray-400 transition-all [&[data-state=active]]:bg-[var(--color-voltage)] [&[data-state=active]]:text-black [&[data-state=active]]:shadow-md [&[data-state=active]:hover]:text-black [&:not([data-state=active])]:hover:bg-white/5 [&:not([data-state=active])]:hover:text-gray-200 border-transparent"
+						className="inline-flex items-center justify-center min-h-[40px] !rounded-full px-6 py-1.5 text-sm font-medium text-gray-400 bg-transparent transition-all duration-200 ease-in-out data-[state=active]:!bg-gray-800/80 data-[state=active]:!text-white data-[state=active]:!shadow-sm data-[state=active]:!border-transparent hover:text-gray-200 !border-transparent outline-none !h-auto"
 					>
 						Categorías
 					</TabsTrigger>

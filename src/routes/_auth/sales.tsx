@@ -745,16 +745,16 @@ function SalesPage() {
 					}}
 					className="w-full"
 				>
-					<TabsList className="mb-6 flex w-full gap-1 rounded-xl border border-gray-800 bg-black/20 p-1.5">
+					<TabsList className="inline-flex mb-6 bg-black/20 border border-gray-800 p-1 rounded-full !h-auto">
 						<TabsTrigger
 							value="today"
-							className="flex-1 rounded-lg border-transparent px-8 py-2.5 text-sm font-semibold text-gray-400 transition-all hover:bg-white/5 hover:text-gray-200 data-[state=active]:bg-[var(--color-voltage)] data-[state=active]:text-black data-[state=active]:shadow-md data-[state=active]:hover:text-black"
+							className="inline-flex items-center justify-center min-h-[40px] !rounded-full px-6 py-1.5 text-sm font-medium text-gray-400 bg-transparent transition-all duration-200 ease-in-out data-[state=active]:!bg-gray-800/80 data-[state=active]:!text-white data-[state=active]:!shadow-sm data-[state=active]:!border-transparent hover:text-gray-200 !border-transparent outline-none !h-auto"
 						>
 							Ventas de hoy
 						</TabsTrigger>
 						<TabsTrigger
 							value="history"
-							className="flex-1 rounded-lg border-transparent px-8 py-2.5 text-sm font-semibold text-gray-400 transition-all hover:bg-white/5 hover:text-gray-200 data-[state=active]:bg-[var(--color-voltage)] data-[state=active]:text-black data-[state=active]:shadow-md data-[state=active]:hover:text-black"
+							className="inline-flex items-center justify-center min-h-[40px] !rounded-full px-6 py-1.5 text-sm font-medium text-gray-400 bg-transparent transition-all duration-200 ease-in-out data-[state=active]:!bg-gray-800/80 data-[state=active]:!text-white data-[state=active]:!shadow-sm data-[state=active]:!border-transparent hover:text-gray-200 !border-transparent outline-none !h-auto"
 						>
 							Historial de ventas
 						</TabsTrigger>

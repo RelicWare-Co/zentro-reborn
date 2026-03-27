@@ -25,12 +25,24 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import {
+	Sheet,
+	SheetContent,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from "@/components/ui/sheet";
 import { listShifts } from "@/features/pos/pos.functions";
 import {
 	createPaymentMethodLabelMap,
@@ -97,6 +109,7 @@ export const Route = createFileRoute("/_auth/shifts")({
 });
 
 function ShiftsPage() {
+	const filtersFormId = useId();
 	const searchId = useId();
 	const statusId = useId();
 	const cashierId = useId();
@@ -112,6 +125,7 @@ function ShiftsPage() {
 	const shifts = initialData.data;
 	const pageSize = search.pageSize ?? DEFAULT_LIST_PARAMS.limit;
 	const cursor = search.cursor ?? DEFAULT_LIST_PARAMS.cursor;
+	const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 	const [draftFilters, setDraftFilters] = useState(() => ({
 		q: search.q ?? "",
 		status: search.status ?? "",
@@ -159,6 +173,15 @@ function ShiftsPage() {
 		search.startDate,
 		search.endDate,
 	].filter(Boolean).length;
+	const activeAdvancedFilterCount = [
+		search.cashierId,
+		search.terminalName,
+		search.paymentMethod,
+		search.differenceStatus,
+		search.hasMovements,
+		search.startDate,
+		search.endDate,
+	].filter(Boolean).length;
 
 	const summary = useMemo(() => {
 		return shifts.reduce(
@@ -187,6 +210,7 @@ function ShiftsPage() {
 	);
 
 	const applyFilters = () => {
+		setIsMobileFilterOpen(false);
 		void navigate({
 			search: {
 				q: normalizeFilterValue(draftFilters.q),
@@ -208,6 +232,7 @@ function ShiftsPage() {
 	};
 
 	const clearFilters = () => {
+		setIsMobileFilterOpen(false);
 		setDraftFilters({
 			q: "",
 			status: "",
@@ -237,6 +262,188 @@ function ShiftsPage() {
 			},
 			replace: true,
 		});
+	};
+
+	const renderAdvancedFilters = (mode: "mobile" | "desktop") => {
+		const isMobile = mode === "mobile";
+		const idPrefix = isMobile ? "mobile-" : "";
+		const inputClassName = `${
+			isMobile ? "h-11" : "h-9"
+		} border-gray-700 bg-black/20 text-white placeholder:text-gray-500`;
+		const selectClassName = `${isMobile ? "h-11" : "h-9"} w-full border-gray-700 bg-black/20 text-white`;
+
+		return (
+			<div className={isMobile ? "space-y-4" : "grid gap-4 md:grid-cols-2"}>
+				<FilterField label="Cajero" htmlFor={`${idPrefix}${cashierId}`}>
+					<Select
+						value={draftFilters.cashierId || ALL_FILTER_VALUE}
+						onValueChange={(value) =>
+							setDraftFilters((current) => ({
+								...current,
+								cashierId: value === ALL_FILTER_VALUE ? "" : value,
+							}))
+						}
+					>
+						<SelectTrigger
+							id={`${idPrefix}${cashierId}`}
+							className={selectClassName}
+						>
+							<SelectValue placeholder="Todos" />
+						</SelectTrigger>
+						<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+							<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+							{initialData.filterOptions.cashiers.map((cashier) => (
+								<SelectItem key={cashier.id} value={cashier.id}>
+									{cashier.name}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</FilterField>
+
+				<FilterField label="Terminal" htmlFor={`${idPrefix}${terminalId}`}>
+					<Select
+						value={draftFilters.terminalName || ALL_FILTER_VALUE}
+						onValueChange={(value) =>
+							setDraftFilters((current) => ({
+								...current,
+								terminalName: value === ALL_FILTER_VALUE ? "" : value,
+							}))
+						}
+					>
+						<SelectTrigger
+							id={`${idPrefix}${terminalId}`}
+							className={selectClassName}
+						>
+							<SelectValue placeholder="Todas" />
+						</SelectTrigger>
+						<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+							<SelectItem value={ALL_FILTER_VALUE}>Todas</SelectItem>
+							{initialData.filterOptions.terminals.map((terminal) => (
+								<SelectItem key={terminal} value={terminal}>
+									{terminal}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</FilterField>
+
+				<FilterField
+					label="Metodo"
+					htmlFor={`${idPrefix}${paymentMethodId}`}
+				>
+					<Select
+						value={draftFilters.paymentMethod || ALL_FILTER_VALUE}
+						onValueChange={(value) =>
+							setDraftFilters((current) => ({
+								...current,
+								paymentMethod: value === ALL_FILTER_VALUE ? "" : value,
+							}))
+						}
+					>
+						<SelectTrigger
+							id={`${idPrefix}${paymentMethodId}`}
+							className={selectClassName}
+						>
+							<SelectValue placeholder="Todos" />
+						</SelectTrigger>
+						<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+							<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+							{initialData.filterOptions.paymentMethods.map((paymentMethod) => (
+								<SelectItem key={paymentMethod.id} value={paymentMethod.id}>
+									{paymentMethod.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</FilterField>
+
+				<FilterField
+					label="Diferencia"
+					htmlFor={`${idPrefix}${differenceStatusId}`}
+				>
+					<Select
+						value={draftFilters.differenceStatus || ALL_FILTER_VALUE}
+						onValueChange={(value) =>
+							setDraftFilters((current) => ({
+								...current,
+								differenceStatus: value === ALL_FILTER_VALUE ? "" : value,
+							}))
+						}
+					>
+						<SelectTrigger
+							id={`${idPrefix}${differenceStatusId}`}
+							className={selectClassName}
+						>
+							<SelectValue placeholder="Todas" />
+						</SelectTrigger>
+						<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+							<SelectItem value={ALL_FILTER_VALUE}>Todas</SelectItem>
+							<SelectItem value="short">Faltante</SelectItem>
+							<SelectItem value="over">Sobrante</SelectItem>
+							<SelectItem value="balanced">Cuadrada</SelectItem>
+						</SelectContent>
+					</Select>
+				</FilterField>
+
+				<FilterField
+					label="Movimientos"
+					htmlFor={`${idPrefix}${hasMovementsId}`}
+				>
+					<Select
+						value={draftFilters.hasMovements || ALL_FILTER_VALUE}
+						onValueChange={(value) =>
+							setDraftFilters((current) => ({
+								...current,
+								hasMovements: value === ALL_FILTER_VALUE ? "" : value,
+							}))
+						}
+					>
+						<SelectTrigger
+							id={`${idPrefix}${hasMovementsId}`}
+							className={selectClassName}
+						>
+							<SelectValue placeholder="Todos" />
+						</SelectTrigger>
+						<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+							<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+							<SelectItem value="yes">Con movimientos</SelectItem>
+							<SelectItem value="no">Sin movimientos</SelectItem>
+						</SelectContent>
+					</Select>
+				</FilterField>
+
+				<FilterField label="Desde" htmlFor={`${idPrefix}${startDateId}`}>
+					<Input
+						id={`${idPrefix}${startDateId}`}
+						type="date"
+						value={draftFilters.startDate}
+						onChange={(event) =>
+							setDraftFilters((current) => ({
+								...current,
+								startDate: event.target.value,
+							}))
+						}
+						className={inputClassName}
+					/>
+				</FilterField>
+
+				<FilterField label="Hasta" htmlFor={`${idPrefix}${endDateId}`}>
+					<Input
+						id={`${idPrefix}${endDateId}`}
+						type="date"
+						value={draftFilters.endDate}
+						onChange={(event) =>
+							setDraftFilters((current) => ({
+								...current,
+								endDate: event.target.value,
+							}))
+						}
+						className={inputClassName}
+					/>
+				</FilterField>
+			</div>
+		);
 	};
 
 	const totalResults = initialData.total;
@@ -354,225 +561,144 @@ function ShiftsPage() {
 					</CardHeader>
 					<CardContent>
 						<form
+							id={filtersFormId}
 							className="space-y-4"
 							onSubmit={(event) => {
 								event.preventDefault();
 								applyFilters();
 							}}
 						>
-							<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-								<div className="space-y-2">
-									<label className="text-sm text-gray-400" htmlFor={searchId}>
-										Busqueda
-									</label>
-									<div className="relative">
-										<Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-500" />
-										<Input
-											id={searchId}
-											value={draftFilters.q}
-											onChange={(event) =>
-												setDraftFilters((current) => ({
-													...current,
-													q: event.target.value,
-												}))
-											}
-											placeholder="Cajero, terminal, notas o id"
-											className="border-gray-700 bg-black/20 pl-9 text-white placeholder:text-gray-500"
-										/>
+							<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+								<div className="w-full sm:max-w-sm">
+									<div className="space-y-2">
+										<label className="text-sm text-gray-400" htmlFor={searchId}>
+											Busqueda
+										</label>
+										<div className="relative">
+											<Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-500" />
+											<Input
+												id={searchId}
+												value={draftFilters.q}
+												onChange={(event) =>
+													setDraftFilters((current) => ({
+														...current,
+														q: event.target.value,
+													}))
+												}
+												placeholder="Cajero, terminal, notas o id"
+												className="h-10 border-gray-700 bg-black/20 pl-9 text-white placeholder:text-gray-500"
+											/>
+										</div>
 									</div>
 								</div>
 
-								<FilterField label="Estado" htmlFor={statusId}>
-									<Select
-										value={draftFilters.status || ALL_FILTER_VALUE}
-										onValueChange={(value) =>
-											setDraftFilters((current) => ({
-												...current,
-												status: value === ALL_FILTER_VALUE ? "" : value,
-											}))
-										}
-									>
-										<SelectTrigger
-											id={statusId}
-											className="h-8 w-full border-gray-700 bg-black/20 text-white"
+								<div className="w-full sm:w-[220px]">
+									<FilterField label="Estado" htmlFor={statusId}>
+										<Select
+											value={draftFilters.status || ALL_FILTER_VALUE}
+											onValueChange={(value) =>
+												setDraftFilters((current) => ({
+													...current,
+													status: value === ALL_FILTER_VALUE ? "" : value,
+												}))
+											}
 										>
-											<SelectValue placeholder="Todos" />
-										</SelectTrigger>
-										<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-											<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-											<SelectItem value="open">Abierto</SelectItem>
-											<SelectItem value="closed">Cerrado</SelectItem>
-										</SelectContent>
-									</Select>
-								</FilterField>
+											<SelectTrigger
+												id={statusId}
+												className="h-10 w-full border-gray-700 bg-black/20 text-white"
+											>
+												<SelectValue placeholder="Todos" />
+											</SelectTrigger>
+											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+												<SelectItem value="open">Abierto</SelectItem>
+												<SelectItem value="closed">Cerrado</SelectItem>
+											</SelectContent>
+										</Select>
+									</FilterField>
+								</div>
 
-								<FilterField label="Cajero" htmlFor={cashierId}>
-									<Select
-										value={draftFilters.cashierId || ALL_FILTER_VALUE}
-										onValueChange={(value) =>
-											setDraftFilters((current) => ({
-												...current,
-												cashierId: value === ALL_FILTER_VALUE ? "" : value,
-											}))
-										}
-									>
-										<SelectTrigger
-											id={cashierId}
-											className="h-8 w-full border-gray-700 bg-black/20 text-white"
+								<Sheet
+									open={isMobileFilterOpen}
+									onOpenChange={setIsMobileFilterOpen}
+								>
+									<SheetTrigger asChild>
+										<Button
+											type="button"
+											variant="outline"
+											className="h-10 w-full border-gray-700 bg-black/20 text-gray-200 hover:bg-white/5 hover:text-white sm:hidden"
 										>
-											<SelectValue placeholder="Todos" />
-										</SelectTrigger>
-										<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-											<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-											{initialData.filterOptions.cashiers.map((cashier) => (
-												<SelectItem key={cashier.id} value={cashier.id}>
-													{cashier.name}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</FilterField>
-
-								<FilterField label="Terminal" htmlFor={terminalId}>
-									<Select
-										value={draftFilters.terminalName || ALL_FILTER_VALUE}
-										onValueChange={(value) =>
-											setDraftFilters((current) => ({
-												...current,
-												terminalName: value === ALL_FILTER_VALUE ? "" : value,
-											}))
-										}
+											<Filter className="mr-2 h-4 w-4" />
+											Filtros
+											{activeAdvancedFilterCount > 0 ? (
+												<Badge className="ml-2 border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 px-1.5 py-0.5 text-[10px] text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+													{activeAdvancedFilterCount}
+												</Badge>
+											) : null}
+										</Button>
+									</SheetTrigger>
+									<SheetContent
+										side="bottom"
+										className="h-[85vh] rounded-t-xl border-gray-800 bg-[var(--color-carbon)] text-white"
+										showCloseButton={false}
 									>
-										<SelectTrigger
-											id={terminalId}
-											className="h-8 w-full border-gray-700 bg-black/20 text-white"
-										>
-											<SelectValue placeholder="Todas" />
-										</SelectTrigger>
-										<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-											<SelectItem value={ALL_FILTER_VALUE}>Todas</SelectItem>
-											{initialData.filterOptions.terminals.map((terminal) => (
-												<SelectItem key={terminal} value={terminal}>
-													{terminal}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</FilterField>
+										<SheetHeader className="border-b border-gray-800 pb-4">
+											<SheetTitle className="text-gray-200">
+												Filtros avanzados
+											</SheetTitle>
+										</SheetHeader>
+										<div className="flex-1 overflow-y-auto px-4 py-4">
+											{renderAdvancedFilters("mobile")}
+										</div>
+										<div className="grid grid-cols-2 gap-3 border-t border-gray-800 px-4 py-4">
+											<Button
+												type="button"
+												variant="outline"
+												onClick={clearFilters}
+												className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+											>
+												Limpiar
+											</Button>
+											<Button
+												type="submit"
+												form={filtersFormId}
+												onClick={() => setIsMobileFilterOpen(false)}
+												className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
+											>
+												Aplicar
+											</Button>
+										</div>
+									</SheetContent>
+								</Sheet>
 
-								<FilterField label="Metodo" htmlFor={paymentMethodId}>
-									<Select
-										value={draftFilters.paymentMethod || ALL_FILTER_VALUE}
-										onValueChange={(value) =>
-											setDraftFilters((current) => ({
-												...current,
-												paymentMethod: value === ALL_FILTER_VALUE ? "" : value,
-											}))
-										}
+								<Popover>
+									<PopoverTrigger asChild>
+										<Button
+											type="button"
+											variant="outline"
+											className="hidden h-10 border-gray-700 bg-black/20 text-gray-200 hover:bg-white/5 hover:text-white sm:inline-flex"
+										>
+											<Filter className="mr-2 h-4 w-4" />
+											Filtros
+											{activeAdvancedFilterCount > 0 ? (
+												<Badge className="ml-2 border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 px-1.5 py-0.5 text-[10px] text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+													{activeAdvancedFilterCount}
+												</Badge>
+											) : null}
+										</Button>
+									</PopoverTrigger>
+									<PopoverContent
+										align="start"
+										className="w-[640px] border-gray-800 bg-[var(--color-carbon)] p-4 text-white"
 									>
-										<SelectTrigger
-											id={paymentMethodId}
-											className="h-8 w-full border-gray-700 bg-black/20 text-white"
-										>
-											<SelectValue placeholder="Todos" />
-										</SelectTrigger>
-										<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-											<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-											{initialData.filterOptions.paymentMethods.map(
-												(paymentMethod) => (
-													<SelectItem
-														key={paymentMethod.id}
-														value={paymentMethod.id}
-													>
-														{paymentMethod.label}
-													</SelectItem>
-												),
-											)}
-										</SelectContent>
-									</Select>
-								</FilterField>
-							</div>
-
-							<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-								<FilterField label="Diferencia" htmlFor={differenceStatusId}>
-									<Select
-										value={draftFilters.differenceStatus || ALL_FILTER_VALUE}
-										onValueChange={(value) =>
-											setDraftFilters((current) => ({
-												...current,
-												differenceStatus:
-													value === ALL_FILTER_VALUE ? "" : value,
-											}))
-										}
-									>
-										<SelectTrigger
-											id={differenceStatusId}
-											className="h-8 w-full border-gray-700 bg-black/20 text-white"
-										>
-											<SelectValue placeholder="Todas" />
-										</SelectTrigger>
-										<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-											<SelectItem value={ALL_FILTER_VALUE}>Todas</SelectItem>
-											<SelectItem value="short">Faltante</SelectItem>
-											<SelectItem value="over">Sobrante</SelectItem>
-											<SelectItem value="balanced">Cuadrada</SelectItem>
-										</SelectContent>
-									</Select>
-								</FilterField>
-
-								<FilterField label="Movimientos" htmlFor={hasMovementsId}>
-									<Select
-										value={draftFilters.hasMovements || ALL_FILTER_VALUE}
-										onValueChange={(value) =>
-											setDraftFilters((current) => ({
-												...current,
-												hasMovements: value === ALL_FILTER_VALUE ? "" : value,
-											}))
-										}
-									>
-										<SelectTrigger
-											id={hasMovementsId}
-											className="h-8 w-full border-gray-700 bg-black/20 text-white"
-										>
-											<SelectValue placeholder="Todos" />
-										</SelectTrigger>
-										<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-											<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-											<SelectItem value="yes">Con movimientos</SelectItem>
-											<SelectItem value="no">Sin movimientos</SelectItem>
-										</SelectContent>
-									</Select>
-								</FilterField>
-
-								<FilterField label="Desde" htmlFor={startDateId}>
-									<Input
-										id={startDateId}
-										type="date"
-										value={draftFilters.startDate}
-										onChange={(event) =>
-											setDraftFilters((current) => ({
-												...current,
-												startDate: event.target.value,
-											}))
-										}
-										className="border-gray-700 bg-black/20 text-white"
-									/>
-								</FilterField>
-
-								<FilterField label="Hasta" htmlFor={endDateId}>
-									<Input
-										id={endDateId}
-										type="date"
-										value={draftFilters.endDate}
-										onChange={(event) =>
-											setDraftFilters((current) => ({
-												...current,
-												endDate: event.target.value,
-											}))
-										}
-										className="border-gray-700 bg-black/20 text-white"
-									/>
-								</FilterField>
+										<div className="space-y-4">
+											<h4 className="text-sm font-medium text-gray-200">
+												Filtros avanzados
+											</h4>
+											{renderAdvancedFilters("desktop")}
+										</div>
+									</PopoverContent>
+								</Popover>
 							</div>
 
 							<div className="flex flex-col gap-3 sm:flex-row">

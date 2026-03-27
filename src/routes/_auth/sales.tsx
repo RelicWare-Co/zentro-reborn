@@ -4,6 +4,7 @@ import {
 	ArrowRight,
 	CalendarDays,
 	Clock3,
+	Filter,
 	History,
 	Receipt,
 	Search,
@@ -33,12 +34,24 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import {
+	Sheet,
+	SheetContent,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from "@/components/ui/sheet";
 import { SaleDetailSheet } from "@/features/pos/components/SaleDetailSheet";
 import {
 	prefetchSalesList,
@@ -150,6 +163,7 @@ function SalesPage() {
 		() => sales[0]?.id ?? null,
 	);
 	const [isDetailOpen, setIsDetailOpen] = useState(false);
+	const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 	const [draftFilters, setDraftFilters] = useState(() => ({
 		q: search.q ?? "",
 		status: search.status ?? "",
@@ -267,6 +281,15 @@ function SalesPage() {
 	const activeFilterCount = [
 		search.q,
 		search.status,
+		search.paymentMethod,
+		search.cashierId,
+		search.terminalName,
+		search.balanceStatus,
+		search.amountMin,
+		search.amountMax,
+		...(isTodayView ? [] : [search.startDate, search.endDate]),
+	].filter(Boolean).length;
+	const activeAdvancedFilterCount = [
 		search.paymentMethod,
 		search.cashierId,
 		search.terminalName,
@@ -405,6 +428,7 @@ function SalesPage() {
 	};
 
 	const clearFilters = () => {
+		setIsMobileFilterOpen(false);
 		setDraftFilters({
 			q: "",
 			status: "",
@@ -460,6 +484,231 @@ function SalesPage() {
 				replace: true,
 			});
 		});
+	};
+
+	const renderAdvancedFilters = (mode: "mobile" | "desktop") => {
+		const isMobile = mode === "mobile";
+		const idPrefix = isMobile ? "mobile-" : "";
+		const inputClassName = isMobile
+			? "h-11 border-gray-700 bg-black/20 text-white placeholder:text-gray-500"
+			: "h-9 border-gray-700 bg-black/20 text-white placeholder:text-gray-500";
+		const selectClassName = `${isMobile ? "h-11" : "h-9"} w-full border-gray-700 bg-black/20 text-white`;
+
+		return (
+			<div className={isMobile ? "space-y-4" : "grid gap-4 md:grid-cols-2"}>
+				<FilterField
+					label="Medio de pago"
+					htmlFor={`${idPrefix}${salesPaymentMethodId}`}
+				>
+					<Select
+						value={draftFilters.paymentMethod || ALL_FILTER_VALUE}
+						onValueChange={(value) =>
+							setDraftFilters((current) => ({
+								...current,
+								paymentMethod: value === ALL_FILTER_VALUE ? "" : value,
+							}))
+						}
+					>
+						<SelectTrigger
+							id={`${idPrefix}${salesPaymentMethodId}`}
+							className={selectClassName}
+						>
+							<SelectValue placeholder="Todos" />
+						</SelectTrigger>
+						<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+							<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+							{paymentMethodOptions.map((paymentMethod) => (
+								<SelectItem key={paymentMethod.id} value={paymentMethod.id}>
+									{paymentMethod.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</FilterField>
+
+				<FilterField label="Cajero" htmlFor={`${idPrefix}${salesCashierId}`}>
+					<Select
+						value={draftFilters.cashierId || ALL_FILTER_VALUE}
+						onValueChange={(value) =>
+							setDraftFilters((current) => ({
+								...current,
+								cashierId: value === ALL_FILTER_VALUE ? "" : value,
+							}))
+						}
+					>
+						<SelectTrigger
+							id={`${idPrefix}${salesCashierId}`}
+							className={selectClassName}
+						>
+							<SelectValue placeholder="Todos" />
+						</SelectTrigger>
+						<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+							<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+							{salesFilterOptions.cashiers.map((cashier) => (
+								<SelectItem key={cashier.id} value={cashier.id}>
+									{cashier.name}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</FilterField>
+
+				<FilterField label="Terminal" htmlFor={`${idPrefix}${salesTerminalId}`}>
+					<Select
+						value={draftFilters.terminalName || ALL_FILTER_VALUE}
+						onValueChange={(value) =>
+							setDraftFilters((current) => ({
+								...current,
+								terminalName: value === ALL_FILTER_VALUE ? "" : value,
+							}))
+						}
+					>
+						<SelectTrigger
+							id={`${idPrefix}${salesTerminalId}`}
+							className={selectClassName}
+						>
+							<SelectValue placeholder="Todas" />
+						</SelectTrigger>
+						<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+							<SelectItem value={ALL_FILTER_VALUE}>Todas</SelectItem>
+							{salesFilterOptions.terminals.map((terminal) => (
+								<SelectItem key={terminal} value={terminal}>
+									{terminal}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</FilterField>
+
+				<FilterField
+					label="Estado de saldo"
+					htmlFor={`${idPrefix}${salesBalanceStatusId}`}
+				>
+					<Select
+						value={draftFilters.balanceStatus || ALL_FILTER_VALUE}
+						onValueChange={(value) =>
+							setDraftFilters((current) => ({
+								...current,
+								balanceStatus: value === ALL_FILTER_VALUE ? "" : value,
+							}))
+						}
+					>
+						<SelectTrigger
+							id={`${idPrefix}${salesBalanceStatusId}`}
+							className={selectClassName}
+						>
+							<SelectValue placeholder="Todos" />
+						</SelectTrigger>
+						<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+							<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+							<SelectItem value="with_balance">
+								Con saldo pendiente
+							</SelectItem>
+							<SelectItem value="settled">Sin saldo</SelectItem>
+						</SelectContent>
+					</Select>
+				</FilterField>
+
+				<FilterField
+					label="Monto mínimo"
+					htmlFor={`${idPrefix}${salesAmountMinId}`}
+				>
+					<Input
+						id={`${idPrefix}${salesAmountMinId}`}
+						name="amountMin"
+						autoComplete="off"
+						inputMode="numeric"
+						min={0}
+						step={500}
+						type="number"
+						value={draftFilters.amountMin}
+						onChange={(event) =>
+							setDraftFilters((current) => ({
+								...current,
+								amountMin: event.target.value,
+							}))
+						}
+						placeholder="Ej. 5000…"
+						className={inputClassName}
+					/>
+				</FilterField>
+
+				<FilterField
+					label="Monto máximo"
+					htmlFor={`${idPrefix}${salesAmountMaxId}`}
+				>
+					<Input
+						id={`${idPrefix}${salesAmountMaxId}`}
+						name="amountMax"
+						autoComplete="off"
+						inputMode="numeric"
+						min={0}
+						step={500}
+						type="number"
+						value={draftFilters.amountMax}
+						onChange={(event) =>
+							setDraftFilters((current) => ({
+								...current,
+								amountMax: event.target.value,
+							}))
+						}
+						placeholder="Ej. 25000…"
+						className={inputClassName}
+					/>
+				</FilterField>
+
+				{isTodayView ? (
+					<div
+						className={
+							isMobile
+								? "rounded-2xl border border-dashed border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/5 px-4 py-3 text-sm text-gray-300"
+								: "md:col-span-2 rounded-2xl border border-dashed border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/5 px-4 py-3 text-sm text-gray-300"
+						}
+					>
+						<p className="font-medium text-white">Fecha fija en hoy</p>
+						<p className="mt-0.5 text-xs text-gray-400">
+							Mostrando solo ventas del {todayLabel}.
+						</p>
+					</div>
+				) : (
+					<>
+						<FilterField label="Desde" htmlFor={`${idPrefix}${salesStartDateId}`}>
+							<Input
+								id={`${idPrefix}${salesStartDateId}`}
+								name="startDate"
+								autoComplete="off"
+								type="date"
+								value={draftFilters.startDate}
+								onChange={(event) =>
+									setDraftFilters((current) => ({
+										...current,
+										startDate: event.target.value,
+									}))
+								}
+								className={inputClassName}
+							/>
+						</FilterField>
+
+						<FilterField label="Hasta" htmlFor={`${idPrefix}${salesEndDateId}`}>
+							<Input
+								id={`${idPrefix}${salesEndDateId}`}
+								name="endDate"
+								autoComplete="off"
+								type="date"
+								value={draftFilters.endDate}
+								onChange={(event) =>
+									setDraftFilters((current) => ({
+										...current,
+										endDate: event.target.value,
+									}))
+								}
+								className={inputClassName}
+							/>
+						</FilterField>
+					</>
+				)}
+			</div>
+		);
 	};
 
 	return (
@@ -602,8 +851,8 @@ function SalesPage() {
 								</div>
 							</div>
 
-							<div className="space-y-3">
-								<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+							<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+								<div className="w-full sm:max-w-sm">
 									<div className="space-y-2">
 										<label
 											className="text-xs font-medium tracking-[0.16em] text-gray-500 uppercase"
@@ -632,7 +881,9 @@ function SalesPage() {
 											/>
 										</div>
 									</div>
+								</div>
 
+								<div className="w-full sm:w-[220px]">
 									<FilterField label="Estado" htmlFor={salesStatusId}>
 										<Select
 											value={draftFilters.status || ALL_FILTER_VALUE}
@@ -657,218 +908,71 @@ function SalesPage() {
 											</SelectContent>
 										</Select>
 									</FilterField>
-
-									<FilterField
-										label="Medio de pago"
-										htmlFor={salesPaymentMethodId}
-									>
-										<Select
-											value={draftFilters.paymentMethod || ALL_FILTER_VALUE}
-											onValueChange={(value) =>
-												setDraftFilters((current) => ({
-													...current,
-													paymentMethod:
-														value === ALL_FILTER_VALUE ? "" : value,
-												}))
-											}
-										>
-											<SelectTrigger
-												id={salesPaymentMethodId}
-												className="h-10 w-full border-gray-700 bg-black/20 text-white"
-											>
-												<SelectValue placeholder="Todos" />
-											</SelectTrigger>
-											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-												{paymentMethodOptions.map((paymentMethod) => (
-													<SelectItem
-														key={paymentMethod.id}
-														value={paymentMethod.id}
-													>
-														{paymentMethod.label}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
-									</FilterField>
-
-									<FilterField label="Cajero" htmlFor={salesCashierId}>
-										<Select
-											value={draftFilters.cashierId || ALL_FILTER_VALUE}
-											onValueChange={(value) =>
-												setDraftFilters((current) => ({
-													...current,
-													cashierId: value === ALL_FILTER_VALUE ? "" : value,
-												}))
-											}
-										>
-											<SelectTrigger
-												id={salesCashierId}
-												className="h-10 w-full border-gray-700 bg-black/20 text-white"
-											>
-												<SelectValue placeholder="Todos" />
-											</SelectTrigger>
-											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-												{salesFilterOptions.cashiers.map((cashier) => (
-													<SelectItem key={cashier.id} value={cashier.id}>
-														{cashier.name}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
-									</FilterField>
-
-									<FilterField label="Terminal" htmlFor={salesTerminalId}>
-										<Select
-											value={draftFilters.terminalName || ALL_FILTER_VALUE}
-											onValueChange={(value) =>
-												setDraftFilters((current) => ({
-													...current,
-													terminalName: value === ALL_FILTER_VALUE ? "" : value,
-												}))
-											}
-										>
-											<SelectTrigger
-												id={salesTerminalId}
-												className="h-10 w-full border-gray-700 bg-black/20 text-white"
-											>
-												<SelectValue placeholder="Todas" />
-											</SelectTrigger>
-											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-												<SelectItem value={ALL_FILTER_VALUE}>Todas</SelectItem>
-												{salesFilterOptions.terminals.map((terminal) => (
-													<SelectItem key={terminal} value={terminal}>
-														{terminal}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
-									</FilterField>
 								</div>
 
-								<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-									<FilterField
-										label="Estado de saldo"
-										htmlFor={salesBalanceStatusId}
-									>
-										<Select
-											value={draftFilters.balanceStatus || ALL_FILTER_VALUE}
-											onValueChange={(value) =>
-												setDraftFilters((current) => ({
-													...current,
-													balanceStatus:
-														value === ALL_FILTER_VALUE ? "" : value,
-												}))
-											}
+								<Sheet
+									open={isMobileFilterOpen}
+									onOpenChange={setIsMobileFilterOpen}
+								>
+									<SheetTrigger asChild>
+										<Button
+											type="button"
+											variant="outline"
+											className="h-10 w-full border-gray-700 bg-black/20 text-gray-200 hover:bg-white/5 hover:text-white sm:hidden"
 										>
-											<SelectTrigger
-												id={salesBalanceStatusId}
-												className="h-10 w-full border-gray-700 bg-black/20 text-white"
-											>
-												<SelectValue placeholder="Todos" />
-											</SelectTrigger>
-											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-												<SelectItem value="with_balance">
-													Con saldo pendiente
-												</SelectItem>
-												<SelectItem value="settled">Sin saldo</SelectItem>
-											</SelectContent>
-										</Select>
-									</FilterField>
-
-									<FilterField label="Monto mínimo" htmlFor={salesAmountMinId}>
-										<Input
-											id={salesAmountMinId}
-											name="amountMin"
-											autoComplete="off"
-											inputMode="numeric"
-											min={0}
-											step={500}
-											type="number"
-											value={draftFilters.amountMin}
-											onChange={(event) =>
-												setDraftFilters((current) => ({
-													...current,
-													amountMin: event.target.value,
-												}))
-											}
-											placeholder="Ej. 5000…"
-											className="h-10 border-gray-700 bg-black/20 text-white placeholder:text-gray-500"
-										/>
-									</FilterField>
-
-									<FilterField label="Monto máximo" htmlFor={salesAmountMaxId}>
-										<Input
-											id={salesAmountMaxId}
-											name="amountMax"
-											autoComplete="off"
-											inputMode="numeric"
-											min={0}
-											step={500}
-											type="number"
-											value={draftFilters.amountMax}
-											onChange={(event) =>
-												setDraftFilters((current) => ({
-													...current,
-													amountMax: event.target.value,
-												}))
-											}
-											placeholder="Ej. 25000…"
-											className="h-10 border-gray-700 bg-black/20 text-white placeholder:text-gray-500"
-										/>
-									</FilterField>
-
-									{isTodayView ? (
-										<div className="flex items-end xl:col-span-2">
-											<div className="w-full rounded-2xl border border-dashed border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/5 px-4 py-2.5 text-sm text-gray-300">
-												<p className="font-medium text-white">
-													Fecha fija en hoy
-												</p>
-												<p className="mt-0.5 text-xs text-gray-400">
-													Mostrando solo ventas del {todayLabel}.
-												</p>
-											</div>
+											<Filter className="mr-2 h-4 w-4" aria-hidden="true" />
+											Filtros
+											{activeAdvancedFilterCount > 0 ? (
+												<Badge className="ml-2 border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 px-1.5 py-0.5 text-[10px] text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+													{activeAdvancedFilterCount}
+												</Badge>
+											) : null}
+										</Button>
+									</SheetTrigger>
+									<SheetContent
+										side="bottom"
+										className="h-[85vh] rounded-t-xl border-gray-800 bg-[var(--color-carbon)] text-white"
+										showCloseButton={false}
+									>
+										<SheetHeader className="border-b border-gray-800 pb-4">
+											<SheetTitle className="text-gray-200">
+												Filtros avanzados
+											</SheetTitle>
+										</SheetHeader>
+										<div className="flex-1 overflow-y-auto px-4 py-4">
+											{renderAdvancedFilters("mobile")}
 										</div>
-									) : (
-										<>
-											<FilterField label="Desde" htmlFor={salesStartDateId}>
-												<Input
-													id={salesStartDateId}
-													name="startDate"
-													autoComplete="off"
-													type="date"
-													value={draftFilters.startDate}
-													onChange={(event) =>
-														setDraftFilters((current) => ({
-															...current,
-															startDate: event.target.value,
-														}))
-													}
-													className="h-10 border-gray-700 bg-black/20 text-white"
-												/>
-											</FilterField>
+									</SheetContent>
+								</Sheet>
 
-											<FilterField label="Hasta" htmlFor={salesEndDateId}>
-												<Input
-													id={salesEndDateId}
-													name="endDate"
-													autoComplete="off"
-													type="date"
-													value={draftFilters.endDate}
-													onChange={(event) =>
-														setDraftFilters((current) => ({
-															...current,
-															endDate: event.target.value,
-														}))
-													}
-													className="h-10 border-gray-700 bg-black/20 text-white"
-												/>
-											</FilterField>
-										</>
-									)}
-								</div>
+								<Popover>
+									<PopoverTrigger asChild>
+										<Button
+											type="button"
+											variant="outline"
+											className="hidden h-10 border-gray-700 bg-black/20 text-gray-200 hover:bg-white/5 hover:text-white sm:inline-flex"
+										>
+											<Filter className="mr-2 h-4 w-4" aria-hidden="true" />
+											Filtros
+											{activeAdvancedFilterCount > 0 ? (
+												<Badge className="ml-2 border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 px-1.5 py-0.5 text-[10px] text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
+													{activeAdvancedFilterCount}
+												</Badge>
+											) : null}
+										</Button>
+									</PopoverTrigger>
+									<PopoverContent
+										align="start"
+										className="w-[640px] border-gray-800 bg-[var(--color-carbon)] p-4 text-white"
+									>
+										<div className="space-y-4">
+											<h4 className="text-sm font-medium text-gray-200">
+												Filtros avanzados
+											</h4>
+											{renderAdvancedFilters("desktop")}
+										</div>
+									</PopoverContent>
+								</Popover>
 							</div>
 						</CardHeader>
 						<CardContent className="pt-0">

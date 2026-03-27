@@ -755,6 +755,14 @@ describe("pos server modules", () => {
 				deletedAt: new Date(),
 				trackInventory: false,
 			});
+			await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Adicion",
+				categoryId: bebidasId,
+				isModifier: true,
+				trackInventory: false,
+			});
 
 			const pageOne =
 				await catalogServer.searchPosProductsForCurrentOrganization({
@@ -766,6 +774,7 @@ describe("pos server modules", () => {
 
 			expect(pageOne.data).toHaveLength(1);
 			expect(pageOne.hasMore).toBe(true);
+			expect(pageOne.total).toBe(2);
 			expect(pageOne.data[0]?.name).toBe("Agua");
 
 			const pageTwo =
@@ -778,7 +787,41 @@ describe("pos server modules", () => {
 
 			expect(pageTwo.data).toHaveLength(1);
 			expect(pageTwo.hasMore).toBe(false);
+			expect(pageTwo.total).toBe(2);
 			expect(pageTwo.data[0]?.name).toBe("Avena");
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("prioritizes exact barcode matches in POS product search", async () => {
+		const { ctx, catalogServer } = await setupPosServers();
+		try {
+			await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Alpha Producto",
+				barcode: "code-123-extra",
+				trackInventory: false,
+			});
+			const exactBarcodeProductId = await insertProduct({
+				db: ctx.db,
+				organizationId: ctx.organizationId,
+				name: "Zulu Producto",
+				barcode: "code-123",
+				trackInventory: false,
+			});
+
+			const result =
+				await catalogServer.searchPosProductsForCurrentOrganization({
+					searchQuery: "code-123",
+					limit: 1,
+					cursor: 0,
+				});
+
+			expect(result.data).toHaveLength(1);
+			expect(result.total).toBe(2);
+			expect(result.data[0]?.id).toBe(exactBarcodeProductId);
 		} finally {
 			ctx.cleanup();
 		}
@@ -815,6 +858,7 @@ describe("pos server modules", () => {
 				});
 			expect(pageOne.data).toHaveLength(1);
 			expect(pageOne.hasMore).toBe(true);
+			expect(pageOne.total).toBe(2);
 
 			const pageTwo =
 				await catalogServer.searchPosCustomersForCurrentOrganization({
@@ -824,6 +868,7 @@ describe("pos server modules", () => {
 				});
 			expect(pageTwo.data).toHaveLength(1);
 			expect(pageTwo.hasMore).toBe(false);
+			expect(pageTwo.total).toBe(2);
 			expect(pageOne.data[0]?.name).toBe("Ana Diaz");
 			expect(pageTwo.data[0]?.name).toBe("Andres Ruiz");
 		} finally {

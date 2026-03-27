@@ -57,6 +57,19 @@ function normalizeSearchQuery(searchQuery?: string | null) {
 	return searchQuery?.trim().toLowerCase() ?? "";
 }
 
+function normalizeCount(value: number | string | null | undefined) {
+	if (typeof value === "number") {
+		return Number.isFinite(value) ? value : 0;
+	}
+
+	if (typeof value === "string") {
+		const parsedValue = Number(value);
+		return Number.isFinite(parsedValue) ? parsedValue : 0;
+	}
+
+	return 0;
+}
+
 export async function searchCreditAccountsForCurrentOrganization(
 	input: SearchCreditAccountsInput,
 ) {
@@ -81,30 +94,45 @@ export async function searchCreditAccountsForCurrentOrganization(
 		);
 	}
 
-	const rows = await db
-		.select({
-			id: creditAccount.id,
-			customerId: creditAccount.customerId,
-			balance: creditAccount.balance,
-			interestRate: creditAccount.interestRate,
-			createdAt: creditAccount.createdAt,
-			updatedAt: creditAccount.updatedAt,
-			customerName: customer.name,
-			customerDocument: customer.documentNumber,
-			customerPhone: customer.phone,
-		})
-		.from(creditAccount)
-		.innerJoin(
-			customer,
-			and(
-				eq(customer.id, creditAccount.customerId),
-				eq(customer.organizationId, organizationId),
-			),
-		)
-		.where(and(...clauses))
-		.orderBy(asc(customer.name))
-		.limit(limit + 1)
-		.offset(cursor);
+	const [rows, totalRows] = await Promise.all([
+		db
+			.select({
+				id: creditAccount.id,
+				customerId: creditAccount.customerId,
+				balance: creditAccount.balance,
+				interestRate: creditAccount.interestRate,
+				createdAt: creditAccount.createdAt,
+				updatedAt: creditAccount.updatedAt,
+				customerName: customer.name,
+				customerDocument: customer.documentNumber,
+				customerPhone: customer.phone,
+			})
+			.from(creditAccount)
+			.innerJoin(
+				customer,
+				and(
+					eq(customer.id, creditAccount.customerId),
+					eq(customer.organizationId, organizationId),
+				),
+			)
+			.where(and(...clauses))
+			.orderBy(asc(customer.name), asc(creditAccount.id))
+			.limit(limit + 1)
+			.offset(cursor),
+		db
+			.select({
+				total: sql<number>`count(*)`,
+			})
+			.from(creditAccount)
+			.innerJoin(
+				customer,
+				and(
+					eq(customer.id, creditAccount.customerId),
+					eq(customer.organizationId, organizationId),
+				),
+			)
+			.where(and(...clauses)),
+	]);
 
 	return {
 		data: rows.slice(0, limit).map((row) => ({
@@ -119,7 +147,7 @@ export async function searchCreditAccountsForCurrentOrganization(
 					: new Date(row.updatedAt).getTime(),
 		})),
 		hasMore: rows.length > limit,
-		total: Math.max(rows.length - (rows.length > limit ? 1 : 0), 0),
+		total: normalizeCount(totalRows[0]?.total),
 		nextCursor: rows.length > limit ? cursor + limit : null,
 	};
 }
@@ -148,26 +176,34 @@ export async function listCreditTransactionsForCurrentOrganization(
 		);
 	}
 
-	const rows = await db
-		.select({
-			id: creditTransaction.id,
-			type: creditTransaction.type,
-			amount: creditTransaction.amount,
-			notes: creditTransaction.notes,
-			saleId: creditTransaction.saleId,
-			paymentId: creditTransaction.paymentId,
-			createdAt: creditTransaction.createdAt,
-		})
-		.from(creditTransaction)
-		.where(
-			and(
-				eq(creditTransaction.organizationId, organizationId),
-				eq(creditTransaction.creditAccountId, input.creditAccountId),
-			),
-		)
-		.orderBy(desc(creditTransaction.createdAt))
-		.limit(limit + 1)
-		.offset(cursor);
+	const transactionClauses = [
+		eq(creditTransaction.organizationId, organizationId),
+		eq(creditTransaction.creditAccountId, input.creditAccountId),
+	];
+
+	const [rows, totalRows] = await Promise.all([
+		db
+			.select({
+				id: creditTransaction.id,
+				type: creditTransaction.type,
+				amount: creditTransaction.amount,
+				notes: creditTransaction.notes,
+				saleId: creditTransaction.saleId,
+				paymentId: creditTransaction.paymentId,
+				createdAt: creditTransaction.createdAt,
+			})
+			.from(creditTransaction)
+			.where(and(...transactionClauses))
+			.orderBy(desc(creditTransaction.createdAt), desc(creditTransaction.id))
+			.limit(limit + 1)
+			.offset(cursor),
+		db
+			.select({
+				total: sql<number>`count(*)`,
+			})
+			.from(creditTransaction)
+			.where(and(...transactionClauses)),
+	]);
 
 	return {
 		data: rows.slice(0, limit).map((row) => ({
@@ -178,7 +214,7 @@ export async function listCreditTransactionsForCurrentOrganization(
 					: new Date(row.createdAt).getTime(),
 		})),
 		hasMore: rows.length > limit,
-		total: Math.max(rows.length - (rows.length > limit ? 1 : 0), 0),
+		total: normalizeCount(totalRows[0]?.total),
 		nextCursor: rows.length > limit ? cursor + limit : null,
 	};
 }

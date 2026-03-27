@@ -16,6 +16,19 @@ function normalizeSearchQuery(searchQuery?: string | null) {
 	return searchQuery?.trim().toLowerCase() ?? "";
 }
 
+function normalizeCount(value: number | string | null | undefined) {
+	if (typeof value === "number") {
+		return Number.isFinite(value) ? value : 0;
+	}
+
+	if (typeof value === "string") {
+		const parsedValue = Number(value);
+		return Number.isFinite(parsedValue) ? parsedValue : 0;
+	}
+
+	return 0;
+}
+
 function normalizePaymentMethodSort(a: string, b: string) {
 	if (a === "cash") return -1;
 	if (b === "cash") return 1;
@@ -39,10 +52,19 @@ export async function searchPosProductsForCurrentOrganization(input: {
 	const normalizedSearch = normalizeSearchQuery(input.searchQuery);
 	const normalizedCategoryId = input.categoryId?.trim() ?? "";
 	const searchPattern = `%${normalizedSearch}%`;
+	const searchRank = normalizedSearch
+		? sql<number>`case
+			when lower(coalesce(${product.barcode}, '')) = ${normalizedSearch} then 0
+			when lower(coalesce(${product.sku}, '')) = ${normalizedSearch} then 1
+			when lower(${product.name}) = ${normalizedSearch} then 2
+			else 3
+		end`
+		: sql<number>`0`;
 
 	const clauses = [
 		eq(product.organizationId, organizationId),
 		isNull(product.deletedAt),
+		eq(product.isModifier, false),
 	];
 	if (normalizedCategoryId) {
 		clauses.push(eq(product.categoryId, normalizedCategoryId));
@@ -53,32 +75,40 @@ export async function searchPosProductsForCurrentOrganization(input: {
 		);
 	}
 
-	const rows = await db
-		.select({
-			id: product.id,
-			name: product.name,
-			categoryId: product.categoryId,
-			categoryName: category.name,
-			sku: product.sku,
-			barcode: product.barcode,
-			price: product.price,
-			taxRate: product.taxRate,
-			trackInventory: product.trackInventory,
-			stock: product.stock,
-			isModifier: product.isModifier,
-		})
-		.from(product)
-		.leftJoin(
-			category,
-			and(
-				eq(product.categoryId, category.id),
-				eq(category.organizationId, organizationId),
-			),
-		)
-		.where(and(...clauses))
-		.orderBy(asc(product.name))
-		.limit(limit + 1)
-		.offset(cursor);
+	const [rows, totalRows] = await Promise.all([
+		db
+			.select({
+				id: product.id,
+				name: product.name,
+				categoryId: product.categoryId,
+				categoryName: category.name,
+				sku: product.sku,
+				barcode: product.barcode,
+				price: product.price,
+				taxRate: product.taxRate,
+				trackInventory: product.trackInventory,
+				stock: product.stock,
+				isModifier: product.isModifier,
+			})
+			.from(product)
+			.leftJoin(
+				category,
+				and(
+					eq(product.categoryId, category.id),
+					eq(category.organizationId, organizationId),
+				),
+			)
+			.where(and(...clauses))
+			.orderBy(asc(searchRank), asc(product.name), asc(product.id))
+			.limit(limit + 1)
+			.offset(cursor),
+		db
+			.select({
+				total: sql<number>`count(*)`,
+			})
+			.from(product)
+			.where(and(...clauses)),
+	]);
 
 	return {
 		data: rows.slice(0, limit).map((row) => ({
@@ -86,7 +116,7 @@ export async function searchPosProductsForCurrentOrganization(input: {
 			categoryName: row.categoryName ?? "Sin categoría",
 		})),
 		hasMore: rows.length > limit,
-		total: Math.max(rows.length - (rows.length > limit ? 1 : 0), 0),
+		total: normalizeCount(totalRows[0]?.total),
 		nextCursor: rows.length > limit ? cursor + limit : null,
 	};
 }
@@ -122,25 +152,33 @@ export async function searchPosCustomersForCurrentOrganization(input: {
 		);
 	}
 
-	const rows = await db
-		.select({
-			id: customer.id,
-			name: customer.name,
-			documentNumber: customer.documentNumber,
-			phone: customer.phone,
-			email: customer.email,
-			taxRegime: customer.taxRegime,
-		})
-		.from(customer)
-		.where(and(...clauses))
-		.orderBy(asc(customer.name))
-		.limit(limit + 1)
-		.offset(cursor);
+	const [rows, totalRows] = await Promise.all([
+		db
+			.select({
+				id: customer.id,
+				name: customer.name,
+				documentNumber: customer.documentNumber,
+				phone: customer.phone,
+				email: customer.email,
+				taxRegime: customer.taxRegime,
+			})
+			.from(customer)
+			.where(and(...clauses))
+			.orderBy(asc(customer.name), asc(customer.id))
+			.limit(limit + 1)
+			.offset(cursor),
+		db
+			.select({
+				total: sql<number>`count(*)`,
+			})
+			.from(customer)
+			.where(and(...clauses)),
+	]);
 
 	return {
 		data: rows.slice(0, limit),
 		hasMore: rows.length > limit,
-		total: Math.max(rows.length - (rows.length > limit ? 1 : 0), 0),
+		total: normalizeCount(totalRows[0]?.total),
 		nextCursor: rows.length > limit ? cursor + limit : null,
 	};
 }

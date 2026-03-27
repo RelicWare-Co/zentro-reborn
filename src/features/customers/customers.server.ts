@@ -51,6 +51,19 @@ function normalizeSearchQuery(searchQuery?: string | null) {
 	return searchQuery?.trim().toLowerCase() ?? "";
 }
 
+function normalizeCount(value: number | string | null | undefined) {
+	if (typeof value === "number") {
+		return Number.isFinite(value) ? value : 0;
+	}
+
+	if (typeof value === "string") {
+		const parsedValue = Number(value);
+		return Number.isFinite(parsedValue) ? parsedValue : 0;
+	}
+
+	return 0;
+}
+
 async function assertUniqueDocumentNumber(
 	organizationId: string,
 	documentNumber: string | null,
@@ -104,26 +117,34 @@ export async function searchCustomersForCurrentOrganization(
 		);
 	}
 
-	const rows = await db
-		.select({
-			id: customer.id,
-			type: customer.type,
-			documentType: customer.documentType,
-			documentNumber: customer.documentNumber,
-			name: customer.name,
-			email: customer.email,
-			phone: customer.phone,
-			address: customer.address,
-			city: customer.city,
-			taxRegime: customer.taxRegime,
-			createdAt: customer.createdAt,
-			updatedAt: customer.updatedAt,
-		})
-		.from(customer)
-		.where(and(...clauses))
-		.orderBy(asc(customer.name))
-		.limit(limit + 1)
-		.offset(cursor);
+	const [rows, totalRows] = await Promise.all([
+		db
+			.select({
+				id: customer.id,
+				type: customer.type,
+				documentType: customer.documentType,
+				documentNumber: customer.documentNumber,
+				name: customer.name,
+				email: customer.email,
+				phone: customer.phone,
+				address: customer.address,
+				city: customer.city,
+				taxRegime: customer.taxRegime,
+				createdAt: customer.createdAt,
+				updatedAt: customer.updatedAt,
+			})
+			.from(customer)
+			.where(and(...clauses))
+			.orderBy(asc(customer.name), asc(customer.id))
+			.limit(limit + 1)
+			.offset(cursor),
+		db
+			.select({
+				total: sql<number>`count(*)`,
+			})
+			.from(customer)
+			.where(and(...clauses)),
+	]);
 
 	return {
 		data: rows.slice(0, limit).map((row) => ({
@@ -138,7 +159,7 @@ export async function searchCustomersForCurrentOrganization(
 					: new Date(row.updatedAt).getTime(),
 		})),
 		hasMore: rows.length > limit,
-		total: Math.max(rows.length - (rows.length > limit ? 1 : 0), 0),
+		total: normalizeCount(totalRows[0]?.total),
 		nextCursor: rows.length > limit ? cursor + limit : null,
 	};
 }
@@ -221,7 +242,7 @@ export async function updateCustomerForCurrentOrganization(
 	);
 
 	updates.updatedAt = new Date();
-	await db
+	const updatedCustomers = await db
 		.update(customer)
 		.set(updates)
 		.where(
@@ -230,7 +251,14 @@ export async function updateCustomerForCurrentOrganization(
 				eq(customer.organizationId, organizationId),
 				isNull(customer.deletedAt),
 			),
+		)
+		.returning({ id: customer.id });
+
+	if (updatedCustomers.length === 0) {
+		throw new Error(
+			"El cliente no existe o ya fue eliminado en la organización actual",
 		);
+	}
 
 	return { success: true };
 }
@@ -238,7 +266,7 @@ export async function updateCustomerForCurrentOrganization(
 export async function deleteCustomerForCurrentOrganization(id: string) {
 	const { organizationId } = await requireAuthContext();
 
-	await db
+	const deletedCustomers = await db
 		.update(customer)
 		.set({ deletedAt: new Date(), updatedAt: new Date() })
 		.where(
@@ -247,7 +275,14 @@ export async function deleteCustomerForCurrentOrganization(id: string) {
 				eq(customer.organizationId, organizationId),
 				isNull(customer.deletedAt),
 			),
+		)
+		.returning({ id: customer.id });
+
+	if (deletedCustomers.length === 0) {
+		throw new Error(
+			"El cliente no existe o ya fue eliminado en la organización actual",
 		);
+	}
 
 	return { success: true };
 }

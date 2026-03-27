@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 import { getRequest } from "@tanstack/react-start/server";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db } from "#/db";
 import { member } from "#/db/schema";
 import { auth } from "#/lib/auth";
@@ -31,6 +31,7 @@ async function resolveOrganizationId(session: AuthSession) {
 		})
 		.from(member)
 		.where(eq(member.userId, session.user.id))
+		.orderBy(asc(member.createdAt), asc(member.id))
 		.limit(1);
 
 	if (!membership) {

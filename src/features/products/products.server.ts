@@ -115,6 +115,7 @@ async function resolveOrganizationId(session: AuthSession) {
 		})
 		.from(member)
 		.where(eq(member.userId, session.user.id))
+		.orderBy(asc(member.createdAt), asc(member.id))
 		.limit(1);
 
 	if (!membership) {
@@ -264,7 +265,7 @@ export async function updateCategoryForCurrentOrganization(
 		throw new Error("No hay campos para actualizar");
 	}
 
-	await db
+	const updatedCategories = await db
 		.update(category)
 		.set(updates)
 		.where(
@@ -272,7 +273,12 @@ export async function updateCategoryForCurrentOrganization(
 				eq(category.id, input.id),
 				eq(category.organizationId, organizationId),
 			),
-		);
+		)
+		.returning({ id: category.id });
+
+	if (updatedCategories.length === 0) {
+		throw new Error("La categoría no existe en la organización actual");
+	}
 
 	return { success: true };
 }
@@ -281,11 +287,16 @@ export async function deleteCategoryForCurrentOrganization(id: string) {
 	const { organizationId } = await getAuthContext();
 	if (!organizationId) throw new Error("No hay una organización activa");
 
-	await db
+	const deletedCategories = await db
 		.delete(category)
 		.where(
 			and(eq(category.id, id), eq(category.organizationId, organizationId)),
-		);
+		)
+		.returning({ id: category.id });
+
+	if (deletedCategories.length === 0) {
+		throw new Error("La categoría no existe en la organización actual");
+	}
 
 	return { success: true };
 }
@@ -369,7 +380,7 @@ export async function updateProductForCurrentOrganization(
 		throw new Error("No hay campos para actualizar");
 	}
 
-	await db
+	const updatedProducts = await db
 		.update(product)
 		.set(updates)
 		.where(
@@ -378,7 +389,14 @@ export async function updateProductForCurrentOrganization(
 				eq(product.organizationId, organizationId),
 				isNull(product.deletedAt),
 			),
+		)
+		.returning({ id: product.id });
+
+	if (updatedProducts.length === 0) {
+		throw new Error(
+			"El producto no existe o ya fue eliminado en la organización actual",
 		);
+	}
 
 	return { success: true };
 }
@@ -487,7 +505,7 @@ export async function deleteProductForCurrentOrganization(id: string) {
 	const { organizationId } = await getAuthContext();
 	if (!organizationId) throw new Error("No hay una organización activa");
 
-	await db
+	const deletedProducts = await db
 		.update(product)
 		.set({ deletedAt: new Date() })
 		.where(
@@ -496,7 +514,14 @@ export async function deleteProductForCurrentOrganization(id: string) {
 				eq(product.organizationId, organizationId),
 				isNull(product.deletedAt),
 			),
+		)
+		.returning({ id: product.id });
+
+	if (deletedProducts.length === 0) {
+		throw new Error(
+			"El producto no existe o ya fue eliminado en la organización actual",
 		);
+	}
 
 	return { success: true };
 }

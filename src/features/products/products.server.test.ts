@@ -373,4 +373,46 @@ describe("products.server", () => {
 			ctx.cleanup();
 		}
 	});
+
+	test("rejects mutations for missing categories and deleted products", async () => {
+		const { ctx, server } = await setupProductsServer();
+		try {
+			const category = await server.createCategoryForCurrentOrganization({
+				name: "Activa",
+				description: null,
+			});
+			const product = await server.createProductForCurrentOrganization({
+				name: "Producto Temporal",
+				price: 5000,
+				categoryId: category.id,
+			});
+
+			await server.deleteProductForCurrentOrganization(product.id);
+
+			await expect(
+				server.updateProductForCurrentOrganization({
+					id: product.id,
+					name: "Producto Editado",
+				}),
+			).rejects.toThrow(
+				"El producto no existe o ya fue eliminado en la organización actual",
+			);
+			await expect(
+				server.deleteProductForCurrentOrganization(product.id),
+			).rejects.toThrow(
+				"El producto no existe o ya fue eliminado en la organización actual",
+			);
+			await expect(
+				server.updateCategoryForCurrentOrganization({
+					id: crypto.randomUUID(),
+					name: "Inexistente",
+				}),
+			).rejects.toThrow("La categoría no existe en la organización actual");
+			await expect(
+				server.deleteCategoryForCurrentOrganization(crypto.randomUUID()),
+			).rejects.toThrow("La categoría no existe en la organización actual");
+		} finally {
+			ctx.cleanup();
+		}
+	});
 });

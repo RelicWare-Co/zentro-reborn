@@ -43,6 +43,7 @@ describe("credit.server", () => {
 		const { ctx, server } = await setupCreditServer();
 		try {
 			const customerId = crypto.randomUUID();
+			const customerIdTwo = crypto.randomUUID();
 			await ctx.db.insert(schema.customer).values({
 				id: customerId,
 				organizationId: ctx.organizationId,
@@ -52,6 +53,22 @@ describe("credit.server", () => {
 				name: "Cliente Credito",
 				email: "cliente@demo.com",
 				phone: "3000000",
+				address: null,
+				city: null,
+				taxRegime: null,
+				deletedAt: null,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			});
+			await ctx.db.insert(schema.customer).values({
+				id: customerIdTwo,
+				organizationId: ctx.organizationId,
+				type: "natural",
+				documentType: "CC",
+				documentNumber: "778",
+				name: "Cliente Credito Dos",
+				email: "cliente2@demo.com",
+				phone: "3000001",
 				address: null,
 				city: null,
 				taxRegime: null,
@@ -69,14 +86,25 @@ describe("credit.server", () => {
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			});
+			await ctx.db.insert(schema.creditAccount).values({
+				id: crypto.randomUUID(),
+				organizationId: ctx.organizationId,
+				customerId: customerIdTwo,
+				balance: 25000,
+				interestRate: 0,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			});
 
 			const result = await server.searchCreditAccountsForCurrentOrganization({
 				searchQuery: "credito",
-				limit: 10,
+				limit: 1,
 				cursor: 0,
 			});
 
 			expect(result.data).toHaveLength(1);
+			expect(result.hasMore).toBe(true);
+			expect(result.total).toBe(2);
 			expect(result.data[0]?.customerName).toBe("Cliente Credito");
 			expect(result.data[0]?.balance).toBe(45000);
 		} finally {
@@ -141,13 +169,14 @@ describe("credit.server", () => {
 
 			const result = await server.listCreditTransactionsForCurrentOrganization({
 				creditAccountId: accountId,
-				limit: 10,
+				limit: 1,
 				cursor: 0,
 			});
 
-			expect(result.data).toHaveLength(2);
+			expect(result.data).toHaveLength(1);
+			expect(result.hasMore).toBe(true);
+			expect(result.total).toBe(2);
 			expect(result.data[0]?.type).toBe("payment");
-			expect(result.data[1]?.type).toBe("charge");
 		} finally {
 			ctx.cleanup();
 		}

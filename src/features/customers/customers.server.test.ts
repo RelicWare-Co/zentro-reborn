@@ -71,6 +71,10 @@ describe("customers.server", () => {
 				name: "Carlos Dos",
 				documentNumber: "A2",
 			});
+			await server.createCustomerForCurrentOrganization({
+				name: "Carlos Tres",
+				documentNumber: "A3",
+			});
 
 			await server.deleteCustomerForCurrentOrganization(first.id);
 
@@ -80,8 +84,9 @@ describe("customers.server", () => {
 				cursor: 0,
 			});
 			expect(page.data).toHaveLength(1);
-			expect(page.hasMore).toBe(false);
-			expect(page.total).toBe(1);
+			expect(page.hasMore).toBe(true);
+			expect(page.total).toBe(2);
+			expect(page.nextCursor).toBe(1);
 			expect(page.data[0]?.name).toBe("Carlos Dos");
 
 			const activeRows = await ctx.db
@@ -93,7 +98,7 @@ describe("customers.server", () => {
 						isNull(schema.customer.deletedAt),
 					),
 				);
-			expect(activeRows).toHaveLength(1);
+			expect(activeRows).toHaveLength(2);
 		} finally {
 			ctx.cleanup();
 		}
@@ -169,6 +174,34 @@ describe("customers.server", () => {
 			await expect(
 				server.updateCustomerForCurrentOrganization({ id: created.id }),
 			).rejects.toThrow("No hay campos para actualizar");
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
+	test("rejects mutations for customers that are no longer active", async () => {
+		const { ctx, server } = await setupCustomersServer();
+		try {
+			const created = await server.createCustomerForCurrentOrganization({
+				name: "Cliente Eliminado",
+				documentNumber: "9912",
+			});
+
+			await server.deleteCustomerForCurrentOrganization(created.id);
+
+			await expect(
+				server.updateCustomerForCurrentOrganization({
+					id: created.id,
+					name: "Cliente Reactivado",
+				}),
+			).rejects.toThrow(
+				"El cliente no existe o ya fue eliminado en la organización actual",
+			);
+			await expect(
+				server.deleteCustomerForCurrentOrganization(created.id),
+			).rejects.toThrow(
+				"El cliente no existe o ya fue eliminado en la organización actual",
+			);
 		} finally {
 			ctx.cleanup();
 		}

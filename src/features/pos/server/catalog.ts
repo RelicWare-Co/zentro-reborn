@@ -59,7 +59,10 @@ export async function searchPosProductsForCurrentOrganization(input: {
 			when lower(${product.name}) = ${normalizedSearch} then 2
 			else 3
 		end`
-		: sql<number>`0`;
+		: null;
+	const productOrderBy = searchRank
+		? [asc(searchRank), asc(product.name), asc(product.id)]
+		: [asc(product.name), asc(product.id)];
 
 	const clauses = [
 		eq(product.organizationId, organizationId),
@@ -99,7 +102,7 @@ export async function searchPosProductsForCurrentOrganization(input: {
 				),
 			)
 			.where(and(...clauses))
-			.orderBy(asc(searchRank), asc(product.name), asc(product.id))
+			.orderBy(...productOrderBy)
 			.limit(limit + 1)
 			.offset(cursor),
 		db

@@ -1,28 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
-	ArrowRight,
 	CircleDollarSign,
 	Clock3,
 	Filter,
-	LogOut,
 	Receipt,
 	Search,
 	Store,
 	User,
 	Wallet,
-	X,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
 	Popover,
@@ -48,7 +38,6 @@ import {
 	createPaymentMethodLabelMap,
 	formatPaymentMethodLabel,
 } from "@/features/pos/utils";
-import { authClient } from "@/lib/auth-client";
 
 const DEFAULT_LIST_PARAMS = {
 	limit: 10,
@@ -109,7 +98,6 @@ export const Route = createFileRoute("/_auth/shifts")({
 });
 
 function ShiftsPage() {
-	const filtersFormId = useId();
 	const searchId = useId();
 	const statusId = useId();
 	const cashierId = useId();
@@ -449,306 +437,234 @@ function ShiftsPage() {
 	const rangeEnd = totalResults === 0 ? 0 : cursor + shifts.length;
 
 	return (
-		<main className="flex-1 space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12">
-			<section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-				<div className="space-y-3">
-					<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-						Operacion de caja
-					</Badge>
-					<div className="space-y-2">
-						<h1 className="text-3xl font-bold tracking-tight">
-							Turnos y cierres de caja
-						</h1>
-						<p className="max-w-3xl text-sm text-gray-400 md:text-base">
-							Consulta turnos, cierres, pagos y movimientos de caja en una sola
-							pantalla con filtros por cajero, estado y fecha.
-						</p>
-					</div>
+		<main className="flex-1 space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12 font-sans">
+			<div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+				<div className="flex items-baseline gap-3">
+					<h1 className="text-3xl font-bold tracking-tight text-white">
+						Turnos y cierres de caja
+					</h1>
+					<span className="text-sm text-gray-400">
+						{formatCount(shifts.length)} turnos •{" "}
+						{formatCurrency(summary.expectedCash)}
+					</span>
 				</div>
 
-				<div className="flex flex-col gap-3 sm:flex-row">
+				<div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
 					<Button
 						asChild
-						className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
+						variant="outline"
+						className="h-10 w-full shrink-0 rounded-lg border-gray-800 bg-[var(--color-carbon)] px-4 py-2 text-gray-300 hover:bg-white/5 hover:text-white sm:w-auto"
+					>
+						<Link to="/dashboard">Ver dashboard</Link>
+					</Button>
+					<Button
+						asChild
+						className="h-10 w-full shrink-0 rounded-lg bg-[var(--color-voltage)] px-4 py-2 font-semibold text-black hover:bg-[#c9e605] sm:w-auto"
 					>
 						<Link to="/pos">
-							<Store className="h-4 w-4" />
+							<Store className="mr-2 h-4 w-4" aria-hidden="true" />
 							Ir al POS
 						</Link>
 					</Button>
-					<Button
-						asChild
-						variant="outline"
-						className="border-gray-700 bg-[var(--color-carbon)] text-gray-200 hover:bg-white/5 hover:text-white"
-					>
-						<Link to="/dashboard">
-							Ver dashboard
-							<ArrowRight className="h-4 w-4" />
-						</Link>
-					</Button>
-					<Button
-						type="button"
-						variant="outline"
-						onClick={async () => {
-							await authClient.signOut();
-							void navigate({ to: "/login" });
-						}}
-						className="border-gray-700 bg-[var(--color-carbon)] text-gray-200 hover:bg-white/5 hover:text-white"
-					>
-						<LogOut className="h-4 w-4" />
-						Cerrar sesión
-					</Button>
 				</div>
-			</section>
+			</div>
 
-			<section className="grid gap-4 md:grid-cols-4">
-				<SummaryCard
+			<div className="mb-6 grid gap-3 grid-cols-2 lg:grid-cols-4">
+				<CompactMetricCard
 					title="Turnos cargados"
 					value={formatCount(shifts.length)}
-					description={
-						activeFilterCount > 0
-							? "Resultados del filtro actual"
-							: "Turnos recientes listados"
-					}
 					icon={Receipt}
 				/>
-				<SummaryCard
+				<CompactMetricCard
 					title="Turnos abiertos"
 					value={formatCount(summary.openShifts)}
-					description="Pendientes por cerrar"
 					icon={Clock3}
 				/>
-				<SummaryCard
+				<CompactMetricCard
 					title="Efectivo esperado"
 					value={formatCurrency(summary.expectedCash)}
-					description="Suma del listado visible"
 					icon={Wallet}
 				/>
-				<SummaryCard
+				<CompactMetricCard
 					title="Movimientos"
 					value={formatCount(summary.movements)}
-					description={`Diferencia total ${formatSignedCurrency(summary.closureDifference)}`}
 					icon={CircleDollarSign}
 				/>
-			</section>
+			</div>
 
-			<section>
-				<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-					<CardHeader>
-						<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-							<div>
-								<CardTitle className="flex items-center gap-2">
-									<Filter className="h-4 w-4 text-[var(--color-voltage)]" />
-									Filtros
-								</CardTitle>
-								<CardDescription className="mt-1 text-gray-400">
-									Busca por cajero, terminal, notas o id del turno y acota el
-									historial por estado, método involucrado, movimientos
-									manuales, diferencia de cierre y fecha de apertura.
-								</CardDescription>
-							</div>
-							{activeFilterCount > 0 ? (
-								<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-									{activeFilterCount} filtro
-									{activeFilterCount === 1 ? "" : "s"} activo
-									{activeFilterCount === 1 ? "" : "s"}
-								</Badge>
-							) : null}
+			<div className="overflow-x-auto rounded-xl border border-gray-800 bg-[var(--color-carbon)]">
+				<div className="flex flex-col gap-4 border-b border-gray-800 p-4 lg:flex-row lg:items-center lg:justify-between">
+					<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center w-full">
+						<div className="relative w-full sm:max-w-xs md:max-w-sm">
+							<Search
+								className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"
+								aria-hidden="true"
+							/>
+							<Input
+								id={searchId}
+								value={draftFilters.q}
+								onChange={(event) =>
+									setDraftFilters((current) => ({
+										...current,
+										q: event.target.value,
+									}))
+								}
+								placeholder="Cajero, terminal o id…"
+								className="h-10 rounded-lg border-gray-800 bg-black/20 pl-9 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20"
+							/>
 						</div>
-					</CardHeader>
-					<CardContent>
-						<form
-							id={filtersFormId}
-							className="space-y-4"
-							onSubmit={(event) => {
-								event.preventDefault();
-								applyFilters();
-							}}
+
+						<div className="w-full sm:w-[200px]">
+							<Select
+								value={draftFilters.status || ALL_FILTER_VALUE}
+								onValueChange={(value) =>
+									setDraftFilters((current) => ({
+										...current,
+										status: value === ALL_FILTER_VALUE ? "" : value,
+									}))
+								}
+							>
+								<SelectTrigger
+									id={statusId}
+									className="h-10 w-full rounded-lg border-gray-800 bg-black/20 text-white"
+								>
+									<SelectValue placeholder="Estado" />
+								</SelectTrigger>
+								<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+									<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
+									<SelectItem value="open">Abierto</SelectItem>
+									<SelectItem value="closed">Cerrado</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						<Sheet
+							open={isMobileFilterOpen}
+							onOpenChange={setIsMobileFilterOpen}
 						>
-							<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-								<div className="w-full sm:max-w-sm">
-									<div className="space-y-2">
-										<label className="text-sm text-gray-400" htmlFor={searchId}>
-											Busqueda
-										</label>
-										<div className="relative">
-											<Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-500" />
-											<Input
-												id={searchId}
-												value={draftFilters.q}
-												onChange={(event) =>
-													setDraftFilters((current) => ({
-														...current,
-														q: event.target.value,
-													}))
-												}
-												placeholder="Cajero, terminal, notas o id"
-												className="h-10 border-gray-700 bg-black/20 pl-9 text-white placeholder:text-gray-500"
-											/>
-										</div>
-									</div>
-								</div>
-
-								<div className="w-full sm:w-[220px]">
-									<FilterField label="Estado" htmlFor={statusId}>
-										<Select
-											value={draftFilters.status || ALL_FILTER_VALUE}
-											onValueChange={(value) =>
-												setDraftFilters((current) => ({
-													...current,
-													status: value === ALL_FILTER_VALUE ? "" : value,
-												}))
-											}
-										>
-											<SelectTrigger
-												id={statusId}
-												className="h-10 w-full border-gray-700 bg-black/20 text-white"
-											>
-												<SelectValue placeholder="Todos" />
-											</SelectTrigger>
-											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-												<SelectItem value="open">Abierto</SelectItem>
-												<SelectItem value="closed">Cerrado</SelectItem>
-											</SelectContent>
-										</Select>
-									</FilterField>
-								</div>
-
-								<Sheet
-									open={isMobileFilterOpen}
-									onOpenChange={setIsMobileFilterOpen}
-								>
-									<SheetTrigger asChild>
-										<Button
-											type="button"
-											variant="outline"
-											className="h-10 w-full border-gray-700 bg-black/20 text-gray-200 hover:bg-white/5 hover:text-white sm:hidden"
-										>
-											<Filter className="mr-2 h-4 w-4" />
-											Filtros
-											{activeAdvancedFilterCount > 0 ? (
-												<Badge className="ml-2 border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 px-1.5 py-0.5 text-[10px] text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-													{activeAdvancedFilterCount}
-												</Badge>
-											) : null}
-										</Button>
-									</SheetTrigger>
-									<SheetContent
-										side="bottom"
-										className="h-[85vh] rounded-t-xl border-gray-800 bg-[var(--color-carbon)] text-white"
-										showCloseButton={false}
-									>
-										<SheetHeader className="border-b border-gray-800 pb-4">
-											<SheetTitle className="text-gray-200">
-												Filtros avanzados
-											</SheetTitle>
-										</SheetHeader>
-										<div className="flex-1 overflow-y-auto px-4 py-4">
-											{renderAdvancedFilters("mobile")}
-										</div>
-										<div className="grid grid-cols-2 gap-3 border-t border-gray-800 px-4 py-4">
-											<Button
-												type="button"
-												variant="outline"
-												onClick={clearFilters}
-												className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
-											>
-												Limpiar
-											</Button>
-											<Button
-												type="submit"
-												form={filtersFormId}
-												onClick={() => setIsMobileFilterOpen(false)}
-												className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
-											>
-												Aplicar
-											</Button>
-										</div>
-									</SheetContent>
-								</Sheet>
-
-								<Popover>
-									<PopoverTrigger asChild>
-										<Button
-											type="button"
-											variant="outline"
-											className="hidden h-10 border-gray-700 bg-black/20 text-gray-200 hover:bg-white/5 hover:text-white sm:inline-flex"
-										>
-											<Filter className="mr-2 h-4 w-4" />
-											Filtros
-											{activeAdvancedFilterCount > 0 ? (
-												<Badge className="ml-2 border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 px-1.5 py-0.5 text-[10px] text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-													{activeAdvancedFilterCount}
-												</Badge>
-											) : null}
-										</Button>
-									</PopoverTrigger>
-									<PopoverContent
-										align="start"
-										className="w-[640px] border-gray-800 bg-[var(--color-carbon)] p-4 text-white"
-									>
-										<div className="space-y-4">
-											<h4 className="text-sm font-medium text-gray-200">
-												Filtros avanzados
-											</h4>
-											{renderAdvancedFilters("desktop")}
-										</div>
-									</PopoverContent>
-								</Popover>
-							</div>
-
-							<div className="flex flex-col gap-3 sm:flex-row">
-								<Button
-									type="submit"
-									className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
-								>
-									<Filter className="h-4 w-4" />
-									Aplicar filtros
-								</Button>
+							<SheetTrigger asChild>
 								<Button
 									type="button"
 									variant="outline"
-									onClick={clearFilters}
-									className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+									className="h-10 w-full rounded-lg border-gray-800 bg-black/20 text-gray-300 hover:bg-white/5 hover:text-white sm:hidden"
 								>
-									<X className="h-4 w-4" />
-									Limpiar
+									<Filter className="mr-2 h-4 w-4" aria-hidden="true" />
+									Filtros
+									{activeAdvancedFilterCount > 0 ? (
+										<Badge className="ml-2 rounded-sm bg-[var(--color-voltage)]/20 px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/30">
+											{activeAdvancedFilterCount}
+										</Badge>
+									) : null}
 								</Button>
-							</div>
-						</form>
-					</CardContent>
-				</Card>
-			</section>
+							</SheetTrigger>
+							<SheetContent
+								side="bottom"
+								className="h-[85vh] rounded-t-xl border-gray-800 bg-[var(--color-carbon)] text-white"
+								showCloseButton={false}
+							>
+								<SheetHeader className="border-b border-gray-800 pb-4">
+									<SheetTitle className="text-gray-200">
+										Filtros avanzados
+									</SheetTitle>
+								</SheetHeader>
+								<div className="flex-1 overflow-y-auto px-4 py-4">
+									{renderAdvancedFilters("mobile")}
+								</div>
+								<div className="grid grid-cols-2 gap-3 border-t border-gray-800 p-4">
+									<Button
+										type="button"
+										variant="outline"
+										onClick={clearFilters}
+										className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+									>
+										Limpiar
+									</Button>
+									<Button
+										type="button"
+										onClick={() => {
+											applyFilters();
+										}}
+										className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
+									>
+										Aplicar
+									</Button>
+								</div>
+							</SheetContent>
+						</Sheet>
 
-			<section>
-				<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-					<CardHeader>
-						<CardTitle>Historial de turnos</CardTitle>
-						<CardDescription className="text-gray-400">
-							Revisa operaciones, pagos esperados, movimientos y conciliacion
-							del cierre de cada turno.
-						</CardDescription>
-					</CardHeader>
-					<CardContent className="space-y-4">
+						<Popover>
+							<PopoverTrigger asChild>
+								<Button
+									type="button"
+									variant="outline"
+									className="hidden h-10 rounded-lg border-gray-800 bg-black/20 text-gray-300 hover:bg-white/5 hover:text-white sm:inline-flex"
+								>
+									<Filter className="mr-2 h-4 w-4" aria-hidden="true" />
+									Filtros
+									{activeAdvancedFilterCount > 0 ? (
+										<Badge className="ml-2 rounded-sm bg-[var(--color-voltage)]/20 px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/30">
+											{activeAdvancedFilterCount}
+										</Badge>
+									) : null}
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent
+								align="start"
+								className="z-50 w-[600px] rounded-xl border-gray-800 bg-[var(--color-carbon)] p-4 text-white shadow-xl"
+							>
+								<div className="space-y-4">
+									<h4 className="text-sm font-medium text-gray-200">
+										Filtros avanzados
+									</h4>
+									{renderAdvancedFilters("desktop")}
+									<div className="flex justify-end pt-2">
+										<Button
+											type="button"
+											onClick={() => {
+												applyFilters();
+											}}
+											className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
+										>
+											Aplicar filtros
+										</Button>
+									</div>
+								</div>
+							</PopoverContent>
+						</Popover>
+
+						{activeFilterCount > 0 && (
+							<Button
+								type="button"
+								variant="ghost"
+								onClick={clearFilters}
+								className="h-10 text-gray-400 hover:text-white"
+							>
+								Limpiar
+							</Button>
+						)}
+					</div>
+				</div>
+
+				<div className="p-4 pt-4">
+					<div className="space-y-4">
 						{shifts.length > 0 ? (
 							shifts.map((shift) => (
-								<Card
+								<div
 									key={shift.id}
-									className="overflow-hidden border-gray-800 bg-[var(--color-carbon)]/40 shadow-none transition-colors hover:bg-[var(--color-carbon)]/80"
+									className="overflow-hidden rounded-xl border border-gray-800 bg-black/10 transition-colors hover:border-gray-700 hover:bg-white/5"
 								>
-									<div className="flex flex-col gap-4 border-b border-gray-800/50 bg-black/20 p-5 sm:flex-row sm:items-center sm:justify-between">
+									<div className="flex flex-col gap-4 border-b border-gray-800/50 bg-black/20 p-4 sm:flex-row sm:items-center sm:justify-between">
 										<div className="flex items-center gap-4">
-											<div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-gray-800 bg-[var(--color-void)] text-gray-400">
-												<User className="h-5 w-5" />
+											<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-800 bg-[var(--color-carbon)] text-gray-400">
+												<User className="h-4 w-4" />
 											</div>
 											<div className="min-w-0">
 												<div className="flex flex-wrap items-center gap-2">
-													<h3 className="truncate text-lg font-semibold text-white">
+													<h3 className="truncate font-medium text-white">
 														{shift.cashierName}
 													</h3>
 													<Badge
-														className={getShiftStatusBadgeClass(shift.status)}
+														className={`${getShiftStatusBadgeClass(shift.status)} border-0`}
 													>
 														{formatShiftStatus(shift.status)}
 													</Badge>
@@ -756,7 +672,7 @@ function ShiftsPage() {
 														#{shift.id.slice(0, 8)}
 													</span>
 												</div>
-												<p className="mt-0.5 truncate text-sm text-gray-400">
+												<p className="mt-0.5 truncate text-xs text-gray-400">
 													{shift.terminalName ?? "Caja principal"}
 												</p>
 											</div>
@@ -777,43 +693,43 @@ function ShiftsPage() {
 									</div>
 
 									<div className="grid grid-cols-1 divide-y divide-gray-800/50 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
-										<div className="p-5">
-											<h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
-												Resumen de Operaciones
+										<div className="p-4">
+											<h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+												Operaciones
 											</h4>
-											<div className="space-y-4">
+											<div className="space-y-3">
 												<div className="grid grid-cols-2 gap-4">
 													<div>
-														<p className="mb-1 text-xs text-gray-500">
+														<p className="text-xs text-gray-500">
 															Pagadas (
 															{formatCount(shift.operations.paidSalesCount)})
 														</p>
-														<p className="text-lg font-medium text-white">
+														<p className="text-sm font-medium text-white">
 															{formatCurrency(shift.operations.paidSalesAmount)}
 														</p>
 													</div>
 													<div>
-														<p className="mb-1 text-xs text-gray-500">
+														<p className="text-xs text-gray-500">
 															A crédito (
 															{formatCount(shift.operations.creditSalesCount)})
 														</p>
-														<p className="text-lg font-medium text-white">
+														<p className="text-sm font-medium text-white">
 															{formatCurrency(
 																shift.operations.creditSalesAmount,
 															)}
 														</p>
 													</div>
 												</div>
-												<div className="border-t border-gray-800/50 pt-3">
+												<div className="border-t border-gray-800/50 pt-2">
 													<div className="flex items-center justify-between">
-														<span className="text-sm text-gray-400">
+														<span className="text-xs text-gray-400">
 															Anuladas (
 															{formatCount(
 																shift.operations.cancelledSalesCount,
 															)}
 															)
 														</span>
-														<span className="text-sm text-gray-300">
+														<span className="text-xs text-gray-300">
 															{formatCurrency(
 																shift.operations.cancelledSalesAmount,
 															)}
@@ -823,38 +739,38 @@ function ShiftsPage() {
 											</div>
 										</div>
 
-										<div className="bg-black/5 p-5">
-											<h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+										<div className="bg-black/5 p-4">
+											<h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
 												Valores Esperados
 											</h4>
-											<div className="space-y-4">
+											<div className="space-y-3">
 												<div className="flex items-end justify-between">
 													<div>
-														<p className="mb-1 text-xs text-gray-500">
+														<p className="text-xs text-gray-500">
 															Efectivo Total
 														</p>
-														<p className="text-xl font-semibold text-emerald-400">
+														<p className="text-base font-semibold text-emerald-400">
 															{formatCurrency(shift.totals.expectedCash)}
 														</p>
-														<p className="mt-1 text-xs text-gray-500">
+														<p className="text-xs text-gray-500">
 															Base: {formatCurrency(shift.startingCash)}
 														</p>
 													</div>
 													<div className="text-right">
-														<p className="mb-1 text-xs text-gray-500">
+														<p className="text-xs text-gray-500">
 															Otros Pagos ({formatCount(shift.payments.length)})
 														</p>
-														<p className="text-lg font-medium text-white">
+														<p className="text-sm font-medium text-white">
 															{formatCurrency(shift.totals.totalPayments)}
 														</p>
 													</div>
 												</div>
 												{shift.paymentBreakdown.length > 0 && (
-													<div className="space-y-2 border-t border-gray-800/50 pt-3">
+													<div className="space-y-1.5 border-t border-gray-800/50 pt-2">
 														{shift.paymentBreakdown.map((pm) => (
 															<div
 																key={pm.method}
-																className="flex items-center justify-between text-sm"
+																className="flex items-center justify-between text-xs"
 															>
 																<span className="text-gray-400">
 																	{formatPaymentMethod(
@@ -872,8 +788,8 @@ function ShiftsPage() {
 											</div>
 										</div>
 
-										<div className="bg-black/10 p-5">
-											<div className="mb-4 flex items-center justify-between">
+										<div className="bg-black/10 p-4">
+											<div className="mb-3 flex items-center justify-between">
 												<h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
 													Cierre y Conciliación
 												</h4>
@@ -892,11 +808,11 @@ function ShiftsPage() {
 											</div>
 
 											{shift.closures.length > 0 ? (
-												<div className="space-y-3">
+												<div className="space-y-2">
 													{shift.closures.map((closure) => (
 														<div
 															key={closure.paymentMethod}
-															className="flex items-center justify-between text-sm"
+															className="flex items-center justify-between text-xs"
 														>
 															<span className="text-gray-300">
 																{formatPaymentMethod(
@@ -908,7 +824,7 @@ function ShiftsPage() {
 																<span className="block font-medium text-white">
 																	{formatCurrency(closure.actualAmount)}
 																</span>
-																<span className="text-xs text-gray-500">
+																<span className="text-gray-500 text-[10px]">
 																	vs {formatCurrency(closure.expectedAmount)}
 																</span>
 															</div>
@@ -916,18 +832,18 @@ function ShiftsPage() {
 													))}
 												</div>
 											) : (
-												<p className="text-sm italic text-gray-500">
+												<p className="text-xs italic text-gray-500">
 													El turno sigue abierto o aún no tiene conciliación
 													registrada.
 												</p>
 											)}
 
 											{shift.movements.length > 0 && (
-												<div className="mt-5 border-t border-gray-800/50 pt-4">
-													<p className="mb-3 text-xs font-medium text-gray-500">
+												<div className="mt-4 border-t border-gray-800/50 pt-3">
+													<p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-gray-500">
 														Movimientos de caja ({shift.movements.length})
 													</p>
-													<div className="space-y-2.5">
+													<div className="space-y-1.5">
 														{shift.movements.slice(0, 3).map((m) => (
 															<div
 																key={m.id}
@@ -952,7 +868,7 @@ function ShiftsPage() {
 															</div>
 														))}
 														{shift.movements.length > 3 && (
-															<p className="mt-1 text-xs italic text-gray-500">
+															<p className="mt-1 text-[10px] italic text-gray-500">
 																+ {shift.movements.length - 3} movimientos más
 															</p>
 														)}
@@ -961,79 +877,93 @@ function ShiftsPage() {
 											)}
 										</div>
 									</div>
-								</Card>
+								</div>
 							))
 						) : (
-							<div className="rounded-2xl border border-dashed border-gray-800 px-4 py-8 text-center text-sm text-gray-500">
+							<div className="rounded-xl border border-dashed border-gray-800 px-4 py-16 text-center text-sm text-gray-500">
 								No hay turnos que coincidan con los filtros actuales.
 							</div>
 						)}
+					</div>
 
-						<div className="flex flex-col gap-3 border-t border-gray-800 pt-4 sm:flex-row sm:items-center sm:justify-between">
-							<p className="text-sm text-gray-400">
-								Mostrando {rangeStart}-{rangeEnd} de {formatCount(totalResults)}{" "}
-								turnos
-							</p>
-							<div className="flex gap-3">
-								<Button
-									type="button"
-									variant="outline"
-									disabled={cursor <= 0}
-									onClick={() =>
-										updatePagination(Math.max(cursor - pageSize, 0))
-									}
-									className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+					<div className="flex flex-col items-center justify-between gap-4 border-t border-gray-800 bg-black/10 p-4 text-sm text-gray-400 sm:flex-row -mx-4 -mb-4 mt-4">
+						<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-start">
+							<div className="flex items-center gap-2">
+								<span>Mostrar</span>
+								<Select
+									value={`${pageSize}`}
+									onValueChange={(value) => {
+										updatePagination(0, Number(value));
+									}}
 								>
-									Anterior
-								</Button>
-								<Button
-									type="button"
-									variant="outline"
-									disabled={!nextCursor}
-									onClick={() => nextCursor && updatePagination(nextCursor)}
-									className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
-								>
-									Siguiente
-								</Button>
+									<SelectTrigger className="h-8 w-[70px] rounded-md border-gray-700 bg-[var(--color-carbon)] text-white">
+										<SelectValue placeholder={pageSize} />
+									</SelectTrigger>
+									<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+										{[10, 20, 30, 40, 50].map((size) => (
+											<SelectItem key={size} value={`${size}`}>
+												{size}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<span>filas</span>
+							</div>
+							<div className="hidden sm:block tabular-nums">
+								{rangeStart}-{rangeEnd} de {totalResults}
 							</div>
 						</div>
-					</CardContent>
-				</Card>
-			</section>
+
+						<div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={cursor <= 0}
+								onClick={() => updatePagination(Math.max(cursor - pageSize, 0))}
+								className="h-8 rounded-md border-gray-700 bg-[var(--color-carbon)] px-3 text-gray-300 hover:bg-white/5 hover:text-white"
+							>
+								Anterior
+							</Button>
+							<Button
+								type="button"
+								variant="default"
+								size="sm"
+								disabled={!nextCursor}
+								onClick={() => nextCursor && updatePagination(nextCursor)}
+								className="h-8 rounded-md border-none bg-[var(--color-voltage)] px-4 font-medium text-black hover:bg-[#c9e605]"
+							>
+								Siguiente
+							</Button>
+						</div>
+					</div>
+				</div>
+			</div>
 		</main>
 	);
 }
 
-function SummaryCard({
+function CompactMetricCard({
 	title,
 	value,
-	description,
 	icon: Icon,
 }: {
 	title: string;
 	value: string;
-	description: string;
 	icon: typeof Receipt;
 }) {
 	return (
-		<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-			<CardHeader className="space-y-4">
-				<div className="flex items-center gap-3">
-					<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]">
-						<Icon className="h-4 w-4" />
-					</div>
-					<div className="min-w-0 flex-1">
-						<CardDescription className="text-gray-400">{title}</CardDescription>
-						<CardTitle className="mt-1 text-2xl font-semibold tracking-tight text-white">
-							{value}
-						</CardTitle>
-					</div>
-				</div>
-			</CardHeader>
-			<CardContent className="pt-0">
-				<p className="text-sm text-gray-400">{description}</p>
-			</CardContent>
-		</Card>
+		<div className="flex items-center gap-3 rounded-xl border border-gray-800 bg-[var(--color-carbon)] p-4">
+			<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]">
+				<Icon className="h-5 w-5" aria-hidden="true" />
+			</div>
+			<div className="min-w-0">
+				<p className="truncate text-xs font-medium text-gray-400">{title}</p>
+				<p className="truncate text-lg font-semibold tabular-nums text-white">
+					{value}
+				</p>
+			</div>
+		</div>
 	);
 }
 

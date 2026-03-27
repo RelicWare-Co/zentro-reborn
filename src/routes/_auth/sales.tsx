@@ -2,16 +2,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
 	ArrowRight,
-	CalendarDays,
 	Clock3,
 	Filter,
-	History,
 	Receipt,
 	Search,
 	Store,
 	UserRound,
 	Wallet,
-	X,
 } from "lucide-react";
 import {
 	useDeferredValue,
@@ -25,13 +22,6 @@ import {
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
 	Popover,
@@ -52,6 +42,7 @@ import {
 	SheetTitle,
 	SheetTrigger,
 } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SaleDetailSheet } from "@/features/pos/components/SaleDetailSheet";
 import {
 	prefetchSalesList,
@@ -714,178 +705,112 @@ function SalesPage() {
 
 	return (
 		<>
-			<main className="flex-1 space-y-5 bg-[var(--color-void)] p-5 text-[var(--color-photon)] md:p-7 lg:p-8">
-				<section className="space-y-4">
-					<div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-						<div className="space-y-2">
-							<div className="flex flex-wrap items-center gap-2">
-								<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-									Historial operativo
-								</Badge>
-								<Badge className="border-gray-700 bg-black/20 text-gray-300 hover:bg-black/20">
-									{viewSummary.kicker}
-								</Badge>
-							</div>
-							<div className="space-y-1">
-								<h1 className="text-balance text-2xl font-semibold tracking-tight text-white md:text-3xl">
-									Ventas
-								</h1>
-								<p className="max-w-2xl text-sm text-gray-400 md:text-[15px]">
-									Consulta la operación del día y el histórico completo sin que
-									el encabezado le robe espacio a la lista.
-								</p>
-							</div>
-						</div>
-
-						<div className="flex flex-col gap-2 sm:flex-row">
-							<Button
-								asChild
-								className="h-10 bg-[var(--color-voltage)] px-4 text-black hover:bg-[#d9f15c]"
-							>
-								<Link to="/pos">
-									<Store className="h-4 w-4" aria-hidden="true" />
-									Ir al POS
-								</Link>
-							</Button>
-							<Button
-								asChild
-								variant="outline"
-								className="h-10 border-gray-700 bg-[var(--color-carbon)] px-4 text-gray-200 hover:bg-white/5 hover:text-white"
-							>
-								<Link to="/dashboard">
-									Ver dashboard
-									<ArrowRight className="h-4 w-4" aria-hidden="true" />
-								</Link>
-							</Button>
-						</div>
+			<main className="flex-1 space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12 font-sans">
+				<div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+					<div className="flex items-baseline gap-3">
+						<h1 className="text-3xl font-bold tracking-tight text-white">
+							Ventas
+						</h1>
+						<span className="text-sm text-gray-400">
+							{sales.length} registros • {formatCurrency(totalRevenue)}{" "}
+							facturado
+						</span>
 					</div>
 
-					<div className="space-y-3">
-						<div className="rounded-2xl border border-gray-800 bg-[var(--color-carbon)] p-2">
-							<div
-								role="tablist"
-								aria-label="Vista de ventas"
-								aria-busy={isSalesViewRefreshing}
-								className="grid gap-2 md:grid-cols-2"
-							>
-								<SalesViewToggle
-									value="today"
-									isActive={activeView === "today"}
-									title="Ventas de hoy"
-									icon={CalendarDays}
-									onSelect={handleViewChange}
-									onIntent={handleViewPrefetch}
-								/>
-								<SalesViewToggle
-									value="history"
-									isActive={activeView === "history"}
-									title="Historial de ventas"
-									icon={History}
-									onSelect={handleViewChange}
-									onIntent={handleViewPrefetch}
-								/>
-							</div>
-							<IndeterminateProgressBar active={isLoadingFeedbackVisible} />
-						</div>
-
-						<div className="grid gap-3 lg:grid-cols-3">
-							<SummaryCard
-								title={viewSummary.resultsTitle}
-								value={`${sales.length}`}
-								icon={Receipt}
-							/>
-							<SummaryCard
-								title={viewSummary.revenueTitle}
-								value={formatCurrency(totalRevenue)}
-								icon={Wallet}
-							/>
-							<SummaryCard
-								title={viewSummary.pendingTitle}
-								value={formatCurrency(totalPending)}
-								icon={Clock3}
-							/>
-						</div>
+					<div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+						<Button
+							asChild
+							variant="outline"
+							className="h-10 w-full shrink-0 rounded-lg border-gray-800 bg-[var(--color-carbon)] px-4 py-2 text-gray-300 hover:bg-white/5 hover:text-white sm:w-auto"
+						>
+							<Link to="/dashboard">Ver dashboard</Link>
+						</Button>
+						<Button
+							asChild
+							className="h-10 w-full shrink-0 rounded-lg bg-[var(--color-voltage)] px-4 py-2 font-semibold text-black hover:bg-[#c9e605] sm:w-auto"
+						>
+							<Link to="/pos">
+								<Store className="mr-2 h-4 w-4" aria-hidden="true" />
+								Ir al POS
+							</Link>
+						</Button>
 					</div>
-				</section>
+				</div>
 
-				<section>
-					<Card
-						className={`border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none transition-opacity ${
-							isLoadingFeedbackVisible ? "opacity-80" : "opacity-100"
-						}`}
-						aria-busy={isSalesViewRefreshing}
-					>
-						<CardHeader className="space-y-4 pb-4">
-							<div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-								<div className="space-y-1">
-									<CardTitle className="text-xl text-white">
-										{viewSummary.listTitle}
-									</CardTitle>
-									<CardDescription className="text-sm text-gray-400">
-										{viewSummary.listDescription}
-									</CardDescription>
-								</div>
+				<Tabs
+					value={activeView}
+					onValueChange={(v) => {
+						handleViewChange(v);
+						handleViewPrefetch(v as SalesView);
+					}}
+					className="w-full"
+				>
+					<TabsList className="mb-6 flex w-full gap-1 rounded-xl border border-gray-800 bg-black/20 p-1.5">
+						<TabsTrigger
+							value="today"
+							className="flex-1 rounded-lg border-transparent px-8 py-2.5 text-sm font-semibold text-gray-400 transition-all hover:bg-white/5 hover:text-gray-200 data-[state=active]:bg-[var(--color-voltage)] data-[state=active]:text-black data-[state=active]:shadow-md data-[state=active]:hover:text-black"
+						>
+							Ventas de hoy
+						</TabsTrigger>
+						<TabsTrigger
+							value="history"
+							className="flex-1 rounded-lg border-transparent px-8 py-2.5 text-sm font-semibold text-gray-400 transition-all hover:bg-white/5 hover:text-gray-200 data-[state=active]:bg-[var(--color-voltage)] data-[state=active]:text-black data-[state=active]:shadow-md data-[state=active]:hover:text-black"
+						>
+							Historial de ventas
+						</TabsTrigger>
+					</TabsList>
 
-								<div className="flex flex-wrap items-center gap-2">
-									{activeFilterCount > 0 ? (
-										<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-											{activeFilterCount} filtro
-											{activeFilterCount === 1 ? "" : "s"} activo
-											{activeFilterCount === 1 ? "" : "s"}
-										</Badge>
-									) : null}
-									{isTodayView ? (
-										<Badge className="border-gray-700 bg-black/20 text-gray-300 hover:bg-black/20">
-											Solo ventas del {todayLabel}
-										</Badge>
-									) : null}
-									<Button
-										type="button"
-										variant="outline"
-										onClick={clearFilters}
-										className="h-9 border-gray-700 bg-transparent px-3 text-gray-200 hover:bg-white/5 hover:text-white"
-										disabled={activeFilterCount === 0}
-									>
-										<X className="h-4 w-4" aria-hidden="true" />
-										Limpiar
-									</Button>
-								</div>
-							</div>
+					<div className="mb-6 grid gap-3 lg:grid-cols-3">
+						<CompactMetricCard
+							title={viewSummary.resultsTitle}
+							value={`${sales.length}`}
+							icon={Receipt}
+						/>
+						<CompactMetricCard
+							title={viewSummary.revenueTitle}
+							value={formatCurrency(totalRevenue)}
+							icon={Wallet}
+						/>
+						<CompactMetricCard
+							title={viewSummary.pendingTitle}
+							value={formatCurrency(totalPending)}
+							icon={Clock3}
+						/>
+					</div>
 
-							<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-								<div className="w-full sm:max-w-sm">
-									<div className="space-y-2">
-										<label
-											className="text-xs font-medium tracking-[0.16em] text-gray-500 uppercase"
-											htmlFor={salesSearchId}
-										>
-											Busqueda
-										</label>
-										<div className="relative">
-											<Search
-												className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-500"
-												aria-hidden="true"
-											/>
-											<Input
-												id={salesSearchId}
-												name="q"
-												autoComplete="off"
-												value={draftFilters.q}
-												onChange={(event) =>
-													setDraftFilters((current) => ({
-														...current,
-														q: event.target.value,
-													}))
-												}
-												placeholder="Cliente, cajero o id…"
-												className="h-10 border-gray-700 bg-black/20 pl-9 text-white placeholder:text-gray-500"
-											/>
-										</div>
+					<IndeterminateProgressBar active={isLoadingFeedbackVisible} />
+
+					<div className="overflow-x-auto rounded-xl border border-gray-800 bg-[var(--color-carbon)]">
+						<div
+							className={`transition-opacity ${
+								isLoadingFeedbackVisible ? "opacity-80" : "opacity-100"
+							}`}
+							aria-busy={isSalesViewRefreshing}
+						>
+							<div className="flex flex-col gap-4 border-b border-gray-800 p-4 lg:flex-row lg:items-center lg:justify-between">
+								<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center w-full">
+									<div className="relative w-full sm:max-w-xs md:max-w-sm">
+										<Search
+											className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"
+											aria-hidden="true"
+										/>
+										<Input
+											id={salesSearchId}
+											name="q"
+											autoComplete="off"
+											value={draftFilters.q}
+											onChange={(event) =>
+												setDraftFilters((current) => ({
+													...current,
+													q: event.target.value,
+												}))
+											}
+											placeholder="Cliente, cajero o id…"
+											className="h-10 rounded-lg border-gray-800 bg-black/20 pl-9 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20"
+										/>
 									</div>
-								</div>
 
-								<div className="w-full sm:w-[220px]">
-									<FilterField label="Estado" htmlFor={salesStatusId}>
+									<div className="w-full sm:w-[200px]">
 										<Select
 											value={draftFilters.status || ALL_FILTER_VALUE}
 											onValueChange={(value) =>
@@ -897,255 +822,270 @@ function SalesPage() {
 										>
 											<SelectTrigger
 												id={salesStatusId}
-												className="h-10 w-full border-gray-700 bg-black/20 text-white"
+												className="h-10 w-full rounded-lg border-gray-800 bg-black/20 text-white"
 											>
-												<SelectValue placeholder="Todos" />
+												<SelectValue placeholder="Estado" />
 											</SelectTrigger>
 											<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
 												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
 												<SelectItem value="completed">Pagada</SelectItem>
-												<SelectItem value="credit">Credito</SelectItem>
+												<SelectItem value="credit">Crédito</SelectItem>
 												<SelectItem value="cancelled">Cancelada</SelectItem>
 											</SelectContent>
 										</Select>
-									</FilterField>
-								</div>
-
-								<Sheet
-									open={isMobileFilterOpen}
-									onOpenChange={setIsMobileFilterOpen}
-								>
-									<SheetTrigger asChild>
-										<Button
-											type="button"
-											variant="outline"
-											className="h-10 w-full border-gray-700 bg-black/20 text-gray-200 hover:bg-white/5 hover:text-white sm:hidden"
-										>
-											<Filter className="mr-2 h-4 w-4" aria-hidden="true" />
-											Filtros
-											{activeAdvancedFilterCount > 0 ? (
-												<Badge className="ml-2 border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 px-1.5 py-0.5 text-[10px] text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-													{activeAdvancedFilterCount}
-												</Badge>
-											) : null}
-										</Button>
-									</SheetTrigger>
-									<SheetContent
-										side="bottom"
-										className="h-[85vh] rounded-t-xl border-gray-800 bg-[var(--color-carbon)] text-white"
-										showCloseButton={false}
-									>
-										<SheetHeader className="border-b border-gray-800 pb-4">
-											<SheetTitle className="text-gray-200">
-												Filtros avanzados
-											</SheetTitle>
-										</SheetHeader>
-										<div className="flex-1 overflow-y-auto px-4 py-4">
-											{renderAdvancedFilters("mobile")}
-										</div>
-									</SheetContent>
-								</Sheet>
-
-								<Popover>
-									<PopoverTrigger asChild>
-										<Button
-											type="button"
-											variant="outline"
-											className="hidden h-10 border-gray-700 bg-black/20 text-gray-200 hover:bg-white/5 hover:text-white sm:inline-flex"
-										>
-											<Filter className="mr-2 h-4 w-4" aria-hidden="true" />
-											Filtros
-											{activeAdvancedFilterCount > 0 ? (
-												<Badge className="ml-2 border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 px-1.5 py-0.5 text-[10px] text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-													{activeAdvancedFilterCount}
-												</Badge>
-											) : null}
-										</Button>
-									</PopoverTrigger>
-									<PopoverContent
-										align="start"
-										className="w-[640px] border-gray-800 bg-[var(--color-carbon)] p-4 text-white"
-									>
-										<div className="space-y-4">
-											<h4 className="text-sm font-medium text-gray-200">
-												Filtros avanzados
-											</h4>
-											{renderAdvancedFilters("desktop")}
-										</div>
-									</PopoverContent>
-								</Popover>
-							</div>
-						</CardHeader>
-						<CardContent className="pt-0">
-							{sales.length > 0 ? (
-								<div className="space-y-2">
-									<div className="hidden grid-cols-[minmax(0,1.45fr)_minmax(0,1.15fr)_84px_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.2fr)_44px] gap-4 px-3 text-[11px] font-medium tracking-[0.16em] text-gray-500 uppercase md:grid">
-										<span>Cliente</span>
-										<span>Fecha/Hora</span>
-										<span>Items</span>
-										<span>Metodo</span>
-										<span className="text-right">Monto total</span>
-										<span className="text-right">Estado</span>
-										<span />
 									</div>
 
-									<div className="space-y-2 [content-visibility:auto]">
-										{sales.map((sale) => {
-											const paymentSummary = formatPaymentSummary(
-												sale,
-												paymentMethodLabels,
-											);
+									<Sheet
+										open={isMobileFilterOpen}
+										onOpenChange={setIsMobileFilterOpen}
+									>
+										<SheetTrigger asChild>
+											<Button
+												type="button"
+												variant="outline"
+												className="h-10 w-full rounded-lg border-gray-800 bg-black/20 text-gray-300 hover:bg-white/5 hover:text-white sm:hidden"
+											>
+												<Filter className="mr-2 h-4 w-4" aria-hidden="true" />
+												Filtros
+												{activeAdvancedFilterCount > 0 ? (
+													<Badge className="ml-2 rounded-sm bg-[var(--color-voltage)]/20 px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/30">
+														{activeAdvancedFilterCount}
+													</Badge>
+												) : null}
+											</Button>
+										</SheetTrigger>
+										<SheetContent
+											side="bottom"
+											className="h-[85vh] rounded-t-xl border-gray-800 bg-[var(--color-carbon)] text-white"
+											showCloseButton={false}
+										>
+											<SheetHeader className="border-b border-gray-800 pb-4">
+												<SheetTitle className="text-gray-200">
+													Filtros avanzados
+												</SheetTitle>
+											</SheetHeader>
+											<div className="flex-1 overflow-y-auto px-4 py-4">
+												{renderAdvancedFilters("mobile")}
+											</div>
+										</SheetContent>
+									</Sheet>
 
-											return (
-												<button
-													key={sale.id}
-													type="button"
-													onClick={() => {
-														setSelectedSaleId(sale.id);
-														setIsDetailOpen(true);
-													}}
-													className={`group w-full touch-manipulation rounded-xl border px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-voltage)]/30 focus-visible:outline-none ${
-														selectedSaleSummary?.id === sale.id
-															? "border-[var(--color-voltage)]/30 bg-[var(--color-voltage)]/6"
-															: "border-gray-800 bg-black/20 hover:border-gray-700 hover:bg-black/30"
-													}`}
-												>
-													<div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1.45fr)_minmax(0,1.15fr)_84px_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.2fr)_44px] md:items-center md:gap-4">
-														<div className="min-w-0">
-															<div className="flex min-w-0 items-center gap-2">
-																<UserRound
-																	className="h-3.5 w-3.5 shrink-0 text-gray-500"
-																	aria-hidden="true"
-																/>
-																<p className="truncate font-medium text-white">
-																	{sale.customerName ?? "Cliente mostrador"}
+									<Popover>
+										<PopoverTrigger asChild>
+											<Button
+												type="button"
+												variant="outline"
+												className="hidden h-10 rounded-lg border-gray-800 bg-black/20 text-gray-300 hover:bg-white/5 hover:text-white sm:inline-flex"
+											>
+												<Filter className="mr-2 h-4 w-4" aria-hidden="true" />
+												Filtros
+												{activeAdvancedFilterCount > 0 ? (
+													<Badge className="ml-2 rounded-sm bg-[var(--color-voltage)]/20 px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/30">
+														{activeAdvancedFilterCount}
+													</Badge>
+												) : null}
+											</Button>
+										</PopoverTrigger>
+										<PopoverContent
+											align="start"
+											className="z-50 w-[600px] rounded-xl border-gray-800 bg-[var(--color-carbon)] p-4 text-white shadow-xl"
+										>
+											<div className="space-y-4">
+												<h4 className="text-sm font-medium text-gray-200">
+													Filtros avanzados
+												</h4>
+												{renderAdvancedFilters("desktop")}
+											</div>
+										</PopoverContent>
+									</Popover>
+
+									{activeFilterCount > 0 && (
+										<Button
+											type="button"
+											variant="ghost"
+											onClick={clearFilters}
+											className="h-10 text-gray-400 hover:text-white"
+										>
+											Limpiar
+										</Button>
+									)}
+								</div>
+							</div>
+							<div className="p-4 pt-4">
+								{sales.length > 0 ? (
+									<div className="space-y-2">
+										<div className="hidden grid-cols-[minmax(0,1.45fr)_minmax(0,1.15fr)_84px_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.2fr)_44px] gap-4 px-3 text-[11px] font-medium tracking-[0.16em] text-gray-500 uppercase md:grid">
+											<span>Cliente</span>
+											<span>Fecha/Hora</span>
+											<span>Items</span>
+											<span>Método</span>
+											<span className="text-right">Monto total</span>
+											<span className="text-right">Estado</span>
+											<span />
+										</div>
+
+										<div className="space-y-2 [content-visibility:auto]">
+											{sales.map((sale) => {
+												const paymentSummary = formatPaymentSummary(
+													sale,
+													paymentMethodLabels,
+												);
+
+												return (
+													<button
+														key={sale.id}
+														type="button"
+														onClick={() => {
+															setSelectedSaleId(sale.id);
+															setIsDetailOpen(true);
+														}}
+														className={`group w-full touch-manipulation rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-voltage)]/30 ${
+															selectedSaleSummary?.id === sale.id
+																? "border-[var(--color-voltage)]/30 bg-[var(--color-voltage)]/10"
+																: "border-gray-800 bg-black/10 hover:border-gray-700 hover:bg-white/5"
+														}`}
+													>
+														<div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1.45fr)_minmax(0,1.15fr)_84px_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1.2fr)_44px] md:items-center md:gap-4">
+															<div className="min-w-0">
+																<div className="flex min-w-0 items-center gap-2">
+																	<UserRound
+																		className="h-3.5 w-3.5 shrink-0 text-gray-500"
+																		aria-hidden="true"
+																	/>
+																	<p className="truncate font-medium text-white">
+																		{sale.customerName ?? "Cliente mostrador"}
+																	</p>
+																</div>
+																<p className="mt-1 truncate pl-5 text-xs text-gray-500">
+																	{sale.cashierName ?? "Sin cajero"}
 																</p>
 															</div>
-															<p className="mt-1 truncate pl-5 text-xs text-gray-500">
-																{sale.cashierName ?? "Sin cajero"}
-															</p>
-														</div>
 
-														<div className="min-w-0 tabular-nums text-sm text-gray-300">
-															<p>{dateTimeFormatter.format(sale.createdAt)}</p>
-														</div>
+															<div className="min-w-0 tabular-nums text-sm text-gray-300">
+																<p>
+																	{dateTimeFormatter.format(sale.createdAt)}
+																</p>
+															</div>
 
-														<div className="text-sm text-gray-300">
-															{formatItemCountLabel(sale.itemCount)}
-														</div>
+															<div className="text-sm text-gray-300">
+																{formatItemCountLabel(sale.itemCount)}
+															</div>
 
-														<div className="min-w-0 text-sm text-gray-300">
-															<p className="truncate" title={paymentSummary}>
-																{paymentSummary}
-															</p>
-														</div>
+															<div className="min-w-0 text-sm text-gray-300">
+																<p className="truncate" title={paymentSummary}>
+																	{paymentSummary}
+																</p>
+															</div>
 
-														<div className="tabular-nums md:text-right">
-															<p className="text-base font-semibold text-white">
-																{formatCurrency(sale.totalAmount)}
-															</p>
-														</div>
+															<div className="tabular-nums md:text-right">
+																<p className="text-base font-semibold text-[var(--color-voltage)]">
+																	{formatCurrency(sale.totalAmount)}
+																</p>
+															</div>
 
-														<div className="flex flex-wrap items-center gap-2 md:justify-end">
-															<Badge
-																className={`${getSaleStatusBadgeClass(sale.status)} px-2 py-0.5 text-xs`}
-															>
-																{formatSaleStatus(sale.status)}
-															</Badge>
-															<p className="text-sm text-gray-400 md:text-right">
-																{sale.balanceDue > 0
-																	? `Pendiente ${formatCurrency(sale.balanceDue)}`
-																	: "Sin saldo pendiente"}
-															</p>
-														</div>
+															<div className="flex flex-wrap items-center gap-2 md:justify-end">
+																<Badge
+																	className={`${getSaleStatusBadgeClass(
+																		sale.status,
+																	)} px-2 py-0.5 text-xs border-0`}
+																>
+																	{formatSaleStatus(sale.status)}
+																</Badge>
+																<p className="text-sm text-gray-400 md:text-right">
+																	{sale.balanceDue > 0
+																		? `Pendiente ${formatCurrency(
+																				sale.balanceDue,
+																			)}`
+																		: "Sin saldo pendiente"}
+																</p>
+															</div>
 
-														<div className="hidden justify-end md:flex">
-															<div className="rounded-full border border-gray-800 p-2 text-gray-400 transition-colors group-hover:border-gray-700 group-hover:text-white">
-																<ArrowRight
-																	className="h-4 w-4"
-																	aria-hidden="true"
-																/>
+															<div className="hidden justify-end md:flex">
+																<div className="rounded-full border border-gray-800 p-2 text-gray-400 transition-colors group-hover:border-gray-700 group-hover:text-white">
+																	<ArrowRight
+																		className="h-4 w-4"
+																		aria-hidden="true"
+																	/>
+																</div>
 															</div>
 														</div>
-													</div>
-												</button>
-											);
-										})}
-									</div>
-
-									<div className="flex flex-col items-center justify-between gap-3 border-t border-gray-800 pt-3 text-sm text-gray-400 sm:flex-row">
-										<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-											<div className="flex items-center gap-2">
-												<span>Mostrar</span>
-												<Select
-													value={`${pageSize}`}
-													onValueChange={(value) => {
-														updatePagination(0, Number(value));
-													}}
-												>
-													<SelectTrigger className="h-9 w-[82px] rounded-md border-gray-700 bg-[var(--color-carbon)] text-white">
-														<SelectValue placeholder={pageSize} />
-													</SelectTrigger>
-													<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-														{[10, 20, 30, 40, 50].map((size) => (
-															<SelectItem key={size} value={`${size}`}>
-																{size}
-															</SelectItem>
-														))}
-													</SelectContent>
-												</Select>
-												<span>filas</span>
-											</div>
-											<div className="tabular-nums text-xs text-gray-500 sm:text-sm">
-												{rangeStart}-{rangeEnd} de {totalResults}
-											</div>
+													</button>
+												);
+											})}
 										</div>
 
-										<div className="flex w-full items-center justify-end gap-2 sm:w-auto">
-											<Button
-												variant="outline"
-												size="sm"
-												className="h-9 rounded-md border-gray-700 bg-[var(--color-carbon)] px-3 text-gray-300 hover:bg-white/5 hover:text-white"
-												onClick={() =>
-													updatePagination(Math.max(cursor - pageSize, 0))
-												}
-												disabled={cursor === 0}
-											>
-												Anterior
-											</Button>
-											<Button
-												variant="default"
-												size="sm"
-												className="h-9 rounded-md border-none bg-[var(--color-voltage)] px-4 font-medium text-black hover:bg-[#c9e605]"
-												onClick={() => {
-													if (nextCursor !== null) {
-														updatePagination(nextCursor);
+										<div className="flex flex-col items-center justify-between gap-4 border-t border-gray-800 bg-black/10 p-4 text-sm text-gray-400 sm:flex-row -mx-4 -mb-4 mt-4">
+											<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-start">
+												<div className="flex items-center gap-2">
+													<span>Mostrar</span>
+													<Select
+														value={`${pageSize}`}
+														onValueChange={(value) => {
+															updatePagination(0, Number(value));
+														}}
+													>
+														<SelectTrigger className="h-8 w-[70px] rounded-md border-gray-700 bg-[var(--color-carbon)] text-white">
+															<SelectValue placeholder={pageSize} />
+														</SelectTrigger>
+														<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+															{[10, 20, 30, 40, 50].map((size) => (
+																<SelectItem key={size} value={`${size}`}>
+																	{size}
+																</SelectItem>
+															))}
+														</SelectContent>
+													</Select>
+													<span>filas</span>
+												</div>
+												<div className="hidden sm:block tabular-nums">
+													{rangeStart}-{rangeEnd} de {totalResults}
+												</div>
+											</div>
+
+											<div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+												<Button
+													variant="outline"
+													size="sm"
+													className="h-8 rounded-md border-gray-700 bg-[var(--color-carbon)] px-3 text-gray-300 hover:bg-white/5 hover:text-white"
+													onClick={() =>
+														updatePagination(Math.max(cursor - pageSize, 0))
 													}
-												}}
-												disabled={nextCursor === null}
-											>
-												Siguiente
-											</Button>
+													disabled={cursor === 0}
+												>
+													Anterior
+												</Button>
+												<Button
+													variant="default"
+													size="sm"
+													className="h-8 rounded-md border-none bg-[var(--color-voltage)] px-4 font-medium text-black hover:bg-[#c9e605]"
+													onClick={() => {
+														if (nextCursor !== null) {
+															updatePagination(nextCursor);
+														}
+													}}
+													disabled={nextCursor === null}
+												>
+													Siguiente
+												</Button>
+											</div>
 										</div>
 									</div>
-								</div>
-							) : (
-								<div className="rounded-2xl border border-dashed border-gray-800 px-4 py-10 text-center">
-									<p className="text-sm text-gray-400">
-										{viewSummary.emptyTitle}
-									</p>
-									<Button
-										asChild
-										variant="outline"
-										className="mt-4 border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
-									>
-										<Link to="/pos">Registrar una venta</Link>
-									</Button>
-								</div>
-							)}
-						</CardContent>
-					</Card>
-				</section>
+								) : (
+									<div className="rounded-xl border border-dashed border-gray-800 px-4 py-16 text-center">
+										<p className="text-gray-400">{viewSummary.emptyTitle}</p>
+										<Button
+											asChild
+											variant="outline"
+											className="mt-4 border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+										>
+											<Link to="/pos">Registrar una venta</Link>
+										</Button>
+									</div>
+								)}
+							</div>
+						</div>
+					</div>
+				</Tabs>
 			</main>
 
 			<SaleDetailSheet
@@ -1296,7 +1236,7 @@ function getCurrentDateFilterValue() {
 	return `${now.getFullYear()}-${month}-${day}`;
 }
 
-function SummaryCard({
+function CompactMetricCard({
 	title,
 	value,
 	icon: Icon,
@@ -1306,23 +1246,17 @@ function SummaryCard({
 	icon: typeof Receipt;
 }) {
 	return (
-		<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-			<CardHeader className="px-4 py-3">
-				<div className="flex items-center justify-between gap-4">
-					<div className="flex min-w-0 items-center gap-3">
-						<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]">
-							<Icon className="h-4 w-4" aria-hidden="true" />
-						</div>
-						<CardDescription className="text-base text-gray-400">
-							{title}
-						</CardDescription>
-					</div>
-					<CardTitle className="shrink-0 text-2xl font-semibold tracking-tight text-white tabular-nums">
-						{value}
-					</CardTitle>
-				</div>
-			</CardHeader>
-		</Card>
+		<div className="flex items-center gap-3 rounded-xl border border-gray-800 bg-[var(--color-carbon)] p-4">
+			<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]">
+				<Icon className="h-5 w-5" aria-hidden="true" />
+			</div>
+			<div className="min-w-0">
+				<p className="truncate text-xs font-medium text-gray-400">{title}</p>
+				<p className="truncate text-lg font-semibold tabular-nums text-white">
+					{value}
+				</p>
+			</div>
+		</div>
 	);
 }
 
@@ -1380,53 +1314,6 @@ function IndeterminateProgressBar({ active }: { active: boolean }) {
 				</div>
 			</div>
 		</>
-	);
-}
-
-function SalesViewToggle({
-	value,
-	isActive,
-	title,
-	icon: Icon,
-	onSelect,
-	onIntent,
-}: {
-	value: SalesView;
-	isActive: boolean;
-	title: string;
-	icon: typeof CalendarDays;
-	onSelect: (value: string) => void;
-	onIntent: (value: SalesView) => void;
-}) {
-	return (
-		<button
-			type="button"
-			role="tab"
-			aria-selected={isActive}
-			onClick={() => onSelect(value)}
-			onFocus={() => onIntent(value)}
-			onMouseEnter={() => onIntent(value)}
-			className={`group flex w-full items-center gap-3 rounded-xl border px-5 py-5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-voltage)]/30 focus-visible:outline-none ${
-				isActive
-					? "border-[var(--color-voltage)]/30 bg-[var(--color-voltage)]/10 text-white"
-					: "border-gray-800 bg-black/20 text-gray-300 hover:border-gray-700 hover:bg-black/30 hover:text-white"
-			}`}
-		>
-			<div
-				className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${
-					isActive
-						? "border-[var(--color-voltage)]/30 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]"
-						: "border-gray-700 bg-black/30 text-gray-400 group-hover:border-gray-600 group-hover:text-gray-200"
-				}`}
-			>
-				<Icon className="h-4 w-4" aria-hidden="true" />
-			</div>
-			<div className="min-w-0">
-				<p className="text-2xl font-semibold tracking-tight md:text-[28px]">
-					{title}
-				</p>
-			</div>
-		</button>
 	);
 }
 

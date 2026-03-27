@@ -18,7 +18,7 @@ const loginSearchSchema = z.object({
 });
 
 const inputBase =
-	"pl-10 h-11 bg-transparent border-gray-800 text-white placeholder:text-gray-600 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20 rounded-xl";
+	"w-full pl-10 h-11 bg-[#1c1c1c] border-white/10 text-white placeholder:text-gray-500 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20 rounded-xl";
 
 export const Route = createFileRoute("/login")({
 	validateSearch: loginSearchSchema,

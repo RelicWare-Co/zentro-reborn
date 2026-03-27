@@ -242,8 +242,8 @@ export function OrganizationSelection() {
 		selectionData?.allowOrganizationCreation ?? true;
 
 	return (
-		<div className="app-safe-area flex min-h-[100dvh] w-full items-center justify-center bg-[var(--color-void)] p-4 text-[var(--color-photon)] md:p-8">
-			<div className="w-full max-w-6xl space-y-8">
+		<div className="app-safe-area flex min-h-[100dvh] w-full items-center justify-center bg-[var(--color-void)] text-[var(--color-photon)]">
+			<div className="w-full max-w-6xl space-y-8 px-4 py-8 md:px-8">
 				<div className="space-y-3 text-center">
 					<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
 						Acceso a organizaciones
@@ -270,7 +270,7 @@ export function OrganizationSelection() {
 					) : null}
 				</div>
 
-				<div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+				<div className="grid gap-6 lg:grid-cols-2 lg:gap-8 xl:grid-cols-[1.1fr_0.9fr]">
 					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
 						<CardHeader>
 							<CardTitle className="flex items-center gap-2">
@@ -477,7 +477,7 @@ export function OrganizationSelection() {
 													Se usará en URLs y selección interna.
 												</p>
 											</div>
-											<div className="flex gap-3">
+											<div className="flex flex-col-reverse gap-3 sm:flex-row">
 												<Button
 													type="button"
 													variant="outline"

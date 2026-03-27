@@ -20,13 +20,6 @@ import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
@@ -181,9 +174,7 @@ function ProductsPage() {
 	const inventoryEntryPriceId = useId();
 
 	const { products, categories } = useProductsQueries(loaderProducts);
-	const activeFilterCount = [
-		search.q,
-		search.categoryId,
+	const activeAdvancedFilterCount = [
 		search.productType,
 		search.inventoryTracking,
 		search.stockStatus,
@@ -192,6 +183,9 @@ function ProductsPage() {
 		search.costMin,
 		search.costMax,
 	].filter(Boolean).length;
+	const activeFilterCount =
+		[search.q, search.categoryId].filter(Boolean).length +
+		activeAdvancedFilterCount;
 	const trackedProducts = useMemo(
 		() => products.filter((product) => product.trackInventory),
 		[products],
@@ -758,315 +752,322 @@ function ProductsPage() {
 				onValueChange={handleTabChange}
 				className="w-full"
 			>
-				<TabsList className="bg-[var(--color-carbon)] border border-gray-800 text-gray-400 mb-6">
+				<TabsList className="bg-black/20 border border-gray-800 flex w-full p-1.5 rounded-xl gap-1 mb-6">
 					<TabsTrigger
 						value="products"
-						className="data-[state=active]:bg-[#c9e605] data-[state=active]:text-black"
+						className="flex-1 rounded-lg py-2.5 px-8 text-sm font-semibold text-gray-400 transition-all [&[data-state=active]]:bg-[var(--color-voltage)] [&[data-state=active]]:text-black [&[data-state=active]]:shadow-md [&[data-state=active]:hover]:text-black [&:not([data-state=active])]:hover:bg-white/5 [&:not([data-state=active])]:hover:text-gray-200 border-transparent"
 					>
 						Productos
 					</TabsTrigger>
 					<TabsTrigger
 						value="categories"
-						className="data-[state=active]:bg-[#c9e605] data-[state=active]:text-black"
+						className="flex-1 rounded-lg py-2.5 px-8 text-sm font-semibold text-gray-400 transition-all [&[data-state=active]]:bg-[var(--color-voltage)] [&[data-state=active]]:text-black [&[data-state=active]]:shadow-md [&[data-state=active]:hover]:text-black [&:not([data-state=active])]:hover:bg-white/5 [&:not([data-state=active])]:hover:text-gray-200 border-transparent"
 					>
 						Categorías
 					</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="products" className="space-y-6 mt-0">
-					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-						<CardHeader>
-							<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-								<div>
-									<CardTitle className="flex items-center gap-2">
-										<Filter
-											className="h-4 w-4 text-[var(--color-voltage)]"
-											aria-hidden="true"
-										/>
-										Filtros
-									</CardTitle>
-									<CardDescription className="mt-1 text-gray-400">
-										Busca por nombre, SKU, código de barras o categoría y
-										restringe el inventario por tipo de producto, seguimiento,
-										estado de stock y rangos de precio o costo.
-									</CardDescription>
-								</div>
-								<div className="flex flex-wrap items-center gap-2">
-									{activeFilterCount > 0 ? (
-										<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-											{activeFilterCount} filtro
-											{activeFilterCount === 1 ? "" : "s"} activo
-											{activeFilterCount === 1 ? "" : "s"}
-										</Badge>
-									) : null}
-									<Badge className="border-gray-700 bg-black/20 text-gray-300 hover:bg-black/20">
-										{filteredProducts.length} resultado
-										{filteredProducts.length === 1 ? "" : "s"}
-									</Badge>
-								</div>
+					<div className="flex flex-col gap-4">
+						<form
+							onSubmit={(event) => {
+								event.preventDefault();
+								applyFilters();
+							}}
+							className="flex flex-col sm:flex-row items-center gap-3 w-full"
+						>
+							<div className="relative w-full sm:max-w-xs md:max-w-sm">
+								<Search
+									className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500"
+									aria-hidden="true"
+								/>
+								<Input
+									id={productSearchId}
+									name="q"
+									autoComplete="off"
+									placeholder="Buscar por nombre, SKU o código..."
+									value={draftFilters.q}
+									onChange={(event) =>
+										setDraftFilters((current) => ({
+											...current,
+											q: event.target.value,
+										}))
+									}
+									className="pl-9 bg-black/20 border-gray-800 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20 rounded-lg h-10"
+								/>
 							</div>
-						</CardHeader>
-						<CardContent>
-							<form
-								className="space-y-4"
-								onSubmit={(event) => {
-									event.preventDefault();
-									applyFilters();
-								}}
-							>
-								<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-									<div className="space-y-2 xl:col-span-2">
-										<label
-											className="text-sm text-gray-400"
-											htmlFor={productSearchId}
-										>
-											Busqueda
-										</label>
-										<div className="relative">
-											<Search
-												className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500"
-												aria-hidden="true"
-											/>
-											<Input
-												id={productSearchId}
-												name="q"
-												autoComplete="off"
-												placeholder="Nombre, SKU, código de barras o categoría…"
-												value={draftFilters.q}
-												onChange={(event) =>
-													setDraftFilters((current) => ({
-														...current,
-														q: event.target.value,
-													}))
-												}
-												className="pl-9 bg-black/20 border-gray-700 focus-visible:border-[var(--color-voltage)] focus-visible:ring-[var(--color-voltage)]/20 rounded-lg"
-											/>
+
+							<div className="w-full sm:w-[200px]">
+								<Select
+									value={draftFilters.categoryId || ALL_FILTER_VALUE}
+									onValueChange={(value) =>
+										setDraftFilters((current) => ({
+											...current,
+											categoryId: value === ALL_FILTER_VALUE ? "" : value,
+										}))
+									}
+								>
+									<SelectTrigger
+										id={categoryFilterId}
+										className="h-10 w-full bg-black/20 border-gray-800 text-white rounded-lg"
+									>
+										<SelectValue placeholder="Todas las categorías" />
+									</SelectTrigger>
+									<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+										<SelectItem value={ALL_FILTER_VALUE}>
+											Todas las categorías
+										</SelectItem>
+										<SelectItem value={UNCATEGORIZED_FILTER_VALUE}>
+											Sin categoría
+										</SelectItem>
+										{categories.map((item) => (
+											<SelectItem key={item.id} value={item.id}>
+												{item.name}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+
+							<Popover>
+								<PopoverTrigger asChild>
+									<Button
+										variant="outline"
+										className="h-10 bg-black/20 border-gray-800 text-gray-300 hover:bg-white/5 hover:text-white rounded-lg w-full sm:w-auto"
+									>
+										<Filter className="w-4 h-4 mr-2" aria-hidden="true" />
+										Filtros
+										{activeAdvancedFilterCount > 0 && (
+											<Badge className="ml-2 bg-[var(--color-voltage)]/20 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/30 px-1.5 py-0.5 rounded-sm font-mono text-[10px]">
+												{activeAdvancedFilterCount}
+											</Badge>
+										)}
+									</Button>
+								</PopoverTrigger>
+								<PopoverContent
+									align="start"
+									className="w-[340px] md:w-[600px] p-4 bg-[var(--color-carbon)] border-gray-800 text-white rounded-xl shadow-xl z-50"
+								>
+									<div className="space-y-4">
+										<h4 className="font-medium text-sm text-gray-200">
+											Filtros avanzados
+										</h4>
+										<div className="grid gap-4 md:grid-cols-2">
+											<FilterField label="Tipo" htmlFor={productTypeId}>
+												<Select
+													value={draftFilters.productType || ALL_FILTER_VALUE}
+													onValueChange={(value) =>
+														setDraftFilters((current) => ({
+															...current,
+															productType:
+																value === ALL_FILTER_VALUE ? "" : value,
+														}))
+													}
+												>
+													<SelectTrigger
+														id={productTypeId}
+														className="h-9 w-full bg-black/20 border-gray-700 text-white"
+													>
+														<SelectValue placeholder="Todos" />
+													</SelectTrigger>
+													<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+														<SelectItem value={ALL_FILTER_VALUE}>
+															Todos
+														</SelectItem>
+														<SelectItem value="standard">
+															Producto normal
+														</SelectItem>
+														<SelectItem value="modifier">
+															Modificador
+														</SelectItem>
+													</SelectContent>
+												</Select>
+											</FilterField>
+
+											<FilterField
+												label="Seguimiento"
+												htmlFor={inventoryTrackingId}
+											>
+												<Select
+													value={
+														draftFilters.inventoryTracking || ALL_FILTER_VALUE
+													}
+													onValueChange={(value) =>
+														setDraftFilters((current) => ({
+															...current,
+															inventoryTracking:
+																value === ALL_FILTER_VALUE ? "" : value,
+														}))
+													}
+												>
+													<SelectTrigger
+														id={inventoryTrackingId}
+														className="h-9 w-full bg-black/20 border-gray-700 text-white"
+													>
+														<SelectValue placeholder="Todos" />
+													</SelectTrigger>
+													<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+														<SelectItem value={ALL_FILTER_VALUE}>
+															Todos
+														</SelectItem>
+														<SelectItem value="tracked">
+															Con inventario
+														</SelectItem>
+														<SelectItem value="untracked">
+															Sin inventario
+														</SelectItem>
+													</SelectContent>
+												</Select>
+											</FilterField>
+
+											<FilterField
+												label="Estado de stock"
+												htmlFor={stockStatusId}
+											>
+												<Select
+													value={draftFilters.stockStatus || ALL_FILTER_VALUE}
+													onValueChange={(value) =>
+														setDraftFilters((current) => ({
+															...current,
+															stockStatus:
+																value === ALL_FILTER_VALUE ? "" : value,
+														}))
+													}
+												>
+													<SelectTrigger
+														id={stockStatusId}
+														className="h-9 w-full bg-black/20 border-gray-700 text-white"
+													>
+														<SelectValue placeholder="Todos" />
+													</SelectTrigger>
+													<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
+														<SelectItem value={ALL_FILTER_VALUE}>
+															Todos
+														</SelectItem>
+														<SelectItem value="available">
+															Disponible
+														</SelectItem>
+														<SelectItem value="low">Stock bajo</SelectItem>
+														<SelectItem value="out">Sin stock</SelectItem>
+														<SelectItem value="negative">
+															Stock negativo
+														</SelectItem>
+														<SelectItem value="untracked">
+															Sin seguimiento
+														</SelectItem>
+													</SelectContent>
+												</Select>
+											</FilterField>
+
+											<div />
+
+											<FilterField label="Precio minimo" htmlFor={priceMinId}>
+												<Input
+													id={priceMinId}
+													name="priceMin"
+													autoComplete="off"
+													inputMode="numeric"
+													min={0}
+													step={500}
+													type="number"
+													value={draftFilters.priceMin}
+													onChange={(event) =>
+														setDraftFilters((current) => ({
+															...current,
+															priceMin: event.target.value,
+														}))
+													}
+													placeholder="Ej. 5000…"
+													className="h-9 bg-black/20 border-gray-700 text-white placeholder:text-gray-500"
+												/>
+											</FilterField>
+
+											<FilterField label="Precio maximo" htmlFor={priceMaxId}>
+												<Input
+													id={priceMaxId}
+													name="priceMax"
+													autoComplete="off"
+													inputMode="numeric"
+													min={0}
+													step={500}
+													type="number"
+													value={draftFilters.priceMax}
+													onChange={(event) =>
+														setDraftFilters((current) => ({
+															...current,
+															priceMax: event.target.value,
+														}))
+													}
+													placeholder="Ej. 25000…"
+													className="h-9 bg-black/20 border-gray-700 text-white placeholder:text-gray-500"
+												/>
+											</FilterField>
+
+											<FilterField label="Costo minimo" htmlFor={costMinId}>
+												<Input
+													id={costMinId}
+													name="costMin"
+													autoComplete="off"
+													inputMode="numeric"
+													min={0}
+													step={500}
+													type="number"
+													value={draftFilters.costMin}
+													onChange={(event) =>
+														setDraftFilters((current) => ({
+															...current,
+															costMin: event.target.value,
+														}))
+													}
+													placeholder="Ej. 2000…"
+													className="h-9 bg-black/20 border-gray-700 text-white placeholder:text-gray-500"
+												/>
+											</FilterField>
+
+											<FilterField label="Costo maximo" htmlFor={costMaxId}>
+												<Input
+													id={costMaxId}
+													name="costMax"
+													autoComplete="off"
+													inputMode="numeric"
+													min={0}
+													step={500}
+													type="number"
+													value={draftFilters.costMax}
+													onChange={(event) =>
+														setDraftFilters((current) => ({
+															...current,
+															costMax: event.target.value,
+														}))
+													}
+													placeholder="Ej. 12000…"
+													className="h-9 bg-black/20 border-gray-700 text-white placeholder:text-gray-500"
+												/>
+											</FilterField>
 										</div>
 									</div>
+								</PopoverContent>
+							</Popover>
 
-									<FilterField label="Categoria" htmlFor={categoryFilterId}>
-										<Select
-											value={draftFilters.categoryId || ALL_FILTER_VALUE}
-											onValueChange={(value) =>
-												setDraftFilters((current) => ({
-													...current,
-													categoryId: value === ALL_FILTER_VALUE ? "" : value,
-												}))
-											}
-										>
-											<SelectTrigger
-												id={categoryFilterId}
-												className="h-10 w-full bg-black/20 border-gray-700 text-white"
-											>
-												<SelectValue placeholder="Todas" />
-											</SelectTrigger>
-											<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
-												<SelectItem value={ALL_FILTER_VALUE}>Todas</SelectItem>
-												<SelectItem value={UNCATEGORIZED_FILTER_VALUE}>
-													Sin categoría
-												</SelectItem>
-												{categories.map((item) => (
-													<SelectItem key={item.id} value={item.id}>
-														{item.name}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
-									</FilterField>
+							<Button
+								type="submit"
+								className="h-10 bg-white/10 text-white hover:bg-white/20 w-full sm:w-auto"
+							>
+								Buscar
+							</Button>
 
-									<FilterField label="Tipo" htmlFor={productTypeId}>
-										<Select
-											value={draftFilters.productType || ALL_FILTER_VALUE}
-											onValueChange={(value) =>
-												setDraftFilters((current) => ({
-													...current,
-													productType: value === ALL_FILTER_VALUE ? "" : value,
-												}))
-											}
-										>
-											<SelectTrigger
-												id={productTypeId}
-												className="h-10 w-full bg-black/20 border-gray-700 text-white"
-											>
-												<SelectValue placeholder="Todos" />
-											</SelectTrigger>
-											<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
-												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-												<SelectItem value="standard">
-													Producto normal
-												</SelectItem>
-												<SelectItem value="modifier">Modificador</SelectItem>
-											</SelectContent>
-										</Select>
-									</FilterField>
-
-									<FilterField
-										label="Seguimiento"
-										htmlFor={inventoryTrackingId}
-									>
-										<Select
-											value={draftFilters.inventoryTracking || ALL_FILTER_VALUE}
-											onValueChange={(value) =>
-												setDraftFilters((current) => ({
-													...current,
-													inventoryTracking:
-														value === ALL_FILTER_VALUE ? "" : value,
-												}))
-											}
-										>
-											<SelectTrigger
-												id={inventoryTrackingId}
-												className="h-10 w-full bg-black/20 border-gray-700 text-white"
-											>
-												<SelectValue placeholder="Todos" />
-											</SelectTrigger>
-											<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
-												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-												<SelectItem value="tracked">Con inventario</SelectItem>
-												<SelectItem value="untracked">
-													Sin inventario
-												</SelectItem>
-											</SelectContent>
-										</Select>
-									</FilterField>
-								</div>
-
-								<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-									<FilterField label="Estado de stock" htmlFor={stockStatusId}>
-										<Select
-											value={draftFilters.stockStatus || ALL_FILTER_VALUE}
-											onValueChange={(value) =>
-												setDraftFilters((current) => ({
-													...current,
-													stockStatus: value === ALL_FILTER_VALUE ? "" : value,
-												}))
-											}
-										>
-											<SelectTrigger
-												id={stockStatusId}
-												className="h-10 w-full bg-black/20 border-gray-700 text-white"
-											>
-												<SelectValue placeholder="Todos" />
-											</SelectTrigger>
-											<SelectContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
-												<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-												<SelectItem value="available">Disponible</SelectItem>
-												<SelectItem value="low">Stock bajo</SelectItem>
-												<SelectItem value="out">Sin stock</SelectItem>
-												<SelectItem value="negative">Stock negativo</SelectItem>
-												<SelectItem value="untracked">
-													Sin seguimiento
-												</SelectItem>
-											</SelectContent>
-										</Select>
-									</FilterField>
-
-									<FilterField label="Precio minimo" htmlFor={priceMinId}>
-										<Input
-											id={priceMinId}
-											name="priceMin"
-											autoComplete="off"
-											inputMode="numeric"
-											min={0}
-											step={500}
-											type="number"
-											value={draftFilters.priceMin}
-											onChange={(event) =>
-												setDraftFilters((current) => ({
-													...current,
-													priceMin: event.target.value,
-												}))
-											}
-											placeholder="Ej. 5000…"
-											className="h-10 bg-black/20 border-gray-700 text-white placeholder:text-gray-500"
-										/>
-									</FilterField>
-
-									<FilterField label="Precio maximo" htmlFor={priceMaxId}>
-										<Input
-											id={priceMaxId}
-											name="priceMax"
-											autoComplete="off"
-											inputMode="numeric"
-											min={0}
-											step={500}
-											type="number"
-											value={draftFilters.priceMax}
-											onChange={(event) =>
-												setDraftFilters((current) => ({
-													...current,
-													priceMax: event.target.value,
-												}))
-											}
-											placeholder="Ej. 25000…"
-											className="h-10 bg-black/20 border-gray-700 text-white placeholder:text-gray-500"
-										/>
-									</FilterField>
-
-									<FilterField label="Costo minimo" htmlFor={costMinId}>
-										<Input
-											id={costMinId}
-											name="costMin"
-											autoComplete="off"
-											inputMode="numeric"
-											min={0}
-											step={500}
-											type="number"
-											value={draftFilters.costMin}
-											onChange={(event) =>
-												setDraftFilters((current) => ({
-													...current,
-													costMin: event.target.value,
-												}))
-											}
-											placeholder="Ej. 2000…"
-											className="h-10 bg-black/20 border-gray-700 text-white placeholder:text-gray-500"
-										/>
-									</FilterField>
-
-									<FilterField label="Costo maximo" htmlFor={costMaxId}>
-										<Input
-											id={costMaxId}
-											name="costMax"
-											autoComplete="off"
-											inputMode="numeric"
-											min={0}
-											step={500}
-											type="number"
-											value={draftFilters.costMax}
-											onChange={(event) =>
-												setDraftFilters((current) => ({
-													...current,
-													costMax: event.target.value,
-												}))
-											}
-											placeholder="Ej. 12000…"
-											className="h-10 bg-black/20 border-gray-700 text-white placeholder:text-gray-500"
-										/>
-									</FilterField>
-								</div>
-
-								<div className="flex flex-col gap-3 sm:flex-row">
-									<Button
-										type="submit"
-										className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
-									>
-										<Filter className="h-4 w-4" aria-hidden="true" />
-										Aplicar filtros
-									</Button>
-									<Button
-										type="button"
-										variant="outline"
-										onClick={clearFilters}
-										className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
-										disabled={activeFilterCount === 0}
-									>
-										Limpiar
-									</Button>
-								</div>
-							</form>
-						</CardContent>
-					</Card>
+							{activeFilterCount > 0 && (
+								<Button
+									type="button"
+									variant="ghost"
+									onClick={clearFilters}
+									className="text-gray-400 hover:text-white h-10"
+								>
+									Limpiar
+								</Button>
+							)}
+						</form>
+					</div>
 
 					<ProductFormSheet
 						isOpen={isSheetOpen}

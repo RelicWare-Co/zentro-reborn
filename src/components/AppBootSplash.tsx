@@ -2,67 +2,85 @@ import { SITE_TITLE } from "../lib/site";
 
 export function AppBootSplash() {
 	return (
-		<section
+		<div
 			role="status"
 			aria-live="polite"
 			aria-busy="true"
-			className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--color-void)] px-6 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]"
+			className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-[var(--color-void)]"
 		>
 			<div aria-hidden="true" className="pointer-events-none absolute inset-0">
-				<div className="absolute inset-x-0 top-[-16%] h-[42svh] bg-[radial-gradient(circle_at_top,rgba(223,255,6,0.16),transparent_62%)]" />
-				<div className="absolute bottom-[-18%] left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(223,255,6,0.12),transparent_68%)] blur-3xl" />
-				<div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_24%,transparent_78%,rgba(255,255,255,0.02))]" />
+				<div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(223,255,6,0.15),transparent)] motion-reduce:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(223,255,6,0.08),transparent)]" />
+				<div className="absolute bottom-0 left-1/2 h-[50vh] w-[80vw] -translate-x-1/2 bg-[radial-gradient(ellipse_50%_100%_at_50%_100%,rgba(223,255,6,0.08),transparent_70%)] motion-reduce:opacity-50" />
+				<div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02)_0%,transparent_30%,transparent_70%,rgba(255,255,255,0.01)_100%)]" />
 			</div>
 
-			<div className="relative w-full max-w-md overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(28,28,28,0.94),rgba(15,15,15,0.98))] p-7 shadow-[0_32px_96px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-				<div
-					aria-hidden="true"
-					className="absolute inset-x-6 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(223,255,6,0.55),transparent)]"
-				/>
+			<div className="relative flex flex-col items-center">
+				<div className="relative mb-8">
+					<div className="absolute -inset-8 rounded-full bg-[var(--color-voltage)]/5 blur-2xl motion-reduce:blur-xl" />
 
-				<div className="flex items-start gap-4">
-					<div className="relative flex size-16 shrink-0 items-center justify-center rounded-[22px] border border-[var(--color-voltage)]/16 bg-[radial-gradient(circle_at_30%_30%,rgba(223,255,6,0.18),rgba(223,255,6,0.02)_45%,rgba(255,255,255,0.03)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-						<div className="absolute inset-[9px] rounded-full border border-white/10" />
-						<div className="absolute inset-[9px] rounded-full border-2 border-transparent border-t-[var(--color-voltage)] border-r-[rgba(223,255,6,0.35)] animate-spin motion-reduce:animate-none" />
-						<div className="h-2.5 w-2.5 rounded-full bg-[var(--color-voltage)] shadow-[0_0_18px_rgba(223,255,6,0.55)]" />
-					</div>
+					<div className="relative flex size-24 items-center justify-center rounded-3xl border border-white/8 bg-gradient-to-b from-white/[0.06] to-white/[0.02] shadow-2xl backdrop-blur-xl">
+						<div className="absolute inset-0 rounded-3xl bg-gradient-to-b from-[var(--color-voltage)]/10 to-transparent opacity-0 motion-safe:animate-pulse" />
 
-					<div className="min-w-0 space-y-2">
-						<p className="text-[11px] font-semibold uppercase tracking-[0.34em] text-[var(--color-voltage)]/78">
-							{SITE_TITLE}
-						</p>
-						<h1 className="text-balance text-[1.9rem] font-semibold tracking-[-0.04em] text-white">
-							Iniciando tu espacio de trabajo…
-						</h1>
-						<p className="max-w-sm text-sm leading-6 text-gray-400">
-							Estamos preparando la interfaz, la sesión y el contexto operativo
-							para continuar.
-						</p>
+						<svg
+							viewBox="0 0 48 48"
+							className="size-10 text-[var(--color-voltage)] motion-safe:animate-[spin_3s_linear_infinite] motion-reduce:animate-none"
+							aria-hidden="true"
+						>
+							<circle
+								cx="24"
+								cy="24"
+								r="20"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="3"
+								strokeLinecap="round"
+								strokeDasharray="60 100"
+								className="opacity-30"
+							/>
+							<circle
+								cx="24"
+								cy="24"
+								r="20"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="3"
+								strokeLinecap="round"
+								strokeDasharray="30 100"
+								className="drop-shadow-[0_0_8px_rgba(223,255,6,0.8)]"
+							>
+								<animateTransform
+									attributeName="transform"
+									type="rotate"
+									from="0 24 24"
+									to="360 24 24"
+									dur="1.5s"
+									repeatCount="indefinite"
+								/>
+							</circle>
+						</svg>
+
+						<div className="absolute size-2 rounded-full bg-[var(--color-voltage)] shadow-[0_0_12px_rgba(223,255,6,1)] motion-safe:animate-pulse" />
 					</div>
 				</div>
 
-				<div className="mt-7 rounded-[24px] border border-white/8 bg-white/[0.03] p-4">
-					<div className="flex items-center gap-3">
-						<div
-							aria-hidden="true"
-							className="flex items-center gap-1.5 text-[var(--color-voltage)]"
-						>
-							<span className="h-1.5 w-1.5 rounded-full bg-current opacity-45" />
-							<span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
-							<span className="h-1.5 w-1.5 rounded-full bg-current" />
-						</div>
-						<p className="text-xs font-medium uppercase tracking-[0.22em] text-white/62">
-							Cargando aplicación…
-						</p>
-					</div>
-					<p className="mt-3 text-sm leading-6 text-gray-500">
-						Este arranque puede tardar un instante más después de una
-						actualización o al volver a abrir la app.
+				<div className="space-y-2 text-center">
+					<p className="text-[10px] font-bold uppercase tracking-[0.4em] text-[var(--color-voltage)]/80">
+						{SITE_TITLE}
 					</p>
+					<h1 className="text-2xl font-semibold tracking-tight text-white">
+						Iniciando…
+					</h1>
+				</div>
+
+				<div className="mt-8 flex items-center gap-1.5">
+					<span className="size-1.5 rounded-full bg-white/30 motion-safe:animate-[bounce_0.6s_ease-in-out_infinite]" />
+					<span className="size-1.5 rounded-full bg-white/50 motion-safe:animate-[bounce_0.6s_ease-in-out_0.2s_infinite]" />
+					<span className="size-1.5 rounded-full bg-white/70 motion-safe:animate-[bounce_0.6s_ease-in-out_0.4s_infinite]" />
+					<span className="ml-2 text-xs text-white/40">Cargando</span>
 				</div>
 
 				<span className="sr-only">Cargando aplicación…</span>
 			</div>
-		</section>
+		</div>
 	);
 }

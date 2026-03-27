@@ -128,32 +128,32 @@ export function CloseShiftModal({
 											<div className="flex justify-between">
 												<span className="text-gray-300">Ingresos manuales</span>
 												<span className="font-medium tabular-nums text-emerald-400">
-													+{formatCurrency(movementSummary.totals.inflow)}
+													+{formatCurrency(shiftCloseSummary.movements.totals.inflow)}
 												</span>
 											</div>
 											<div className="flex justify-between">
 												<span className="text-gray-300">Gastos operativos</span>
 												<span className="font-medium tabular-nums text-red-400">
-													-{formatCurrency(movementSummary.totals.expense)}
+													-{formatCurrency(shiftCloseSummary.movements.totals.expense)}
 												</span>
 											</div>
 											<div className="flex justify-between">
 												<span className="text-gray-300">Pagos a proveedor</span>
 												<span className="font-medium tabular-nums text-red-400">
-													-{formatCurrency(movementSummary.totals.payout)}
+													-{formatCurrency(shiftCloseSummary.movements.totals.payout)}
 												</span>
 											</div>
 											<div className="flex justify-between">
 												<span className="text-gray-300">Ajuste neto</span>
 												<span
 													className={`font-medium tabular-nums ${
-														movementSummary.totals.net >= 0
+														shiftCloseSummary.movements.totals.net >= 0
 															? "text-emerald-400"
 															: "text-red-400"
 													}`}
 												>
-													{movementSummary.totals.net >= 0 ? "+" : ""}
-													{formatCurrency(movementSummary.totals.net)}
+													{shiftCloseSummary.movements.totals.net >= 0 ? "+" : ""}
+													{formatCurrency(shiftCloseSummary.movements.totals.net)}
 												</span>
 											</div>
 										</div>

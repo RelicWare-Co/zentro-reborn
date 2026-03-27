@@ -81,9 +81,10 @@ export const DEFAULT_ORGANIZATION_SETTINGS: OrganizationSettings = {
 	},
 };
 
-const PAYMENT_METHOD_CATALOG_BY_ID = new Map(
-	PAYMENT_METHOD_CATALOG.map((method) => [method.id, method]),
-);
+const PAYMENT_METHOD_CATALOG_BY_ID: ReadonlyMap<
+	string,
+	(typeof PAYMENT_METHOD_CATALOG)[number]
+> = new Map(PAYMENT_METHOD_CATALOG.map((method) => [method.id, method]));
 
 function toSafeString(value: unknown, fallback: string) {
 	if (typeof value !== "string") {

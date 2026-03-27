@@ -4,8 +4,11 @@ import {
 	createRootRouteWithContext,
 	HeadContent,
 	Scripts,
+	useRouterState,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { useEffect, useState } from "react";
+import { AppBootSplash } from "../components/AppBootSplash";
 import { AppUpdateNotifier } from "../components/AppUpdateNotifier";
 import { DefaultCatchBoundary } from "../components/DefaultCatchBoundary";
 import { DeploymentSkewProtection } from "../components/DeploymentSkewProtection";
@@ -104,6 +107,31 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+	const { hasResolvedInitialMatch, isRoutePending } = useRouterState({
+		select: (state) => ({
+			hasResolvedInitialMatch: state.matches.length > 0,
+			isRoutePending:
+				state.isLoading ||
+				state.matches.some((match) => match.status === "pending"),
+		}),
+		structuralSharing: true,
+	});
+	const [hasCompletedAppBoot, setHasCompletedAppBoot] = useState(
+		() => hasResolvedInitialMatch && !isRoutePending,
+	);
+
+	useEffect(() => {
+		if (hasCompletedAppBoot) {
+			return;
+		}
+
+		if (!hasResolvedInitialMatch || isRoutePending) {
+			return;
+		}
+
+		setHasCompletedAppBoot(true);
+	}, [hasCompletedAppBoot, hasResolvedInitialMatch, isRoutePending]);
+
 	return (
 		<html lang="es-CO" suppressHydrationWarning>
 			<head>
@@ -114,6 +142,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 			<body className="min-h-screen bg-[var(--color-void)] font-sans text-[var(--color-photon)] antialiased [overflow-wrap:anywhere] selection:bg-[rgba(79,184,178,0.24)]">
 				<TanStackQueryProvider>
 					{children}
+					{hasCompletedAppBoot ? null : <AppBootSplash />}
 					<TanStackDevtools
 						config={{
 							position: "bottom-right",

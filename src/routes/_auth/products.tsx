@@ -1403,7 +1403,7 @@ function ProductsPage() {
 				</TabsContent>
 
 				<TabsContent value="categories" className="space-y-6 mt-0">
-					<div className="flex justify-between items-center">
+					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 						<h2 className="text-xl font-semibold">Categorías</h2>
 						<Button
 							className="bg-[var(--color-voltage)] hover:bg-[#c9e605] text-black font-semibold rounded-lg px-4 py-2 h-10 w-full sm:w-auto shrink-0"

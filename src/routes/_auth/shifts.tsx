@@ -328,10 +328,7 @@ function ShiftsPage() {
 					</Select>
 				</FilterField>
 
-				<FilterField
-					label="Metodo"
-					htmlFor={`${idPrefix}${paymentMethodId}`}
-				>
+				<FilterField label="Metodo" htmlFor={`${idPrefix}${paymentMethodId}`}>
 					<Select
 						value={draftFilters.paymentMethod || ALL_FILTER_VALUE}
 						onValueChange={(value) =>

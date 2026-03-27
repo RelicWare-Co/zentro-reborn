@@ -601,9 +601,7 @@ function SalesPage() {
 						</SelectTrigger>
 						<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
 							<SelectItem value={ALL_FILTER_VALUE}>Todos</SelectItem>
-							<SelectItem value="with_balance">
-								Con saldo pendiente
-							</SelectItem>
+							<SelectItem value="with_balance">Con saldo pendiente</SelectItem>
 							<SelectItem value="settled">Sin saldo</SelectItem>
 						</SelectContent>
 					</Select>
@@ -672,7 +670,10 @@ function SalesPage() {
 					</div>
 				) : (
 					<>
-						<FilterField label="Desde" htmlFor={`${idPrefix}${salesStartDateId}`}>
+						<FilterField
+							label="Desde"
+							htmlFor={`${idPrefix}${salesStartDateId}`}
+						>
 							<Input
 								id={`${idPrefix}${salesStartDateId}`}
 								name="startDate"

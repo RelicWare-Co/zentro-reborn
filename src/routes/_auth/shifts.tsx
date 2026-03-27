@@ -8,6 +8,7 @@ import {
 	Receipt,
 	Search,
 	Store,
+	User,
 	Wallet,
 	X,
 } from "lucide-react";
@@ -609,198 +610,235 @@ function ShiftsPage() {
 					<CardContent className="space-y-4">
 						{shifts.length > 0 ? (
 							shifts.map((shift) => (
-								<article
+								<Card
 									key={shift.id}
-									className="rounded-3xl border border-gray-800 bg-black/20 p-5"
+									className="overflow-hidden border-gray-800 bg-[var(--color-carbon)]/40 shadow-none transition-colors hover:bg-[var(--color-carbon)]/80"
 								>
-									<div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-										<div className="space-y-2">
-											<div className="flex flex-wrap items-center gap-2">
-												<p className="text-lg font-semibold text-white">
-													{shift.cashierName}
-												</p>
-												<Badge
-													className={getShiftStatusBadgeClass(shift.status)}
-												>
-													{formatShiftStatus(shift.status)}
-												</Badge>
-												<Badge
-													variant="outline"
-													className="border-gray-700 bg-gray-900/50 text-gray-300"
-												>
-													{shift.id.slice(0, 8)}
-												</Badge>
+									<div className="flex flex-col gap-4 border-b border-gray-800/50 bg-black/20 p-5 sm:flex-row sm:items-center sm:justify-between">
+										<div className="flex items-center gap-4">
+											<div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-gray-800 bg-[var(--color-void)] text-gray-400">
+												<User className="h-5 w-5" />
 											</div>
-											<p className="text-sm text-gray-400">
-												{shift.terminalName ?? "Caja principal"}
-											</p>
-											<p className="text-xs text-gray-500">
+											<div className="min-w-0">
+												<div className="flex flex-wrap items-center gap-2">
+													<h3 className="truncate text-lg font-semibold text-white">
+														{shift.cashierName}
+													</h3>
+													<Badge
+														className={getShiftStatusBadgeClass(shift.status)}
+													>
+														{formatShiftStatus(shift.status)}
+													</Badge>
+													<span className="font-mono text-xs text-gray-500">
+														#{shift.id.slice(0, 8)}
+													</span>
+												</div>
+												<p className="mt-0.5 truncate text-sm text-gray-400">
+													{shift.terminalName ?? "Caja principal"}
+												</p>
+											</div>
+										</div>
+										<div className="shrink-0 text-left sm:text-right">
+											<p className="text-sm font-medium text-gray-300">
 												{formatShiftRange(shift.openedAt, shift.closedAt)}
 											</p>
 											{shift.notes ? (
-												<p className="max-w-2xl text-sm text-gray-400">
-													Notas: {shift.notes}
+												<p
+													className="mt-1 max-w-[280px] truncate text-xs text-gray-500 sm:ml-auto"
+													title={shift.notes}
+												>
+													{shift.notes}
 												</p>
 											) : null}
 										</div>
-
-										<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-											<MiniMetric
-												label="Ventas pagadas"
-												value={formatCount(shift.operations.paidSalesCount)}
-												description={formatCurrency(
-													shift.operations.paidSalesAmount,
-												)}
-											/>
-											<MiniMetric
-												label="Ventas anuladas"
-												value={formatCount(
-													shift.operations.cancelledSalesCount,
-												)}
-												description={formatCurrency(
-													shift.operations.cancelledSalesAmount,
-												)}
-											/>
-											<MiniMetric
-												label="Ventas a credito"
-												value={formatCount(shift.operations.creditSalesCount)}
-												description={formatCurrency(
-													shift.operations.creditSalesAmount,
-												)}
-											/>
-											<MiniMetric
-												label="Efectivo esperado"
-												value={formatCurrency(shift.totals.expectedCash)}
-												description={`Base ${formatCurrency(shift.startingCash)}`}
-											/>
-											<MiniMetric
-												label="Pagos registrados"
-												value={formatCurrency(shift.totals.totalPayments)}
-												description={`${formatCount(shift.payments.length)} movimientos de pago`}
-											/>
-										</div>
 									</div>
 
-									<div className="mt-5 grid gap-4 xl:grid-cols-3">
-										<SectionCard
-											title="Esperado por metodo"
-											description={`Total esperado ${formatCurrency(shift.totals.totalExpected)}`}
-										>
-											{shift.paymentBreakdown.length > 0 ? (
-												<div className="space-y-2">
-													{shift.paymentBreakdown.map((paymentMethod) => (
-														<RowItem
-															key={`${shift.id}-${paymentMethod.method}`}
-															label={formatPaymentMethod(
-																paymentMethod.method,
-																paymentMethodLabels,
+									<div className="grid grid-cols-1 divide-y divide-gray-800/50 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+										<div className="p-5">
+											<h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+												Resumen de Operaciones
+											</h4>
+											<div className="space-y-4">
+												<div className="grid grid-cols-2 gap-4">
+													<div>
+														<p className="mb-1 text-xs text-gray-500">
+															Pagadas (
+															{formatCount(shift.operations.paidSalesCount)})
+														</p>
+														<p className="text-lg font-medium text-white">
+															{formatCurrency(shift.operations.paidSalesAmount)}
+														</p>
+													</div>
+													<div>
+														<p className="mb-1 text-xs text-gray-500">
+															A crédito (
+															{formatCount(shift.operations.creditSalesCount)})
+														</p>
+														<p className="text-lg font-medium text-white">
+															{formatCurrency(
+																shift.operations.creditSalesAmount,
 															)}
-															value={formatCurrency(paymentMethod.amount)}
-														/>
-													))}
+														</p>
+													</div>
 												</div>
-											) : (
-												<EmptySection text="Sin pagos ni saldo esperado en este turno." />
-											)}
-										</SectionCard>
-
-										<SectionCard
-											title="Movimientos de caja"
-											description={`${formatCount(shift.movements.length)} registros`}
-										>
-											{shift.movements.length > 0 ? (
-												<div className="space-y-2">
-													{shift.movements.map((movement) => (
-														<div
-															key={movement.id}
-															className="rounded-2xl border border-gray-800 bg-[var(--color-void)]/60 p-3"
-														>
-															<div className="flex items-start justify-between gap-3">
-																<div className="min-w-0">
-																	<p className="text-sm font-medium text-white">
-																		{formatMovementType(movement.type)}
-																	</p>
-																	<p className="text-sm text-gray-400">
-																		{formatPaymentMethod(
-																			movement.paymentMethod,
-																			paymentMethodLabels,
-																		)}{" "}
-																		· {movement.description}
-																	</p>
-																	<p className="mt-1 text-xs text-gray-500">
-																		{dateTimeFormatter.format(
-																			movement.createdAt,
-																		)}
-																	</p>
-																</div>
-																<p
-																	className={
-																		movement.type === "inflow"
-																			? "text-sm font-medium text-emerald-300"
-																			: "text-sm font-medium text-rose-300"
-																	}
-																>
-																	{movement.type === "inflow" ? "+" : "-"}
-																	{formatCurrency(movement.amount)}
-																</p>
-															</div>
-														</div>
-													))}
+												<div className="border-t border-gray-800/50 pt-3">
+													<div className="flex items-center justify-between">
+														<span className="text-sm text-gray-400">
+															Anuladas (
+															{formatCount(
+																shift.operations.cancelledSalesCount,
+															)}
+															)
+														</span>
+														<span className="text-sm text-gray-300">
+															{formatCurrency(
+																shift.operations.cancelledSalesAmount,
+															)}
+														</span>
+													</div>
 												</div>
-											) : (
-												<EmptySection text="No hubo movimientos manuales de caja." />
-											)}
-										</SectionCard>
+											</div>
+										</div>
 
-										<SectionCard
-											title="Cierre de caja"
-											description={
-												shift.closures.length > 0
-													? `Diferencia total ${formatSignedCurrency(shift.totals.totalDifference)}`
-													: "Aun no se ha registrado cierre"
-											}
-										>
-											{shift.closures.length > 0 ? (
-												<div className="space-y-2">
-													{shift.closures.map((closure) => (
-														<div
-															key={`${shift.id}-${closure.paymentMethod}`}
-															className="rounded-2xl border border-gray-800 bg-[var(--color-void)]/60 p-3"
-														>
-															<div className="flex items-center justify-between gap-3">
-																<p className="text-sm font-medium text-white">
+										<div className="bg-black/5 p-5">
+											<h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+												Valores Esperados
+											</h4>
+											<div className="space-y-4">
+												<div className="flex items-end justify-between">
+													<div>
+														<p className="mb-1 text-xs text-gray-500">
+															Efectivo Total
+														</p>
+														<p className="text-xl font-semibold text-emerald-400">
+															{formatCurrency(shift.totals.expectedCash)}
+														</p>
+														<p className="mt-1 text-xs text-gray-500">
+															Base: {formatCurrency(shift.startingCash)}
+														</p>
+													</div>
+													<div className="text-right">
+														<p className="mb-1 text-xs text-gray-500">
+															Otros Pagos ({formatCount(shift.payments.length)})
+														</p>
+														<p className="text-lg font-medium text-white">
+															{formatCurrency(shift.totals.totalPayments)}
+														</p>
+													</div>
+												</div>
+												{shift.paymentBreakdown.length > 0 && (
+													<div className="space-y-2 border-t border-gray-800/50 pt-3">
+														{shift.paymentBreakdown.map((pm) => (
+															<div
+																key={pm.method}
+																className="flex items-center justify-between text-sm"
+															>
+																<span className="text-gray-400">
 																	{formatPaymentMethod(
-																		closure.paymentMethod,
+																		pm.method,
 																		paymentMethodLabels,
 																	)}
-																</p>
-																<p
-																	className={getDifferenceClassName(
-																		closure.difference,
-																	)}
-																>
-																	{formatSignedCurrency(closure.difference)}
-																</p>
+																</span>
+																<span className="font-medium text-gray-300">
+																	{formatCurrency(pm.amount)}
+																</span>
 															</div>
-															<div className="mt-2 grid gap-2 text-xs text-gray-400 sm:grid-cols-2">
-																<RowItem
-																	label="Esperado"
-																	value={formatCurrency(closure.expectedAmount)}
-																/>
-																<RowItem
-																	label="Contado"
-																	value={formatCurrency(closure.actualAmount)}
-																/>
+														))}
+													</div>
+												)}
+											</div>
+										</div>
+
+										<div className="bg-black/10 p-5">
+											<div className="mb-4 flex items-center justify-between">
+												<h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+													Cierre y Conciliación
+												</h4>
+												{shift.closures.length > 0 && (
+													<Badge
+														variant="outline"
+														className={`h-6 rounded-md border-0 px-2 py-0.5 ${getDifferenceClassName(shift.totals.totalDifference)}`}
+													>
+														{shift.totals.totalDifference === 0
+															? "Cuadrado"
+															: formatSignedCurrency(
+																	shift.totals.totalDifference,
+																)}
+													</Badge>
+												)}
+											</div>
+
+											{shift.closures.length > 0 ? (
+												<div className="space-y-3">
+													{shift.closures.map((closure) => (
+														<div
+															key={closure.paymentMethod}
+															className="flex items-center justify-between text-sm"
+														>
+															<span className="text-gray-300">
+																{formatPaymentMethod(
+																	closure.paymentMethod,
+																	paymentMethodLabels,
+																)}
+															</span>
+															<div className="text-right">
+																<span className="block font-medium text-white">
+																	{formatCurrency(closure.actualAmount)}
+																</span>
+																<span className="text-xs text-gray-500">
+																	vs {formatCurrency(closure.expectedAmount)}
+																</span>
 															</div>
 														</div>
 													))}
 												</div>
 											) : (
-												<EmptySection text="El turno sigue abierto o aun no tiene conciliacion registrada." />
+												<p className="text-sm italic text-gray-500">
+													El turno sigue abierto o aún no tiene conciliación
+													registrada.
+												</p>
 											)}
-										</SectionCard>
+
+											{shift.movements.length > 0 && (
+												<div className="mt-5 border-t border-gray-800/50 pt-4">
+													<p className="mb-3 text-xs font-medium text-gray-500">
+														Movimientos de caja ({shift.movements.length})
+													</p>
+													<div className="space-y-2.5">
+														{shift.movements.slice(0, 3).map((m) => (
+															<div
+																key={m.id}
+																className="flex items-start justify-between gap-2 text-xs"
+															>
+																<span
+																	className="line-clamp-2 break-words text-gray-400"
+																	title={m.description}
+																>
+																	{m.description || formatMovementType(m.type)}
+																</span>
+																<span
+																	className={`shrink-0 font-medium ${
+																		m.type === "inflow"
+																			? "text-emerald-400"
+																			: "text-rose-400"
+																	}`}
+																>
+																	{m.type === "inflow" ? "+" : "-"}
+																	{formatCurrency(m.amount)}
+																</span>
+															</div>
+														))}
+														{shift.movements.length > 3 && (
+															<p className="mt-1 text-xs italic text-gray-500">
+																+ {shift.movements.length - 3} movimientos más
+															</p>
+														)}
+													</div>
+												</div>
+											)}
+										</div>
 									</div>
-								</article>
+								</Card>
 							))
 						) : (
 							<div className="rounded-2xl border border-dashed border-gray-800 px-4 py-8 text-center text-sm text-gray-500">
@@ -876,24 +914,6 @@ function SummaryCard({
 	);
 }
 
-function MiniMetric({
-	label,
-	value,
-	description,
-}: {
-	label: string;
-	value: string;
-	description: string;
-}) {
-	return (
-		<div className="rounded-2xl border border-gray-800 bg-[var(--color-void)]/60 p-4">
-			<p className="text-sm text-gray-400">{label}</p>
-			<p className="mt-2 text-lg font-semibold text-white">{value}</p>
-			<p className="mt-1 text-xs text-gray-500">{description}</p>
-		</div>
-	);
-}
-
 function FilterField({
 	label,
 	htmlFor,
@@ -911,39 +931,6 @@ function FilterField({
 			{children}
 		</div>
 	);
-}
-
-function SectionCard({
-	title,
-	description,
-	children,
-}: {
-	title: string;
-	description: string;
-	children: React.ReactNode;
-}) {
-	return (
-		<div className="rounded-3xl border border-gray-800 bg-black/10 p-4">
-			<div className="mb-3">
-				<p className="font-medium text-white">{title}</p>
-				<p className="text-sm text-gray-400">{description}</p>
-			</div>
-			{children}
-		</div>
-	);
-}
-
-function RowItem({ label, value }: { label: string; value: string }) {
-	return (
-		<div className="flex items-center justify-between gap-3 text-sm">
-			<span className="text-gray-400">{label}</span>
-			<span className="font-medium text-white">{value}</span>
-		</div>
-	);
-}
-
-function EmptySection({ text }: { text: string }) {
-	return <p className="text-sm text-gray-500">{text}</p>;
 }
 
 function formatCurrency(value: number) {

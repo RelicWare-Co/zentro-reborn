@@ -1,15 +1,7 @@
-import { useRouter } from "@tanstack/react-router";
-import { AlertTriangle } from "lucide-react";
+import { Link, useRouter } from "@tanstack/react-router";
+import { AlertTriangle, Home, RefreshCcw } from "lucide-react";
 
 import { Button } from "./ui/button";
-import {
-	Empty,
-	EmptyContent,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "./ui/empty";
 
 interface DefaultCatchBoundaryProps {
 	error: Error;
@@ -31,33 +23,44 @@ export function DefaultCatchBoundary({
 	};
 
 	return (
-		<div className="flex min-h-screen w-full flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
-			<Empty className="w-full max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-xl border-border bg-card shadow-sm">
-				<EmptyHeader className="max-w-none sm:max-w-md lg:max-w-lg">
-					<EmptyMedia
-						variant="icon"
-						className="mb-4 size-12 sm:size-14 lg:size-16 bg-destructive/10 text-destructive"
-					>
-						<AlertTriangle className="size-6 sm:size-7 lg:size-8" />
-					</EmptyMedia>
-					<EmptyTitle className="text-xl sm:text-2xl lg:text-3xl">
-						Algo salió mal
-					</EmptyTitle>
-					<EmptyDescription className="mt-2 text-center text-muted-foreground text-sm sm:text-base lg:text-lg max-w-xs sm:max-w-md lg:max-w-lg">
-						{error?.message ||
-							"Ha ocurrido un error inesperado en la aplicación. Por favor, inténtalo de nuevo."}
-					</EmptyDescription>
-				</EmptyHeader>
-				<EmptyContent className="mt-6 sm:mt-8 max-w-none sm:max-w-md lg:max-w-lg">
+		<div className="flex min-h-[100dvh] w-full flex-col items-center justify-center bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-12">
+			<div className="w-full max-w-[460px] space-y-8 rounded-3xl border border-gray-800 bg-[var(--color-carbon)] p-8 shadow-2xl sm:p-10">
+				<div className="flex flex-col items-center space-y-5 text-center">
+					<div className="flex h-20 w-20 items-center justify-center rounded-full border border-red-500/20 bg-red-500/10 text-red-400">
+						<AlertTriangle className="h-10 w-10" />
+					</div>
+
+					<div className="space-y-2">
+						<h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+							Algo salió mal
+						</h1>
+						<p className="text-sm leading-relaxed text-gray-400">
+							{error?.message ||
+								"Ha ocurrido un error inesperado en la aplicación. Por favor, inténtalo de nuevo."}
+						</p>
+					</div>
+				</div>
+
+				<div className="flex flex-col gap-3 pt-4">
 					<Button
 						onClick={handleReset}
-						variant="outline"
-						className="min-w-[120px] sm:min-w-[140px] lg:min-w-[160px] text-sm sm:text-base lg:text-lg h-9 sm:h-10 lg:h-11 px-4 sm:px-5 lg:px-6"
+						className="h-11 w-full rounded-xl bg-[var(--color-voltage)] text-[15px] font-semibold text-black hover:bg-[#c9e605]"
 					>
+						<RefreshCcw className="mr-2 h-4 w-4" />
 						Intentar de nuevo
 					</Button>
-				</EmptyContent>
-			</Empty>
+					<Button
+						asChild
+						variant="outline"
+						className="h-11 w-full rounded-xl border-gray-700 bg-transparent text-[15px] font-medium text-gray-200 hover:bg-white/5 hover:text-white"
+					>
+						<Link to="/">
+							<Home className="mr-2 h-4 w-4" />
+							Volver al inicio
+						</Link>
+					</Button>
+				</div>
+			</div>
 		</div>
 	);
 }

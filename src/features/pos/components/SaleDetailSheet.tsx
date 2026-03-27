@@ -151,51 +151,274 @@ export function SaleDetailSheet({
 		<>
 			<Sheet open={isOpen} onOpenChange={onOpenChange}>
 				<SheetContent
-					className="w-full overflow-hidden border-gray-800 bg-[var(--color-carbon)] p-0 text-[var(--color-photon)] sm:max-w-xl"
+					className="!w-full !max-w-full sm:!w-[1000px] overflow-hidden border-gray-800 bg-[var(--color-carbon)] p-0 text-[var(--color-photon)] flex flex-col"
 					side="right"
 				>
-					<SheetHeader className="border-b border-gray-800 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:p-4">
-						<SheetTitle className="text-xl text-[var(--color-photon)]">
+					<SheetHeader className="border-b border-gray-800 px-6 py-5 shrink-0">
+						<SheetTitle className="text-2xl font-bold text-[var(--color-photon)]">
 							Detalle de venta
 						</SheetTitle>
-						<SheetDescription className="text-pretty text-base text-gray-400">
+						<SheetDescription className="text-base text-gray-400">
 							Revisa cliente, pagos e items registrados para esta venta.
 						</SheetDescription>
 					</SheetHeader>
 
-					<div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:p-4">
+					<div className="flex-1 overflow-y-auto p-6">
 						{isLoading ? (
-							<div className="space-y-3">
+							<div className="space-y-4">
 								<div className="h-24 animate-pulse rounded-2xl bg-black/20" />
 								<div className="h-32 animate-pulse rounded-2xl bg-black/20" />
 								<div className="h-48 animate-pulse rounded-2xl bg-black/20" />
 							</div>
 						) : sale ? (
-							<div className="space-y-3 sm:space-y-4">
-								<section className="rounded-[20px] border border-gray-800 bg-black/20 p-3.5 sm:rounded-2xl sm:p-4">
-									<div className="flex flex-col gap-3 sm:gap-4">
-										<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-											<div className="min-w-0 space-y-2">
-												<div className="flex flex-wrap items-center gap-2">
-													<p className="text-sm text-gray-400">Venta</p>
+							<div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-6">
+								{/* Columna Principal (Izquierda) */}
+								<div className="space-y-6">
+									{/* Items */}
+									<section className="rounded-2xl border border-gray-800 bg-black/20 p-5">
+										<div className="flex items-center justify-between">
+											<h3 className="font-medium text-white text-lg">Items</h3>
+											<p className="text-sm text-gray-400">
+												{sale.items.length} linea
+												{sale.items.length === 1 ? "" : "s"}
+											</p>
+										</div>
+
+										<div className="mt-4 space-y-3">
+											{sale.items.map((item) => (
+												<div
+													key={item.id}
+													className="rounded-xl bg-white/[0.03] px-4 py-4 ring-1 ring-white/6"
+												>
+													<div className="flex items-start justify-between gap-3">
+														<div className="min-w-0 flex-1">
+															<p className="break-words font-medium text-white text-base">
+																{item.quantity} x {item.name}
+															</p>
+															<p className="mt-1 text-sm text-gray-400">
+																{formatCurrency(item.unitPrice)} c/u
+															</p>
+														</div>
+														<p className="shrink-0 font-medium text-white text-base [font-variant-numeric:tabular-nums]">
+															{formatCurrency(item.totalAmount)}
+														</p>
+													</div>
+
+													<div className="mt-3 space-y-1 text-sm text-gray-400 [font-variant-numeric:tabular-nums]">
+														<p>Base: {formatCurrency(item.subtotal)}</p>
+														{item.taxAmount > 0 ? (
+															<p>
+																Impuesto ({item.taxRate}%):{" "}
+																{formatCurrency(item.taxAmount)}
+															</p>
+														) : null}
+														{item.discountAmount > 0 ? (
+															<p>
+																Descuento: {formatCurrency(item.discountAmount)}
+															</p>
+														) : null}
+													</div>
+
+													{item.modifiers.length > 0 ? (
+														<div className="mt-4 rounded-lg bg-black/20 p-3">
+															<p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+																Modificadores
+															</p>
+															<div className="mt-2 space-y-2">
+																{item.modifiers.map((modifier) => (
+																	<div
+																		key={modifier.id}
+																		className="flex items-center justify-between gap-3 text-sm"
+																	>
+																		<span className="min-w-0 break-words text-gray-300">
+																			{modifier.quantity} x {modifier.name}
+																		</span>
+																		<span className="shrink-0 text-gray-400 [font-variant-numeric:tabular-nums]">
+																			{formatCurrency(modifier.subtotal)}
+																		</span>
+																	</div>
+																))}
+															</div>
+														</div>
+													) : null}
+												</div>
+											))}
+										</div>
+									</section>
+
+									{/* Pagos */}
+									<section className="rounded-2xl border border-gray-800 bg-black/20 p-5">
+										<div className="flex items-center justify-between">
+											<h3 className="font-medium text-white text-lg">Pagos</h3>
+											<p className="text-sm text-gray-400">
+												{sale.payments.length} registro
+												{sale.payments.length === 1 ? "" : "s"}
+											</p>
+										</div>
+
+										{sale.payments.length > 0 ? (
+											<div className="mt-4 space-y-3">
+												{sale.payments.map((payment) => (
+													<div
+														key={payment.id}
+														className="rounded-xl bg-white/[0.03] px-4 py-4 ring-1 ring-white/6"
+													>
+														<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+															<div className="min-w-0">
+																<div className="flex flex-wrap items-center gap-2">
+																	<p className="break-words font-medium text-white">
+																		{formatPaymentMethodLabel(
+																			payment.method,
+																			paymentMethodLabels,
+																		)}
+																	</p>
+																	<Badge
+																		className={getPaymentKindBadgeClass(
+																			payment.kind,
+																		)}
+																	>
+																		{formatPaymentKind(payment.kind)}
+																	</Badge>
+																</div>
+																<p className="mt-1 break-words text-sm text-gray-400">
+																	{payment.reference?.trim()
+																		? `Ref. ${payment.reference}`
+																		: "Sin referencia"}
+																</p>
+																{payment.notes ? (
+																	<p className="mt-1 break-words text-xs text-gray-500">
+																		{payment.notes}
+																	</p>
+																) : null}
+															</div>
+															<div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:flex-wrap sm:justify-end">
+																<p className="shrink-0 font-medium text-white [font-variant-numeric:tabular-nums]">
+																	{formatCurrency(payment.amount)}
+																</p>
+																<Button
+																	type="button"
+																	variant="outline"
+																	size="sm"
+																	onClick={() => handlePrintPayment(payment)}
+																	className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+																>
+																	Reimprimir
+																</Button>
+															</div>
+														</div>
+													</div>
+												))}
+											</div>
+										) : (
+											<EmptyBlock className="mt-4">
+												No hay pagos registrados para esta venta.
+											</EmptyBlock>
+										)}
+									</section>
+
+									{/* Registrar abono */}
+									{sale.balanceDue > 0 ? (
+										<CreditPaymentSection
+											key={sale.id}
+											sale={sale}
+											activeShiftId={activeShiftId}
+											creditAccount={creditAccount}
+											paymentMethodOptions={paymentMethodOptions}
+											paymentMethodLabels={paymentMethodLabels}
+										/>
+									) : null}
+								</div>
+
+								{/* Columna Lateral (Derecha) */}
+								<div className="space-y-6">
+									{/* Resumen de Valores */}
+									<section className="rounded-2xl border border-gray-800 bg-black/20 p-5">
+										<div className="flex items-center justify-between mb-4">
+											<h3 className="font-medium text-white text-lg">
+												Resumen
+											</h3>
+											<p className="text-xl font-bold text-[var(--color-voltage)] [font-variant-numeric:tabular-nums]">
+												{formatCurrency(sale.totalAmount)}
+											</p>
+										</div>
+
+										<div className="space-y-3 text-sm">
+											<SummaryRow
+												label="Subtotal"
+												value={formatCurrency(sale.subtotal)}
+											/>
+											<SummaryRow
+												label="Impuestos"
+												value={formatCurrency(sale.taxAmount)}
+											/>
+											<SummaryRow
+												label="Descuentos"
+												value={formatCurrency(sale.discountAmount)}
+											/>
+											<div className="border-t border-gray-800 my-2 pt-2" />
+											<SummaryRow
+												label="Pagado"
+												value={formatCurrency(sale.paidAmount)}
+											/>
+											<SummaryRow
+												label="Saldo pendiente"
+												value={formatCurrency(sale.balanceDue)}
+												emphasis={sale.balanceDue > 0}
+											/>
+										</div>
+									</section>
+
+									{/* Info de la Venta */}
+									<section className="rounded-2xl border border-gray-800 bg-black/20 p-5">
+										<div className="flex flex-col gap-5">
+											<div className="space-y-3">
+												<div className="flex flex-wrap items-center justify-between gap-2">
+													<p className="text-sm font-medium text-gray-400">
+														ESTADO
+													</p>
 													<Badge
 														className={getSaleStatusBadgeClass(sale.status)}
 													>
 														{formatSaleStatus(sale.status)}
 													</Badge>
 												</div>
-												<p className="break-words text-lg font-semibold text-white">
-													#{sale.id.slice(0, 8)}
-												</p>
-												<p className="text-sm text-gray-400 [font-variant-numeric:tabular-nums]">
-													{dateTimeFormatter.format(sale.createdAt)}
-												</p>
+												<div className="flex flex-col gap-1">
+													<p className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+														Identificador
+													</p>
+													<p className="break-words text-lg font-semibold text-white">
+														#{sale.id.slice(0, 8)}
+													</p>
+												</div>
+												<div className="flex flex-col gap-1">
+													<p className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+														Fecha
+													</p>
+													<p className="text-base text-gray-300 [font-variant-numeric:tabular-nums]">
+														{dateTimeFormatter.format(sale.createdAt)}
+													</p>
+												</div>
 											</div>
-											<div className="grid w-full gap-2 sm:ml-auto sm:w-56">
+
+											<div className="grid gap-3 pt-4 border-t border-gray-800">
+												<InfoBlock
+													label="Cliente"
+													value={sale.customer?.name ?? "Cliente mostrador"}
+													description={formatCustomerMeta(sale)}
+												/>
+												<InfoBlock
+													label="Cajero"
+													value={sale.cashier?.name ?? "Sin registro"}
+													description={
+														sale.shift?.terminalName ?? "Sin terminal"
+													}
+												/>
+											</div>
+
+											<div className="grid gap-2 pt-4 border-t border-gray-800">
 												<Button
 													type="button"
 													variant="outline"
-													size="sm"
 													onClick={handlePrintSale}
 													className="w-full border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
 												>
@@ -204,7 +427,6 @@ export function SaleDetailSheet({
 												<Button
 													type="button"
 													variant="outline"
-													size="sm"
 													onClick={handleCancelSale}
 													disabled={!canCancelSale}
 													className="w-full border-rose-500/40 bg-transparent text-rose-200 hover:bg-rose-500/10 hover:text-rose-100 disabled:border-gray-800 disabled:text-gray-500"
@@ -214,219 +436,22 @@ export function SaleDetailSheet({
 														: "Anular Venta"}
 												</Button>
 											</div>
+
+											{sale.status === "cancelled" ? (
+												<p className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 leading-relaxed">
+													Venta anulada. Sus pagos se conservan solo para
+													trazabilidad y ya no impactan ventas, saldo ni cuadre
+													de caja.
+												</p>
+											) : null}
+											{cancelSaleMutation.error instanceof Error ? (
+												<p className="text-sm text-red-400">
+													{cancelSaleMutation.error.message}
+												</p>
+											) : null}
 										</div>
-
-										<div className="grid gap-0 divide-y divide-white/6 sm:grid-cols-2 sm:gap-3 sm:divide-y-0">
-											<InfoBlock
-												label="Cliente"
-												value={sale.customer?.name ?? "Cliente mostrador"}
-												description={formatCustomerMeta(sale)}
-											/>
-											<InfoBlock
-												label="Cajero"
-												value={sale.cashier?.name ?? "Sin registro"}
-												description={sale.shift?.terminalName ?? "Sin terminal"}
-											/>
-										</div>
-									</div>
-
-									{sale.status === "cancelled" ? (
-										<p className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
-											Venta anulada. Sus pagos se conservan solo para
-											trazabilidad y ya no impactan ventas, saldo ni cuadre de
-											caja.
-										</p>
-									) : null}
-									{cancelSaleMutation.error instanceof Error ? (
-										<p className="mt-3 text-sm text-red-400">
-											{cancelSaleMutation.error.message}
-										</p>
-									) : null}
-								</section>
-
-								<section className="rounded-[20px] border border-gray-800 bg-black/20 p-3.5 sm:rounded-2xl sm:p-4">
-									<div className="flex items-center justify-between">
-										<h3 className="font-medium text-white">Resumen</h3>
-										<p className="text-lg font-semibold text-white [font-variant-numeric:tabular-nums]">
-											{formatCurrency(sale.totalAmount)}
-										</p>
-									</div>
-
-									<div className="mt-4 space-y-2 text-sm">
-										<SummaryRow
-											label="Subtotal"
-											value={formatCurrency(sale.subtotal)}
-										/>
-										<SummaryRow
-											label="Impuestos"
-											value={formatCurrency(sale.taxAmount)}
-										/>
-										<SummaryRow
-											label="Descuentos"
-											value={formatCurrency(sale.discountAmount)}
-										/>
-										<SummaryRow
-											label="Pagado"
-											value={formatCurrency(sale.paidAmount)}
-										/>
-										<SummaryRow
-											label="Saldo pendiente"
-											value={formatCurrency(sale.balanceDue)}
-											emphasis={sale.balanceDue > 0}
-										/>
-									</div>
-								</section>
-
-								<section className="rounded-[20px] border border-gray-800 bg-black/20 p-3.5 sm:rounded-2xl sm:p-4">
-									<div className="flex items-center justify-between">
-										<h3 className="font-medium text-white">Pagos</h3>
-										<p className="text-sm text-gray-400">
-											{sale.payments.length} registro
-											{sale.payments.length === 1 ? "" : "s"}
-										</p>
-									</div>
-
-									{sale.payments.length > 0 ? (
-										<div className="mt-4 space-y-3">
-											{sale.payments.map((payment) => (
-												<div
-													key={payment.id}
-													className="rounded-xl bg-white/[0.03] px-3 py-3 ring-1 ring-white/6 sm:px-4"
-												>
-													<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-														<div className="min-w-0">
-															<div className="flex flex-wrap items-center gap-2">
-																<p className="break-words font-medium text-white">
-																	{formatPaymentMethodLabel(
-																		payment.method,
-																		paymentMethodLabels,
-																	)}
-																</p>
-																<Badge
-																	className={getPaymentKindBadgeClass(
-																		payment.kind,
-																	)}
-																>
-																	{formatPaymentKind(payment.kind)}
-																</Badge>
-															</div>
-															<p className="mt-1 break-words text-sm text-gray-400">
-																{payment.reference?.trim()
-																	? `Ref. ${payment.reference}`
-																	: "Sin referencia"}
-															</p>
-															{payment.notes ? (
-																<p className="mt-1 break-words text-xs text-gray-500">
-																	{payment.notes}
-																</p>
-															) : null}
-														</div>
-														<div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:flex-wrap sm:justify-end">
-															<p className="shrink-0 font-medium text-white [font-variant-numeric:tabular-nums]">
-																{formatCurrency(payment.amount)}
-															</p>
-															<Button
-																type="button"
-																variant="outline"
-																size="sm"
-																onClick={() => handlePrintPayment(payment)}
-																className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
-															>
-																Reimprimir
-															</Button>
-														</div>
-													</div>
-												</div>
-											))}
-										</div>
-									) : (
-										<EmptyBlock className="mt-4">
-											No hay pagos registrados para esta venta.
-										</EmptyBlock>
-									)}
-								</section>
-
-								{sale.balanceDue > 0 ? (
-									<CreditPaymentSection
-										key={sale.id}
-										sale={sale}
-										activeShiftId={activeShiftId}
-										creditAccount={creditAccount}
-										paymentMethodOptions={paymentMethodOptions}
-										paymentMethodLabels={paymentMethodLabels}
-									/>
-								) : null}
-
-								<section className="rounded-[20px] border border-gray-800 bg-black/20 p-3.5 sm:rounded-2xl sm:p-4">
-									<div className="flex items-center justify-between">
-										<h3 className="font-medium text-white">Items</h3>
-										<p className="text-sm text-gray-400">
-											{sale.items.length} linea
-											{sale.items.length === 1 ? "" : "s"}
-										</p>
-									</div>
-
-									<div className="mt-4 space-y-3">
-										{sale.items.map((item) => (
-											<div
-												key={item.id}
-												className="rounded-xl bg-white/[0.03] px-3 py-3 ring-1 ring-white/6 sm:px-4"
-											>
-												<div className="flex items-start justify-between gap-3">
-													<div className="min-w-0 flex-1">
-														<p className="break-words font-medium text-white">
-															{item.quantity} x {item.name}
-														</p>
-														<p className="mt-1 text-sm text-gray-400">
-															{formatCurrency(item.unitPrice)} c/u
-														</p>
-													</div>
-													<p className="shrink-0 font-medium text-white [font-variant-numeric:tabular-nums]">
-														{formatCurrency(item.totalAmount)}
-													</p>
-												</div>
-
-												<div className="mt-3 space-y-1 text-sm text-gray-400 [font-variant-numeric:tabular-nums]">
-													<p>Base: {formatCurrency(item.subtotal)}</p>
-													{item.taxAmount > 0 ? (
-														<p>
-															Impuesto ({item.taxRate}%):{" "}
-															{formatCurrency(item.taxAmount)}
-														</p>
-													) : null}
-													{item.discountAmount > 0 ? (
-														<p>
-															Descuento: {formatCurrency(item.discountAmount)}
-														</p>
-													) : null}
-												</div>
-
-												{item.modifiers.length > 0 ? (
-													<div className="mt-3 rounded-lg bg-black/20 p-3">
-														<p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-															Modificadores
-														</p>
-														<div className="mt-2 space-y-2">
-															{item.modifiers.map((modifier) => (
-																<div
-																	key={modifier.id}
-																	className="flex items-center justify-between gap-3 text-sm"
-																>
-																	<span className="min-w-0 break-words text-gray-300">
-																		{modifier.quantity} x {modifier.name}
-																	</span>
-																	<span className="shrink-0 text-gray-400 [font-variant-numeric:tabular-nums]">
-																		{formatCurrency(modifier.subtotal)}
-																	</span>
-																</div>
-															))}
-														</div>
-													</div>
-												) : null}
-											</div>
-										))}
-									</div>
-								</section>
+									</section>
+								</div>
 							</div>
 						) : (
 							<EmptyBlock>

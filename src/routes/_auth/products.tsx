@@ -15,7 +15,14 @@ import {
 	Search,
 	Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useId,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -324,7 +331,9 @@ function ProductsPage() {
 		search.stockStatus,
 	]);
 
-	const applyFilters = () => {
+	const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const applyFilters = useCallback(() => {
 		const priceRange = resolveNumericRangeFilters(
 			draftFilters.priceMin,
 			draftFilters.priceMax,
@@ -358,7 +367,22 @@ function ProductsPage() {
 			},
 			replace: true,
 		});
-	};
+	}, [activeTab, draftFilters, navigate]);
+
+	useEffect(() => {
+		if (debounceRef.current) {
+			clearTimeout(debounceRef.current);
+		}
+		debounceRef.current = setTimeout(() => {
+			applyFilters();
+		}, 300);
+
+		return () => {
+			if (debounceRef.current) {
+				clearTimeout(debounceRef.current);
+			}
+		};
+	}, [applyFilters]);
 
 	const clearFilters = () => {
 		setDraftFilters({
@@ -777,13 +801,7 @@ function ProductsPage() {
 
 				<TabsContent value="products" className="space-y-6 mt-0">
 					<div className="flex flex-col gap-4">
-						<form
-							onSubmit={(event) => {
-								event.preventDefault();
-								applyFilters();
-							}}
-							className="flex flex-col sm:flex-row items-center gap-3 w-full"
-						>
+						<div className="flex flex-col sm:flex-row items-center gap-3 w-full">
 							<div className="relative w-full sm:max-w-xs md:max-w-sm">
 								<Search
 									className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500"
@@ -1292,13 +1310,6 @@ function ProductsPage() {
 								</PopoverContent>
 							</Popover>
 
-							<Button
-								type="submit"
-								className="h-10 bg-white/10 text-white hover:bg-white/20 w-full sm:w-auto"
-							>
-								Buscar
-							</Button>
-
 							{activeFilterCount > 0 && (
 								<Button
 									type="button"
@@ -1309,7 +1320,7 @@ function ProductsPage() {
 									Limpiar
 								</Button>
 							)}
-						</form>
+						</div>
 					</div>
 
 					<ProductFormSheet

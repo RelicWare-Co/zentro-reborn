@@ -57,7 +57,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 	}
 
 	return (
-		<div className="app-safe-area flex min-h-[100dvh] bg-[var(--color-void)] text-[var(--color-photon)] overflow-hidden">
+		<div className="app-safe-area flex bg-[var(--color-void)] text-[var(--color-photon)] min-h-[100dvh]">
 			{/* Mobile Sidebar Overlay */}
 			{isSidebarOpen && (
 				<button
@@ -71,11 +71,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 			{/* Sidebar */}
 			<aside
 				className={`
-        fixed lg:static inset-y-0 left-0 z-50
+        fixed lg:sticky lg:top-0 left-0 z-50
         ${isCollapsed ? "lg:w-20 w-64" : "w-64"} bg-[var(--color-carbon)] border-r border-gray-800
         transition-all duration-300 ease-in-out
         ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-        flex flex-col pt-[var(--safe-area-top)] pb-[var(--safe-area-bottom)]
+        flex flex-col h-[100dvh] shrink-0
+        pt-[var(--safe-area-top)] pb-[var(--safe-area-bottom)]
       `}
 			>
 				{/* Sidebar Header */}
@@ -188,7 +189,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 			</aside>
 
 			{/* Main Content */}
-			<div className="flex-1 flex min-h-0 flex-col min-w-0 overflow-y-auto">
+			<div className="flex-1 flex flex-col min-w-0 min-h-[100dvh] overflow-y-auto">
 				{/* Mobile Header */}
 				<header className="lg:hidden h-16 flex items-center px-4 bg-[var(--color-carbon)] border-b border-gray-800">
 					<button

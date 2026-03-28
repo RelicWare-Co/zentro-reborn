@@ -350,8 +350,8 @@ export function ProductGrid({
 			</div>
 
 			<ScrollArea className="flex-1 min-h-0 bg-[#0a0a0a] p-4">
-				<div className="space-y-6 pb-24 md:pb-6">
-					<div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+				<div className="space-y-6 pb-24 md:pb-6 h-fit">
+					<div className="grid grid-cols-2 gap-3 [&>*]:h-fit md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
 						{regularProducts.map((product) => {
 							const qty = getProductQuantity(product.id);
 							const isOutOfStock = product.trackInventory && product.stock <= 0;

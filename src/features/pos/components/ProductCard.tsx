@@ -16,13 +16,34 @@ export function ProductCard({
 	isActiveShift,
 	onSelect,
 }: ProductCardProps) {
+	const outOfStockAlert = isOutOfStock && isActiveShift;
+	const noShiftAlert = !isActiveShift;
+
 	return (
 		<button
 			type="button"
 			onClick={onSelect}
-			className={`text-left bg-[#151515] rounded-xl p-3 border border-gray-800/80 flex flex-col justify-between transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-voltage)] group min-h-[100px] relative overflow-hidden hover:border-[var(--color-voltage)]/50 hover:bg-[#1a1a1a] cursor-pointer ${
-				!isActiveShift ? "ring-1 ring-amber-500/20" : ""
-			}`}
+			className={`
+				text-left
+				bg-[#151515]
+				rounded-xl
+				p-3
+				border
+				border-gray-800/80
+				block
+				w-full
+				relative
+				overflow-hidden
+				transition-all
+				hover:border-[var(--color-voltage)]/50
+				hover:bg-[#1a1a1a]
+				focus-visible:outline-none
+				focus-visible:ring-2
+				focus-visible:ring-[var(--color-voltage)]
+				cursor-pointer
+				group
+				${!isActiveShift ? "ring-1 ring-amber-500/20" : ""}
+			`}
 		>
 			{quantity > 0 && (
 				<div className="absolute top-0 right-0 bg-[var(--color-voltage)] text-black text-[10px] font-bold px-2 py-0.5 rounded-bl-lg rounded-tr-xl z-10">
@@ -55,12 +76,12 @@ export function ProductCard({
 				<p className="font-bold text-[15px] text-white tracking-tight tabular-nums">
 					{formatCurrency(product.price)}
 				</p>
-				{isOutOfStock && isActiveShift ? (
+				{outOfStockAlert && (
 					<p className="mt-1 text-[10px] font-medium text-amber-400">
 						La venta puede dejar stock negativo
 					</p>
-				) : null}
-				{!isActiveShift && (
+				)}
+				{noShiftAlert && (
 					<p className="mt-1 text-[10px] font-medium text-amber-400">
 						Abre el turno para vender
 					</p>

@@ -127,7 +127,7 @@ function DashboardPage() {
 				</div>
 			</div>
 
-			<section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+			<section className="grid gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 				<CompactStatCard
 					title="Ventas hoy"
 					value={formatCurrency(data.stats.todayRevenue)}
@@ -586,22 +586,22 @@ function CompactStatCard({
 	icon: typeof Receipt;
 }) {
 	return (
-		<div className="flex flex-col justify-between gap-3 rounded-xl border border-gray-800 bg-[var(--color-carbon)] p-4">
-			<div className="flex items-center gap-3">
-				<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]">
-					<Icon className="h-5 w-5" aria-hidden="true" />
+		<div className="flex flex-col justify-between gap-2 sm:gap-3 rounded-xl border border-gray-800 bg-[var(--color-carbon)] p-3 sm:p-4">
+			<div className="flex items-center gap-2 sm:gap-3">
+				<div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)]">
+					<Icon className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
 				</div>
 				<div className="min-w-0 flex-1">
-					<p className="truncate text-[11px] font-medium uppercase tracking-wider text-gray-500">
+					<p className="truncate text-[10px] sm:text-[11px] font-medium uppercase tracking-wider text-gray-500">
 						{title}
 					</p>
-					<p className="truncate text-lg font-semibold tabular-nums text-white mt-0.5">
+					<p className="truncate text-base sm:text-lg font-semibold tabular-nums text-white mt-0.5">
 						{value}
 					</p>
 				</div>
 			</div>
 			{(description || highlight) && (
-				<div className="text-[11px]">
+				<div className="hidden sm:block text-[11px]">
 					{description && (
 						<p className="text-gray-400 truncate">{description}</p>
 					)}

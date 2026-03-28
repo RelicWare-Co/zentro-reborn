@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
-	Building2,
 	Copy,
 	Link2,
 	Mail,
+	Settings,
 	ShieldCheck,
 	Users,
 	XCircle,
@@ -28,14 +28,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
 import {
 	useCreateOrganizationJoinLinkMutation,
 	useOrganizationManagement,
@@ -62,6 +54,8 @@ const dateTimeFormatter = new Intl.DateTimeFormat("es-CO", {
 	minute: "2-digit",
 });
 
+type Section = "access" | "members" | "settings";
+
 export const Route = createFileRoute("/_auth/organization")({
 	loader: () => getOrganizationManagementData(),
 	component: OrganizationPage,
@@ -78,6 +72,7 @@ function OrganizationPage() {
 	const [expiresInDays, setExpiresInDays] = useState("7");
 	const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 	const [latestJoinUrl, setLatestJoinUrl] = useState<string | null>(null);
+	const [activeSection, setActiveSection] = useState<Section>("access");
 
 	const createJoinUrl = (joinPath: string) =>
 		new URL(joinPath, window.location.origin).toString();
@@ -139,459 +134,606 @@ function OrganizationPage() {
 	};
 
 	return (
-		<main className="flex-1 space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12">
-			<section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-				<div className="space-y-3">
-					<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
-						Organización
-					</Badge>
-					<div className="space-y-2">
-						<h1 className="text-3xl font-bold tracking-tight text-balance">
-							Organización y Acceso
-						</h1>
-						<p className="max-w-3xl text-sm text-gray-400 md:text-base">
-							Controla quién entra, qué enlaces siguen activos y cómo se
-							incorpora cada cliente a la organización actual.
-						</p>
-					</div>
-				</div>
-				<div className="rounded-2xl border border-gray-800 bg-[var(--color-carbon)] px-4 py-3">
-					<p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-						Organización activa
-					</p>
-					<p className="mt-1 text-lg font-semibold text-white">
-						{data.organization.name}
-					</p>
-					<p className="text-sm text-gray-400">/{data.organization.slug}</p>
-				</div>
-			</section>
-
-			<div aria-live="polite" className="space-y-3">
-				{feedbackMessage ? (
-					<Alert className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-photon)]">
-						<AlertTitle>Estado</AlertTitle>
-						<AlertDescription>{feedbackMessage}</AlertDescription>
-					</Alert>
-				) : null}
-
-				{(createJoinLinkMutation.error instanceof Error ||
-					revokeJoinLinkMutation.error instanceof Error) &&
-				!feedbackMessage ? (
-					<Alert
-						variant="destructive"
-						className="border-red-500/20 bg-red-500/10 text-red-100"
-					>
-						<AlertTitle>No se pudo completar la acción</AlertTitle>
-						<AlertDescription>
-							{createJoinLinkMutation.error instanceof Error
-								? createJoinLinkMutation.error.message
-								: revokeJoinLinkMutation.error instanceof Error
-									? revokeJoinLinkMutation.error.message
-									: "Vuelve a intentarlo."}
-						</AlertDescription>
-					</Alert>
-				) : null}
-			</div>
-
-			<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-				<SummaryCard
-					title="Tu rol"
-					value={formatOrganizationRoleLabel(data.viewer.role)}
-					description="Permisos sobre esta organización"
-					icon={ShieldCheck}
-				/>
-				<SummaryCard
-					title="Miembros"
-					value={`${data.stats.membersCount}`}
-					description="Usuarios con acceso activo"
-					icon={Users}
-				/>
-				<SummaryCard
-					title="Invitaciones"
-					value={`${data.stats.pendingInvitationsCount}`}
-					description="Pendientes en Better Auth"
-					icon={Mail}
-				/>
-				<SummaryCard
-					title="Join Links"
-					value={`${data.stats.activeJoinLinksCount}`}
-					description="Links disponibles ahora"
-					icon={Link2}
-				/>
-			</section>
-
-			<section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-				<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-					<CardHeader>
-						<CardTitle className="flex items-center gap-2">
-							<Link2 className="h-4 w-4 text-[var(--color-voltage)]" />
-							Acceso por Link
-						</CardTitle>
-						<CardDescription className="text-gray-400">
-							Crea enlaces directos para que un cliente se registre o inicie
-							sesión y entre a esta organización sin flujo por correo.
-						</CardDescription>
-					</CardHeader>
-					<CardContent className="space-y-6">
-						{data.viewer.canManageAccess ? (
-							<form
-								onSubmit={handleCreateJoinLink}
-								className="grid gap-4 rounded-2xl border border-gray-800 bg-black/20 p-4 md:grid-cols-[1fr_180px_auto]"
-							>
-								<div className="space-y-2">
-									<Label htmlFor={labelId}>Referencia del cliente</Label>
-									<Input
-										id={labelId}
-										name="joinLinkLabel"
-										value={joinLinkLabel}
-										onChange={(event) => setJoinLinkLabel(event.target.value)}
-										placeholder="Ej. Cliente Centro…"
-										autoComplete="off"
-										className="border-gray-800 bg-black/30"
-										disabled={createJoinLinkMutation.isPending}
-									/>
-								</div>
-								<div className="space-y-2">
-									<Label htmlFor={expiryId}>Vigencia</Label>
-									<Select
-										value={expiresInDays}
-										onValueChange={setExpiresInDays}
-										disabled={createJoinLinkMutation.isPending}
-									>
-										<SelectTrigger
-											id={expiryId}
-											className="border-gray-800 bg-black/30"
-										>
-											<SelectValue placeholder="Selecciona" />
-										</SelectTrigger>
-										<SelectContent>
-											{JOIN_LINK_EXPIRY_OPTIONS.map((option) => (
-												<SelectItem
-													key={option.value}
-													value={String(option.value)}
-												>
-													{option.label}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-								<div className="flex items-end">
-									<Button
-										type="submit"
-										className="w-full bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
-										disabled={createJoinLinkMutation.isPending}
-									>
-										{createJoinLinkMutation.isPending
-											? "Creando…"
-											: "Crear Link"}
-									</Button>
-								</div>
-							</form>
-						) : (
-							<Alert className="border-amber-500/20 bg-amber-500/10 text-amber-100">
-								<AlertTitle>Acceso restringido</AlertTitle>
-								<AlertDescription>
-									Solo owners y admins pueden crear o revocar enlaces de acceso.
-								</AlertDescription>
-							</Alert>
-						)}
-
-						{latestJoinUrl ? (
-							<div className="space-y-2 rounded-2xl border border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 p-4">
-								<p className="text-sm font-medium text-white">
-									Último enlace generado
-								</p>
-								<div className="flex flex-col gap-3 md:flex-row">
-									<Input
-										readOnly
-										value={latestJoinUrl}
-										name="latestJoinLink"
-										aria-label="Último enlace generado"
-										className="border-[var(--color-voltage)]/20 bg-black/20"
-									/>
-									<Button
-										type="button"
-										variant="outline"
-										onClick={() =>
-											navigator.clipboard.writeText(latestJoinUrl).then(() => {
-												setFeedbackMessage("Enlace copiado nuevamente.");
-											})
-										}
-										className="border-[var(--color-voltage)]/20 bg-black/20 text-white hover:bg-black/30"
-									>
-										<Copy className="h-4 w-4" />
-										Copiar
-									</Button>
-								</div>
+		<div className="flex-1 bg-[var(--color-void)] min-h-screen">
+			<div className="mx-auto max-w-7xl min-h-screen flex flex-col">
+				{/* Header */}
+				<header className="border-b border-gray-800 px-6 py-6 md:px-8 lg:px-12 shrink-0">
+					<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+						<div className="space-y-1">
+							<h1 className="text-2xl font-bold tracking-tight text-white">
+								{data.organization.name}
+							</h1>
+							<div className="flex items-center gap-2 text-sm text-gray-400">
+								<span>/{data.organization.slug}</span>
+								<span className="text-gray-600">•</span>
+								<span className="inline-flex items-center gap-1">
+									<ShieldCheck className="h-3.5 w-3.5 text-[var(--color-voltage)]" />
+									{formatOrganizationRoleLabel(data.viewer.role)}
+								</span>
 							</div>
-						) : null}
+						</div>
+						<div className="flex gap-4">
+							<div className="text-right">
+								<p className="text-xs uppercase tracking-wider text-gray-500">
+									Miembros
+								</p>
+								<p className="text-lg font-semibold text-white">
+									{data.stats.membersCount}
+								</p>
+							</div>
+							<div className="w-px bg-gray-800" />
+							<div className="text-right">
+								<p className="text-xs uppercase tracking-wider text-gray-500">
+									Links
+								</p>
+								<p className="text-lg font-semibold text-white">
+									{data.stats.activeJoinLinksCount}
+								</p>
+							</div>
+						</div>
+					</div>
+				</header>
 
-						<div className="overflow-hidden rounded-2xl border border-gray-800">
-							<Table>
-								<TableHeader>
-									<TableRow className="border-gray-800 hover:bg-transparent">
-										<TableHead>Referencia</TableHead>
-										<TableHead>Estado</TableHead>
-										<TableHead>Expira</TableHead>
-										<TableHead>Uso</TableHead>
-										<TableHead className="text-right">Acciones</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{data.joinLinks.length > 0 ? (
-										data.joinLinks.map((joinLink) => (
-											<TableRow
-												key={joinLink.id}
-												className="border-gray-800 hover:bg-white/[0.03]"
-											>
-												<TableCell className="min-w-0">
-													<div className="min-w-0">
-														<p className="truncate font-medium text-white">
-															{joinLink.label || "Sin referencia"}
-														</p>
-														<p className="truncate text-xs text-gray-500">
-															{joinLink.lastUsedAt
-																? `Último uso ${dateTimeFormatter.format(joinLink.lastUsedAt)}`
-																: "Sin uso todavía"}
-														</p>
-													</div>
-												</TableCell>
-												<TableCell>
-													<JoinLinkStatusBadge status={joinLink.status} />
-												</TableCell>
-												<TableCell className="text-sm text-gray-300">
-													{joinLink.expiresAt
-														? dateTimeFormatter.format(joinLink.expiresAt)
-														: "Sin límite"}
-												</TableCell>
-												<TableCell className="text-sm text-gray-300">
-													{joinLink.useCount}/{joinLink.maxUses}
-												</TableCell>
-												<TableCell>
-													<div className="flex justify-end gap-2">
+				{/* Layout con Sidebar */}
+				<div className="flex flex-1 flex-col lg:flex-row">
+					{/* Sidebar Navigation */}
+					<aside className="border-b border-gray-800 lg:w-64 lg:border-b-0 lg:border-r lg:flex-shrink-0">
+						<nav className="flex lg:flex-col">
+							<NavItem
+								icon={Link2}
+								label="Acceso y Links"
+								isActive={activeSection === "access"}
+								onClick={() => setActiveSection("access")}
+							/>
+							<NavItem
+								icon={Users}
+								label="Miembros"
+								isActive={activeSection === "members"}
+								onClick={() => setActiveSection("members")}
+								badge={
+									data.pendingInvitations.length > 0
+										? data.pendingInvitations.length
+										: undefined
+								}
+							/>
+							<NavItem
+								icon={Settings}
+								label="Configuración"
+								isActive={activeSection === "settings"}
+								onClick={() => setActiveSection("settings")}
+							/>
+						</nav>
+					</aside>
+
+					{/* Main Content */}
+					<main className="flex-1 p-6 md:p-8 lg:p-12 text-[var(--color-photon)]">
+						<div className="space-y-6 max-w-4xl">
+							{/* Feedback Messages */}
+							<div aria-live="polite" className="space-y-2">
+								{feedbackMessage ? (
+									<Alert className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-photon)]">
+										<AlertTitle>Estado</AlertTitle>
+										<AlertDescription>{feedbackMessage}</AlertDescription>
+									</Alert>
+								) : null}
+
+								{(createJoinLinkMutation.error instanceof Error ||
+									revokeJoinLinkMutation.error instanceof Error) &&
+								!feedbackMessage ? (
+									<Alert
+										variant="destructive"
+										className="border-red-500/20 bg-red-500/10 text-red-100"
+									>
+										<AlertTitle>No se pudo completar la acción</AlertTitle>
+										<AlertDescription>
+											{createJoinLinkMutation.error instanceof Error
+												? createJoinLinkMutation.error.message
+												: revokeJoinLinkMutation.error instanceof Error
+													? revokeJoinLinkMutation.error.message
+													: "Vuelve a intentarlo."}
+										</AlertDescription>
+									</Alert>
+								) : null}
+							</div>
+
+							{/* Section: Access */}
+							{activeSection === "access" && (
+								<div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+									<div className="grid gap-6 lg:grid-cols-3">
+										{/* Create Link Form */}
+										<Card className="col-span-2 border-gray-800 bg-[var(--color-carbon)] shadow-none">
+											<CardHeader className="pb-4">
+												<CardTitle className="text-lg">
+													Crear Nuevo Link de Acceso
+												</CardTitle>
+												<CardDescription className="text-gray-400">
+													Genera enlaces directos para nuevos miembros
+												</CardDescription>
+											</CardHeader>
+											<CardContent className="space-y-4">
+												{data.viewer.canManageAccess ? (
+													<form
+														onSubmit={handleCreateJoinLink}
+														className="space-y-4"
+													>
+														<div className="grid gap-4 sm:grid-cols-2">
+															<div className="space-y-2">
+																<Label htmlFor={labelId}>Referencia</Label>
+																<Input
+																	id={labelId}
+																	name="joinLinkLabel"
+																	value={joinLinkLabel}
+																	onChange={(event) =>
+																		setJoinLinkLabel(event.target.value)
+																	}
+																	placeholder="Ej. Cliente Centro..."
+																	autoComplete="off"
+																	className="border-gray-800 bg-black/30"
+																	disabled={createJoinLinkMutation.isPending}
+																/>
+															</div>
+															<div className="space-y-2">
+																<Label htmlFor={expiryId}>Vigencia</Label>
+																<Select
+																	value={expiresInDays}
+																	onValueChange={setExpiresInDays}
+																	disabled={createJoinLinkMutation.isPending}
+																>
+																	<SelectTrigger
+																		id={expiryId}
+																		className="border-gray-800 bg-black/30"
+																	>
+																		<SelectValue placeholder="Selecciona" />
+																	</SelectTrigger>
+																	<SelectContent>
+																		{JOIN_LINK_EXPIRY_OPTIONS.map((option) => (
+																			<SelectItem
+																				key={option.value}
+																				value={String(option.value)}
+																			>
+																				{option.label}
+																			</SelectItem>
+																		))}
+																	</SelectContent>
+																</Select>
+															</div>
+														</div>
 														<Button
-															type="button"
-															variant="outline"
-															onClick={() =>
-																handleCopyJoinUrl(joinLink.joinPath)
-															}
-															disabled={!isJoinLinkActive(joinLink.status)}
-															className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
+															type="submit"
+															className="w-full bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c] sm:w-auto"
+															disabled={createJoinLinkMutation.isPending}
 														>
-															<Copy className="h-4 w-4" />
-															Copiar
+															{createJoinLinkMutation.isPending
+																? "Creando..."
+																: "Crear Link de Acceso"}
 														</Button>
-														{data.viewer.canManageAccess ? (
+													</form>
+												) : (
+													<Alert className="border-amber-500/20 bg-amber-500/10 text-amber-100">
+														<AlertTitle>Acceso restringido</AlertTitle>
+														<AlertDescription>
+															Solo owners y admins pueden crear o revocar
+															enlaces de acceso.
+														</AlertDescription>
+													</Alert>
+												)}
+
+												{latestJoinUrl ? (
+													<div className="space-y-2 rounded-xl border border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 p-4">
+														<p className="text-sm font-medium text-white">
+															Último enlace generado
+														</p>
+														<div className="flex gap-2">
+															<Input
+																readOnly
+																value={latestJoinUrl}
+																className="flex-1 border-[var(--color-voltage)]/20 bg-black/20 text-sm"
+															/>
 															<Button
 																type="button"
 																variant="outline"
 																onClick={() =>
-																	handleRevokeJoinLink(joinLink.id)
+																	navigator.clipboard
+																		.writeText(latestJoinUrl)
+																		.then(() => {
+																			setFeedbackMessage(
+																				"Enlace copiado nuevamente.",
+																			);
+																		})
 																}
-																disabled={
-																	joinLink.status === "revoked" ||
-																	revokeJoinLinkMutation.isPending
-																}
-																className="border-red-500/30 bg-transparent text-red-200 hover:bg-red-500/10 hover:text-red-100"
+																className="border-[var(--color-voltage)]/20 bg-black/20 text-white"
 															>
-																<XCircle className="h-4 w-4" />
-																Revocar
+																<Copy className="h-4 w-4" />
 															</Button>
-														) : null}
+														</div>
 													</div>
-												</TableCell>
-											</TableRow>
-										))
-									) : (
-										<TableRow className="border-gray-800 hover:bg-transparent">
-											<TableCell
-												colSpan={5}
-												className="py-10 text-center text-sm text-gray-400"
-											>
-												Aún no has creado enlaces de acceso para esta
-												organización.
-											</TableCell>
-										</TableRow>
-									)}
-								</TableBody>
-							</Table>
-						</div>
-					</CardContent>
-				</Card>
+												) : null}
+											</CardContent>
+										</Card>
 
-				<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-					<CardHeader>
-						<CardTitle className="flex items-center gap-2">
-							<Building2 className="h-4 w-4 text-[var(--color-voltage)]" />
-							Modo de Alta
-						</CardTitle>
-						<CardDescription className="text-gray-400">
-							Define cómo entra gente nueva y qué hacer cuando no hay
-							invitaciones disponibles.
-						</CardDescription>
-					</CardHeader>
-					<CardContent className="space-y-4">
-						<div className="rounded-2xl border border-gray-800 bg-black/20 p-4">
-							<p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-								Creación libre
-							</p>
-							<p className="mt-2 text-lg font-semibold text-white">
-								{data.policy.allowOrganizationCreation
-									? "Habilitada"
-									: "Deshabilitada"}
-							</p>
-							<p className="mt-2 text-sm text-gray-400">
-								{data.policy.contactMessage}
-							</p>
-						</div>
-
-						<div className="rounded-2xl border border-gray-800 bg-black/20 p-4">
-							<p className="text-xs uppercase tracking-[0.18em] text-gray-500">
-								Canal recomendado
-							</p>
-							<p className="mt-2 text-sm text-gray-300">
-								Si el cliente no tiene invitaciones ni link activo, debe pedir
-								acceso a un administrador.
-							</p>
-							{data.policy.contactHref ? (
-								<Button
-									asChild
-									variant="outline"
-									className="mt-4 border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white"
-								>
-									<a
-										href={data.policy.contactHref}
-										target="_blank"
-										rel="noreferrer"
-									>
-										{data.policy.contactLabel}
-									</a>
-								</Button>
-							) : (
-								<p className="mt-4 text-sm font-medium text-white">
-									{data.policy.contactLabel}
-								</p>
-							)}
-						</div>
-					</CardContent>
-				</Card>
-			</section>
-
-			<section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-				<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-					<CardHeader>
-						<CardTitle>Miembros Activos</CardTitle>
-						<CardDescription className="text-gray-400">
-							Visibilidad rápida del equipo que hoy tiene acceso al espacio.
-						</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<div className="overflow-hidden rounded-2xl border border-gray-800">
-							<Table>
-								<TableHeader>
-									<TableRow className="border-gray-800 hover:bg-transparent">
-										<TableHead>Usuario</TableHead>
-										<TableHead>Rol</TableHead>
-										<TableHead>Ingreso</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{data.members.map((memberRow) => (
-										<TableRow
-											key={memberRow.memberId}
-											className="border-gray-800 hover:bg-white/[0.03]"
-										>
-											<TableCell className="min-w-0">
-												<div className="min-w-0">
-													<p className="truncate font-medium text-white">
-														{memberRow.name}
+										{/* Quick Stats */}
+										<Card className="border-gray-800 bg-[var(--color-carbon)] shadow-none">
+											<CardHeader className="pb-4">
+												<CardTitle className="text-lg">Modo de Alta</CardTitle>
+												<CardDescription className="text-gray-400">
+													Configuración de invitaciones
+												</CardDescription>
+											</CardHeader>
+											<CardContent className="space-y-4">
+												<div className="space-y-2">
+													<p className="text-xs uppercase tracking-wider text-gray-500">
+														Creación Libre
 													</p>
-													<p className="truncate text-sm text-gray-400">
-														{memberRow.email}
+													<Badge
+														variant="outline"
+														className={
+															data.policy.allowOrganizationCreation
+																? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+																: "border-gray-700 bg-gray-800 text-gray-400"
+														}
+													>
+														{data.policy.allowOrganizationCreation
+															? "Habilitada"
+															: "Deshabilitada"}
+													</Badge>
+												</div>
+												<p className="text-sm text-gray-400">
+													{data.policy.contactMessage}
+												</p>
+												{data.policy.contactHref ? (
+													<Button
+														asChild
+														variant="outline"
+														className="w-full border-gray-700 bg-transparent text-gray-200 hover:bg-white/5"
+													>
+														<a
+															href={data.policy.contactHref}
+															target="_blank"
+															rel="noreferrer"
+														>
+															{data.policy.contactLabel}
+														</a>
+													</Button>
+												) : null}
+											</CardContent>
+										</Card>
+									</div>
+
+									{/* Links List */}
+									<Card className="border-gray-800 bg-[var(--color-carbon)] shadow-none">
+										<CardHeader className="pb-4">
+											<div className="flex items-center justify-between">
+												<CardTitle className="text-lg">
+													Links de Acceso Activos
+												</CardTitle>
+												<Badge variant="outline" className="text-gray-400">
+													{data.joinLinks.length} total
+												</Badge>
+											</div>
+										</CardHeader>
+										<CardContent>
+											{data.joinLinks.length > 0 ? (
+												<div className="space-y-3">
+													{data.joinLinks.map((joinLink) => (
+														<div
+															key={joinLink.id}
+															className="flex flex-col gap-3 rounded-xl border border-gray-800 bg-black/20 p-4 sm:flex-row sm:items-center sm:justify-between"
+														>
+															<div className="flex-1 min-w-0 space-y-1">
+																<div className="flex items-center gap-2">
+																	<p className="font-medium text-white truncate">
+																		{joinLink.label || "Sin referencia"}
+																	</p>
+																	<JoinLinkStatusBadge
+																		status={joinLink.status}
+																	/>
+																</div>
+																<p className="text-xs text-gray-500">
+																	{joinLink.lastUsedAt
+																		? `Último uso ${dateTimeFormatter.format(
+																				joinLink.lastUsedAt,
+																			)}`
+																		: "Sin uso todavía"}
+																	<span className="mx-2 text-gray-700">•</span>
+																	Expira:{" "}
+																	{joinLink.expiresAt
+																		? dateTimeFormatter.format(
+																				joinLink.expiresAt,
+																			)
+																		: "Sin límite"}
+																	<span className="mx-2 text-gray-700">•</span>
+																	Uso: {joinLink.useCount}/{joinLink.maxUses}
+																</p>
+															</div>
+															<div className="flex gap-2">
+																<Button
+																	type="button"
+																	variant="outline"
+																	size="sm"
+																	onClick={() =>
+																		handleCopyJoinUrl(joinLink.joinPath)
+																	}
+																	disabled={!isJoinLinkActive(joinLink.status)}
+																	className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5"
+																>
+																	<Copy className="mr-1.5 h-3.5 w-3.5" />
+																	Copiar
+																</Button>
+																{data.viewer.canManageAccess ? (
+																	<Button
+																		type="button"
+																		variant="outline"
+																		size="sm"
+																		onClick={() =>
+																			handleRevokeJoinLink(joinLink.id)
+																		}
+																		disabled={
+																			joinLink.status === "revoked" ||
+																			revokeJoinLinkMutation.isPending
+																		}
+																		className="border-red-500/30 bg-transparent text-red-200 hover:bg-red-500/10"
+																	>
+																		<XCircle className="mr-1.5 h-3.5 w-3.5" />
+																		Revocar
+																	</Button>
+																) : null}
+															</div>
+														</div>
+													))}
+												</div>
+											) : (
+												<div className="rounded-xl border border-dashed border-gray-800 bg-black/10 p-8 text-center">
+													<p className="text-sm text-gray-500">
+														No hay links de acceso creados todavía
+													</p>
+													<p className="text-xs text-gray-600 mt-1">
+														Usa el formulario de arriba para crear uno nuevo
 													</p>
 												</div>
-											</TableCell>
-											<TableCell className="text-sm text-gray-300">
-												{formatOrganizationRoleLabel(memberRow.role)}
-											</TableCell>
-											<TableCell className="text-sm text-gray-300">
-												{memberRow.joinedAt
-													? dateFormatter.format(memberRow.joinedAt)
-													: "Sin fecha"}
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-					<CardHeader>
-						<CardTitle>Invitaciones Pendientes</CardTitle>
-						<CardDescription className="text-gray-400">
-							Compatibilidad con invitaciones existentes de Better Auth.
-						</CardDescription>
-					</CardHeader>
-					<CardContent className="space-y-3">
-						{data.pendingInvitations.length > 0 ? (
-							data.pendingInvitations.map((invitation) => (
-								<div
-									key={invitation.id}
-									className="rounded-2xl border border-gray-800 bg-black/20 p-4"
-								>
-									<p className="font-medium text-white">{invitation.email}</p>
-									<p className="mt-1 text-sm text-gray-400">
-										Rol: {formatOrganizationRoleLabel(invitation.role)}
-									</p>
-									<p className="mt-2 text-xs text-gray-500">
-										Expira{" "}
-										{invitation.expiresAt
-											? dateTimeFormatter.format(invitation.expiresAt)
-											: "sin fecha"}
-									</p>
+											)}
+										</CardContent>
+									</Card>
 								</div>
-							))
-						) : (
-							<div className="rounded-2xl border border-dashed border-gray-800 bg-black/10 p-6 text-sm text-gray-400">
-								No hay invitaciones pendientes. Para nuevos accesos usa join
-								links desde esta misma página.
-							</div>
-						)}
-					</CardContent>
-				</Card>
-			</section>
-		</main>
+							)}
+
+							{/* Section: Members */}
+							{activeSection === "members" && (
+								<div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+									<div className="grid gap-6 lg:grid-cols-3">
+										{/* Members List */}
+										<Card className="col-span-2 border-gray-800 bg-[var(--color-carbon)] shadow-none">
+											<CardHeader className="pb-4">
+												<div className="flex items-center justify-between">
+													<CardTitle className="text-lg">
+														Miembros Activos
+													</CardTitle>
+													<Badge variant="outline" className="text-gray-400">
+														{data.members.length} total
+													</Badge>
+												</div>
+											</CardHeader>
+											<CardContent>
+												{data.members.length > 0 ? (
+													<div className="space-y-2">
+														{data.members.map((memberRow) => (
+															<div
+																key={memberRow.memberId}
+																className="flex items-center justify-between rounded-xl border border-gray-800 bg-black/20 p-4"
+															>
+																<div className="flex items-center gap-3 min-w-0">
+																	<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-800">
+																		<span className="text-sm font-medium text-gray-400">
+																			{memberRow.name.charAt(0).toUpperCase()}
+																		</span>
+																	</div>
+																	<div className="min-w-0">
+																		<p className="font-medium text-white truncate">
+																			{memberRow.name}
+																		</p>
+																		<p className="text-sm text-gray-500 truncate">
+																			{memberRow.email}
+																		</p>
+																	</div>
+																</div>
+																<div className="text-right">
+																	<Badge
+																		variant="outline"
+																		className="text-gray-300"
+																	>
+																		{formatOrganizationRoleLabel(
+																			memberRow.role,
+																		)}
+																	</Badge>
+																	<p className="mt-1 text-xs text-gray-500">
+																		{memberRow.joinedAt
+																			? `Ingresó ${dateFormatter.format(
+																					memberRow.joinedAt,
+																				)}`
+																			: "Sin fecha"}
+																	</p>
+																</div>
+															</div>
+														))}
+													</div>
+												) : (
+													<div className="rounded-xl border border-dashed border-gray-800 bg-black/10 p-8 text-center">
+														<p className="text-sm text-gray-500">
+															No hay miembros en la organización
+														</p>
+													</div>
+												)}
+											</CardContent>
+										</Card>
+
+										{/* Pending Invitations */}
+										<Card className="border-gray-800 bg-[var(--color-carbon)] shadow-none">
+											<CardHeader className="pb-4">
+												<div className="flex items-center justify-between">
+													<CardTitle className="text-lg">
+														<Mail className="inline-block mr-2 h-4 w-4" />
+														Invitaciones
+													</CardTitle>
+													{data.pendingInvitations.length > 0 ? (
+														<Badge className="bg-amber-500/20 text-amber-200 border-amber-500/30">
+															{data.pendingInvitations.length} pendientes
+														</Badge>
+													) : (
+														<Badge variant="outline" className="text-gray-500">
+															0 pendientes
+														</Badge>
+													)}
+												</div>
+												<CardDescription className="text-gray-400">
+													Invitaciones pendientes de Better Auth
+												</CardDescription>
+											</CardHeader>
+											<CardContent>
+												{data.pendingInvitations.length > 0 ? (
+													<div className="space-y-3">
+														{data.pendingInvitations.map((invitation) => (
+															<div
+																key={invitation.id}
+																className="rounded-xl border border-gray-800 bg-black/20 p-3"
+															>
+																<p className="font-medium text-white text-sm truncate">
+																	{invitation.email}
+																</p>
+																<p className="text-xs text-gray-500">
+																	{formatOrganizationRoleLabel(invitation.role)}
+																</p>
+																<p className="mt-1 text-xs text-gray-600">
+																	Expira:{" "}
+																	{invitation.expiresAt
+																		? dateTimeFormatter.format(
+																				invitation.expiresAt,
+																			)
+																		: "sin fecha"}
+																</p>
+															</div>
+														))}
+													</div>
+												) : (
+													<div className="rounded-xl border border-dashed border-gray-800 bg-black/10 p-6 text-center">
+														<p className="text-sm text-gray-500">
+															No hay invitaciones pendientes
+														</p>
+														<p className="text-xs text-gray-600 mt-1">
+															Usa links de acceso para nuevos miembros
+														</p>
+													</div>
+												)}
+											</CardContent>
+										</Card>
+									</div>
+								</div>
+							)}
+
+							{/* Section: Settings */}
+							{activeSection === "settings" && (
+								<div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+									<Card className="border-gray-800 bg-[var(--color-carbon)] shadow-none max-w-2xl">
+										<CardHeader>
+											<CardTitle>Configuración de la Organización</CardTitle>
+											<CardDescription className="text-gray-400">
+												Ajustes generales y políticas de acceso
+											</CardDescription>
+										</CardHeader>
+										<CardContent className="space-y-6">
+											<div className="grid gap-6 sm:grid-cols-2">
+												<div className="space-y-3">
+													<p className="text-xs uppercase tracking-wider text-gray-500">
+														Creación de Organizaciones
+													</p>
+													<div className="flex items-center gap-3">
+														<Badge
+															variant="outline"
+															className={
+																data.policy.allowOrganizationCreation
+																	? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+																	: "border-gray-700 bg-gray-800 text-gray-400"
+															}
+														>
+															{data.policy.allowOrganizationCreation
+																? "Habilitada"
+																: "Deshabilitada"}
+														</Badge>
+													</div>
+													<p className="text-sm text-gray-400">
+														{data.policy.contactMessage}
+													</p>
+												</div>
+
+												<div className="space-y-3">
+													<p className="text-xs uppercase tracking-wider text-gray-500">
+														Contacto para Acceso
+													</p>
+													{data.policy.contactHref ? (
+														<Button
+															asChild
+															variant="outline"
+															className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5"
+														>
+															<a
+																href={data.policy.contactHref}
+																target="_blank"
+																rel="noreferrer"
+															>
+																{data.policy.contactLabel}
+															</a>
+														</Button>
+													) : (
+														<p className="text-sm font-medium text-white">
+															{data.policy.contactLabel}
+														</p>
+													)}
+												</div>
+											</div>
+										</CardContent>
+									</Card>
+								</div>
+							)}
+						</div>
+					</main>
+				</div>
+			</div>
+		</div>
 	);
 }
 
-function SummaryCard(props: {
-	title: string;
-	value: string;
-	description: string;
+function NavItem({
+	icon: Icon,
+	label,
+	isActive,
+	onClick,
+	badge,
+}: {
 	icon: React.ComponentType<{ className?: string }>;
+	label: string;
+	isActive: boolean;
+	onClick: () => void;
+	badge?: number;
 }) {
-	const Icon = props.icon;
-
 	return (
-		<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-			<CardHeader className="space-y-3">
-				<div className="flex items-center justify-between gap-3">
-					<CardDescription className="text-gray-400">
-						{props.title}
-					</CardDescription>
-					<div className="rounded-lg bg-[var(--color-voltage)]/10 p-2 text-[var(--color-voltage)]">
-						<Icon className="h-4 w-4" />
-					</div>
-				</div>
-				<CardTitle className="text-3xl">{props.value}</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<p className="text-sm text-gray-400">{props.description}</p>
-			</CardContent>
-		</Card>
+		<button
+			type="button"
+			onClick={onClick}
+			className={`flex items-center justify-between w-full px-4 py-3 text-left transition-colors lg:w-full
+				${
+					isActive
+						? "bg-[var(--color-voltage)]/10 border-l-2 lg:border-l-2 border-[var(--color-voltage)] text-white"
+						: "text-gray-400 hover:text-white hover:bg-white/5"
+				}`}
+		>
+			<div className="flex items-center gap-3">
+				<Icon className="h-4 w-4" />
+				<span className="text-sm font-medium">{label}</span>
+			</div>
+			{badge !== undefined && badge > 0 && (
+				<span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-voltage)] text-xs font-medium text-black">
+					{badge}
+				</span>
+			)}
+		</button>
 	);
 }
 

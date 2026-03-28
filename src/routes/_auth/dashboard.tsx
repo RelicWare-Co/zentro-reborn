@@ -36,8 +36,9 @@ const dayFormatter = new Intl.DateTimeFormat("es-CO", {
 const dateTimeFormatter = new Intl.DateTimeFormat("es-CO", {
 	day: "numeric",
 	month: "short",
-	hour: "numeric",
+	hour: "2-digit",
 	minute: "2-digit",
+	hour12: false,
 });
 
 export const Route = createFileRoute("/_auth/dashboard")({
@@ -272,56 +273,56 @@ function DashboardPage() {
 						</p>
 					</div>
 
-					<div className="rounded-xl border border-gray-800 bg-black/20 p-4">
-						<div className="flex items-start justify-between gap-3">
-							<div>
-								<p className="text-sm font-medium text-white">Turno</p>
-								<p className="mt-1 text-sm text-gray-400">
-									{data.activeShift
-										? `Abierto en ${data.activeShift.terminalName ?? "caja principal"}`
-										: "No hay un turno abierto para este usuario"}
-								</p>
-							</div>
-							<Badge
-								className={
-									data.activeShift
-										? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 border-0"
-										: "border-gray-700 bg-gray-800/80 text-gray-300 border-0"
-								}
-							>
-								{data.activeShift ? "Activo" : "Pendiente"}
-							</Badge>
+					<div className="flex items-start justify-between gap-3">
+						<div>
+							<p className="text-sm font-medium text-white">Turno</p>
+							<p className="mt-1 text-sm text-gray-400">
+								{data.activeShift
+									? `Abierto en ${data.activeShift.terminalName ?? "caja principal"}`
+									: "No hay un turno abierto para este usuario"}
+							</p>
 						</div>
+						<Badge
+							className={
+								data.activeShift
+									? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 border-0"
+									: "border-gray-700 bg-gray-800/80 text-gray-300 border-0"
+							}
+						>
+							{data.activeShift ? "Activo" : "Pendiente"}
+						</Badge>
+					</div>
 
-						{data.activeShift ? (
-							<div className="mt-4 grid gap-3 sm:grid-cols-2">
-								<MiniMetric
+					{data.activeShift ? (
+						<div className="rounded-xl border border-gray-800/60 bg-black/20 p-2">
+							<div className="grid gap-2 sm:grid-cols-2">
+								<MetricItem
 									label="Abierto desde"
 									value={dateTimeFormatter.format(data.activeShift.openedAt)}
 									description="Hora local"
 								/>
-								<MiniMetric
+								<MetricItem
 									label="Base inicial"
 									value={formatCurrency(data.activeShift.startingCash)}
 									description="Efectivo de apertura"
 								/>
 							</div>
-						) : (
-							<Button
-								asChild
-								variant="outline"
-								className="mt-4 w-full rounded-lg border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white h-9"
-							>
-								<Link to="/pos">
-									Abrir caja en POS
-									<ArrowRight className="ml-2 h-4 w-4" />
-								</Link>
-							</Button>
-						)}
-					</div>
+						</div>
+					) : (
+						<Button
+							asChild
+							variant="outline"
+							className="w-full rounded-lg border-gray-700 bg-transparent text-gray-200 hover:bg-white/5 hover:text-white h-9"
+						>
+							<Link to="/pos">
+								Abrir caja en POS
+								<ArrowRight className="ml-2 h-4 w-4" />
+							</Link>
+						</Button>
+					)}
 
-					<div className="space-y-3">
-						<div className="flex items-center justify-between">
+					<div className="border-t border-gray-800 pt-4">
+						<div className="flex items-center justify-between mb-3">
 							<p className="text-sm font-medium text-white">Cobros hoy</p>
 							<p className="text-sm text-gray-400">
 								{formatCurrency(paymentTotal)}
@@ -375,17 +376,19 @@ function DashboardPage() {
 						)}
 					</div>
 
-					<div className="grid gap-3 sm:grid-cols-2">
-						<MiniMetric
-							label="Clientes activos"
-							value={formatCount(data.stats.activeCustomersCount)}
-							description="Base disponible"
-						/>
-						<MiniMetric
-							label="Productos activos"
-							value={formatCount(data.stats.activeProductsCount)}
-							description="Catalogo habilitado"
-						/>
+					<div className="rounded-xl border border-gray-800/60 bg-black/20 p-2">
+						<div className="grid gap-2 sm:grid-cols-2">
+							<MetricItem
+								label="Clientes activos"
+								value={formatCount(data.stats.activeCustomersCount)}
+								description="Base disponible"
+							/>
+							<MetricItem
+								label="Productos activos"
+								value={formatCount(data.stats.activeProductsCount)}
+								description="Catalogo habilitado"
+							/>
+						</div>
 					</div>
 
 					<Button
@@ -625,6 +628,24 @@ function MiniMetric({
 			<p className="text-sm text-gray-400">{label}</p>
 			<p className="mt-2 text-lg font-semibold text-white">{value}</p>
 			<p className="mt-1 text-xs text-gray-500">{description}</p>
+		</div>
+	);
+}
+
+function MetricItem({
+	label,
+	value,
+	description,
+}: {
+	label: string;
+	value: string;
+	description: string;
+}) {
+	return (
+		<div className="p-3">
+			<p className="text-sm text-gray-400">{label}</p>
+			<p className="mt-1 text-base font-semibold text-white">{value}</p>
+			<p className="text-xs text-gray-500">{description}</p>
 		</div>
 	);
 }

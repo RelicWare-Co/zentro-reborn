@@ -22,6 +22,13 @@
       "when": 1774564337802,
       "tag": "0002_windy_overlord",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1774723995168,
+      "tag": "0003_stale_omega_flight",
+      "breakpoints": true
     }
   ]
 }

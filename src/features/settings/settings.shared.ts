@@ -41,6 +41,18 @@ export type OrganizationPaymentMethodSettings = {
 };
 
 export type OrganizationSettings = {
+	modules: {
+		restaurants: {
+			enabled: boolean;
+		};
+	};
+	restaurants: {
+		kitchen: {
+			displayEnabled: boolean;
+			printTicketsEnabled: boolean;
+			autoPrintOnSend: boolean;
+		};
+	};
 	pos: {
 		defaultTerminalName: string;
 		defaultStartingCash: number;
@@ -59,6 +71,18 @@ export type OrganizationSettings = {
 };
 
 export const DEFAULT_ORGANIZATION_SETTINGS: OrganizationSettings = {
+	modules: {
+		restaurants: {
+			enabled: false,
+		},
+	},
+	restaurants: {
+		kitchen: {
+			displayEnabled: false,
+			printTicketsEnabled: true,
+			autoPrintOnSend: true,
+		},
+	},
 	pos: {
 		defaultTerminalName: "Caja Principal",
 		defaultStartingCash: 0,
@@ -306,6 +330,18 @@ export function normalizeOrganizationSettings(
 		source.pos && typeof source.pos === "object"
 			? (source.pos as Record<string, unknown>)
 			: {};
+	const modulesSource =
+		source.modules && typeof source.modules === "object"
+			? (source.modules as Record<string, unknown>)
+			: {};
+	const restaurantsSource =
+		source.restaurants && typeof source.restaurants === "object"
+			? (source.restaurants as Record<string, unknown>)
+			: {};
+	const restaurantKitchenSource =
+		restaurantsSource.kitchen && typeof restaurantsSource.kitchen === "object"
+			? (restaurantsSource.kitchen as Record<string, unknown>)
+			: {};
 	const creditSource =
 		source.credit && typeof source.credit === "object"
 			? (source.credit as Record<string, unknown>)
@@ -316,6 +352,32 @@ export function normalizeOrganizationSettings(
 			: {};
 
 	return {
+		modules: {
+			restaurants: {
+				enabled: toBoolean(
+					(modulesSource.restaurants as Record<string, unknown> | undefined)
+						?.enabled,
+					DEFAULT_ORGANIZATION_SETTINGS.modules.restaurants.enabled,
+				),
+			},
+		},
+		restaurants: {
+			kitchen: {
+				displayEnabled: toBoolean(
+					restaurantKitchenSource.displayEnabled,
+					DEFAULT_ORGANIZATION_SETTINGS.restaurants.kitchen.displayEnabled,
+				),
+				printTicketsEnabled: toBoolean(
+					restaurantKitchenSource.printTicketsEnabled,
+					DEFAULT_ORGANIZATION_SETTINGS.restaurants.kitchen
+						.printTicketsEnabled,
+				),
+				autoPrintOnSend: toBoolean(
+					restaurantKitchenSource.autoPrintOnSend,
+					DEFAULT_ORGANIZATION_SETTINGS.restaurants.kitchen.autoPrintOnSend,
+				),
+			},
+		},
 		pos: {
 			defaultTerminalName: toSafeString(
 				posSource.defaultTerminalName,

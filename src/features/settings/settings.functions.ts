@@ -74,6 +74,18 @@ const paymentMethodsSchema = z
 	});
 
 const settingsSchema = z.object({
+	modules: z.object({
+		restaurants: z.object({
+			enabled: z.boolean(),
+		}),
+	}),
+	restaurants: z.object({
+		kitchen: z.object({
+			displayEnabled: z.boolean(),
+			printTicketsEnabled: z.boolean(),
+			autoPrintOnSend: z.boolean(),
+		}),
+	}),
 	pos: z.object({
 		defaultTerminalName: z.string().trim().min(1).max(80),
 		defaultStartingCash: z.coerce.number().int().min(0),

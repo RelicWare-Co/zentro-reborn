@@ -151,6 +151,8 @@ describe("settings.server", () => {
 			expect(result.settings.pos.defaultStartingCash).toBe(25000);
 			expect(result.settings.credit.allowCreditSales).toBe(false);
 			expect(result.settings.inventory.lowStockThreshold).toBe(3);
+			expect(result.modules.restaurants.entitlementStatus).toBe("granted");
+			expect(result.settings.modules.restaurants.enabled).toBe(false);
 		} finally {
 			ctx.cleanup();
 		}
@@ -161,6 +163,18 @@ describe("settings.server", () => {
 		try {
 			const result = await server.updateSettingsForCurrentOrganization({
 				settings: {
+					modules: {
+						restaurants: {
+							enabled: true,
+						},
+					},
+					restaurants: {
+						kitchen: {
+							displayEnabled: true,
+							printTicketsEnabled: false,
+							autoPrintOnSend: false,
+						},
+					},
 					pos: {
 						defaultTerminalName: "   ",
 						defaultStartingCash: -10,
@@ -211,6 +225,8 @@ describe("settings.server", () => {
 			expect(result.settings.credit.defaultInterestRate).toBe(100);
 			expect(result.settings.inventory.defaultTaxRate).toBe(0);
 			expect(result.settings.inventory.lowStockThreshold).toBe(0);
+			expect(result.settings.modules.restaurants.enabled).toBe(true);
+			expect(result.settings.restaurants.kitchen.displayEnabled).toBe(true);
 
 			const cashMethod = result.settings.pos.paymentMethods.find(
 				(method) => method.id === "cash",

@@ -3,6 +3,7 @@ import {
 	getSettings,
 	updateSettings,
 } from "@/features/settings/settings.functions";
+import { ORGANIZATION_CAPABILITIES_QUERY_KEY } from "@/features/modules/hooks/use-module-access";
 
 export const SETTINGS_QUERY_KEY = ["organization-settings"];
 
@@ -36,7 +37,12 @@ export function useUpdateSettingsMutation() {
 						: currentValue,
 			);
 
-			await queryClient.invalidateQueries({ queryKey: ["pos-bootstrap"] });
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ["pos-bootstrap"] }),
+				queryClient.invalidateQueries({
+					queryKey: ORGANIZATION_CAPABILITIES_QUERY_KEY,
+				}),
+			]);
 		},
 	});
 }

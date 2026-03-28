@@ -1,3 +1,5 @@
+import { isPlatformAdminRole } from "./access-control.shared";
+
 const DISABLED_FLAG_VALUES = new Set(["0", "false", "no", "off"]);
 
 type OrganizationPolicyUser = {
@@ -6,13 +8,6 @@ type OrganizationPolicyUser = {
 
 function isDisabledFlag(value: string | undefined) {
 	return value ? DISABLED_FLAG_VALUES.has(value.trim().toLowerCase()) : false;
-}
-
-function isPlatformAdminRole(role: string | null | undefined) {
-	return role
-		?.split(",")
-		.map((value) => value.trim().toLowerCase())
-		.includes("admin");
 }
 
 export function canUserCreateOrganization(user?: OrganizationPolicyUser) {

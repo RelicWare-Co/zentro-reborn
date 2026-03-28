@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 import {
 	Building2,
+	ChefHat,
 	ChevronLeft,
 	ChevronRight,
 	Clock3,
@@ -17,9 +18,11 @@ import {
 	Receipt,
 	Settings,
 	Store,
+	UtensilsCrossed,
 	Users,
 } from "lucide-react";
 import { useState } from "react";
+import { useOrganizationCapabilities } from "@/features/modules/hooks/use-module-access";
 import { resetQueryCache } from "@/integrations/tanstack-query/root-provider";
 import { authClient } from "@/lib/auth-client";
 import { OrganizationSelection } from "./OrganizationSelection";
@@ -33,6 +36,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
 	const { data: activeOrganization, isPending: isActiveOrgPending } =
 		authClient.useActiveOrganization();
+	const { data: capabilities } = useOrganizationCapabilities({
+		enabled: Boolean(activeOrganization),
+	});
 
 	const navItems = [
 		{ name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
@@ -43,6 +49,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 		{ name: "Productos", path: "/products", icon: Package },
 		{ name: "Configuración", path: "/settings", icon: Settings },
 	];
+	if (capabilities?.modules.restaurants.accessible) {
+		navItems.splice(3, 0, {
+			name: "Restaurantes",
+			path: "/restaurants",
+			icon: UtensilsCrossed,
+		});
+	}
+	if (capabilities?.modules.restaurants.accessible &&
+		capabilities.modules.restaurants.kitchenDisplayEnabled) {
+		navItems.splice(4, 0, {
+			name: "Cocina",
+			path: "/kitchen",
+			icon: ChefHat,
+		});
+	}
 
 	if (isActiveOrgPending) {
 		return (

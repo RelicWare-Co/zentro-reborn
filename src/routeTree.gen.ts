@@ -16,9 +16,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthShiftsRouteImport } from './routes/_auth/shifts'
 import { Route as AuthSettingsRouteImport } from './routes/_auth/settings'
 import { Route as AuthSalesRouteImport } from './routes/_auth/sales'
+import { Route as AuthRestaurantsRouteImport } from './routes/_auth/restaurants'
 import { Route as AuthProductsRouteImport } from './routes/_auth/products'
 import { Route as AuthPosRouteImport } from './routes/_auth/pos'
 import { Route as AuthOrganizationRouteImport } from './routes/_auth/organization'
+import { Route as AuthKitchenRouteImport } from './routes/_auth/kitchen'
 import { Route as AuthDashboardRouteImport } from './routes/_auth/dashboard'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
@@ -56,6 +58,11 @@ const AuthSalesRoute = AuthSalesRouteImport.update({
   path: '/sales',
   getParentRoute: () => AuthRoute,
 } as any)
+const AuthRestaurantsRoute = AuthRestaurantsRouteImport.update({
+  id: '/restaurants',
+  path: '/restaurants',
+  getParentRoute: () => AuthRoute,
+} as any)
 const AuthProductsRoute = AuthProductsRouteImport.update({
   id: '/products',
   path: '/products',
@@ -69,6 +76,11 @@ const AuthPosRoute = AuthPosRouteImport.update({
 const AuthOrganizationRoute = AuthOrganizationRouteImport.update({
   id: '/organization',
   path: '/organization',
+  getParentRoute: () => AuthRoute,
+} as any)
+const AuthKitchenRoute = AuthKitchenRouteImport.update({
+  id: '/kitchen',
+  path: '/kitchen',
   getParentRoute: () => AuthRoute,
 } as any)
 const AuthDashboardRoute = AuthDashboardRouteImport.update({
@@ -87,9 +99,11 @@ export interface FileRoutesByFullPath {
   '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthDashboardRoute
+  '/kitchen': typeof AuthKitchenRoute
   '/organization': typeof AuthOrganizationRoute
   '/pos': typeof AuthPosRoute
   '/products': typeof AuthProductsRoute
+  '/restaurants': typeof AuthRestaurantsRoute
   '/sales': typeof AuthSalesRoute
   '/settings': typeof AuthSettingsRoute
   '/shifts': typeof AuthShiftsRoute
@@ -100,9 +114,11 @@ export interface FileRoutesByTo {
   '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthDashboardRoute
+  '/kitchen': typeof AuthKitchenRoute
   '/organization': typeof AuthOrganizationRoute
   '/pos': typeof AuthPosRoute
   '/products': typeof AuthProductsRoute
+  '/restaurants': typeof AuthRestaurantsRoute
   '/sales': typeof AuthSalesRoute
   '/settings': typeof AuthSettingsRoute
   '/shifts': typeof AuthShiftsRoute
@@ -115,9 +131,11 @@ export interface FileRoutesById {
   '/join': typeof JoinRoute
   '/login': typeof LoginRoute
   '/_auth/dashboard': typeof AuthDashboardRoute
+  '/_auth/kitchen': typeof AuthKitchenRoute
   '/_auth/organization': typeof AuthOrganizationRoute
   '/_auth/pos': typeof AuthPosRoute
   '/_auth/products': typeof AuthProductsRoute
+  '/_auth/restaurants': typeof AuthRestaurantsRoute
   '/_auth/sales': typeof AuthSalesRoute
   '/_auth/settings': typeof AuthSettingsRoute
   '/_auth/shifts': typeof AuthShiftsRoute
@@ -130,9 +148,11 @@ export interface FileRouteTypes {
     | '/join'
     | '/login'
     | '/dashboard'
+    | '/kitchen'
     | '/organization'
     | '/pos'
     | '/products'
+    | '/restaurants'
     | '/sales'
     | '/settings'
     | '/shifts'
@@ -143,9 +163,11 @@ export interface FileRouteTypes {
     | '/join'
     | '/login'
     | '/dashboard'
+    | '/kitchen'
     | '/organization'
     | '/pos'
     | '/products'
+    | '/restaurants'
     | '/sales'
     | '/settings'
     | '/shifts'
@@ -157,9 +179,11 @@ export interface FileRouteTypes {
     | '/join'
     | '/login'
     | '/_auth/dashboard'
+    | '/_auth/kitchen'
     | '/_auth/organization'
     | '/_auth/pos'
     | '/_auth/products'
+    | '/_auth/restaurants'
     | '/_auth/sales'
     | '/_auth/settings'
     | '/_auth/shifts'
@@ -225,6 +249,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSalesRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_auth/restaurants': {
+      id: '/_auth/restaurants'
+      path: '/restaurants'
+      fullPath: '/restaurants'
+      preLoaderRoute: typeof AuthRestaurantsRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/products': {
       id: '/_auth/products'
       path: '/products'
@@ -246,6 +277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthOrganizationRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_auth/kitchen': {
+      id: '/_auth/kitchen'
+      path: '/kitchen'
+      fullPath: '/kitchen'
+      preLoaderRoute: typeof AuthKitchenRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_auth/dashboard': {
       id: '/_auth/dashboard'
       path: '/dashboard'
@@ -265,9 +303,11 @@ declare module '@tanstack/react-router' {
 
 interface AuthRouteChildren {
   AuthDashboardRoute: typeof AuthDashboardRoute
+  AuthKitchenRoute: typeof AuthKitchenRoute
   AuthOrganizationRoute: typeof AuthOrganizationRoute
   AuthPosRoute: typeof AuthPosRoute
   AuthProductsRoute: typeof AuthProductsRoute
+  AuthRestaurantsRoute: typeof AuthRestaurantsRoute
   AuthSalesRoute: typeof AuthSalesRoute
   AuthSettingsRoute: typeof AuthSettingsRoute
   AuthShiftsRoute: typeof AuthShiftsRoute
@@ -275,9 +315,11 @@ interface AuthRouteChildren {
 
 const AuthRouteChildren: AuthRouteChildren = {
   AuthDashboardRoute: AuthDashboardRoute,
+  AuthKitchenRoute: AuthKitchenRoute,
   AuthOrganizationRoute: AuthOrganizationRoute,
   AuthPosRoute: AuthPosRoute,
   AuthProductsRoute: AuthProductsRoute,
+  AuthRestaurantsRoute: AuthRestaurantsRoute,
   AuthSalesRoute: AuthSalesRoute,
   AuthSettingsRoute: AuthSettingsRoute,
   AuthShiftsRoute: AuthShiftsRoute,

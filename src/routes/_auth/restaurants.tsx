@@ -28,6 +28,7 @@ import {
 } from "@/features/restaurants/hooks/use-restaurants";
 import { getRestaurantBootstrap } from "@/features/restaurants/restaurants.functions";
 import { buildKitchenTicketDocument } from "@/features/restaurants/printing/kitchenTicketDocuments";
+import type { RestaurantTableSummary } from "@/features/restaurants/types";
 
 export const Route = createFileRoute("/_auth/restaurants")({
 	loader: () => getRestaurantBootstrap(),
@@ -311,7 +312,7 @@ function RestaurantsPage() {
 									{area.name}
 								</h2>
 								<div className="space-y-2">
-									{area.tables.map((table) => {
+									{area.tables.map((table: RestaurantTableSummary) => {
 										const isSelected = table.id === selectedTableId;
 										return (
 											<button

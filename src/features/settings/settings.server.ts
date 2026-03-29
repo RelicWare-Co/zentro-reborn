@@ -8,12 +8,12 @@ import {
 	organization,
 	product,
 } from "#/db/schema";
-import { getModuleAccessForCurrentOrganization } from "#/features/modules/module-access.server";
+import { getOrganizationCapabilitiesForCurrentOrganization } from "#/features/modules/module-access.server";
 import {
-	getCurrentOrganizationAccess,
 	requireOrganizationManagerAccess,
 } from "#/features/organization/access-control.server";
 import { requireAuthContext } from "#/features/pos/server/auth-context";
+import { getRestaurantModuleToggleSettings } from "#/features/restaurants/restaurants.module";
 import { getRestaurantConfigurationForCurrentOrganization } from "#/features/restaurants/restaurants.server";
 import {
 	normalizeOrganizationSettings,
@@ -44,8 +44,7 @@ export async function getSettingsForCurrentOrganization() {
 		invitationCountRows,
 		productCountRows,
 		customerCountRows,
-		restaurantModule,
-		access,
+		capabilities,
 		restaurantConfiguration,
 	] = await Promise.all([
 		db
@@ -94,8 +93,7 @@ export async function getSettingsForCurrentOrganization() {
 					isNull(customer.deletedAt),
 				),
 			),
-		getModuleAccessForCurrentOrganization("restaurants"),
-		getCurrentOrganizationAccess(),
+		getOrganizationCapabilitiesForCurrentOrganization(),
 		getRestaurantConfigurationForCurrentOrganization(),
 	]);
 
@@ -122,12 +120,10 @@ export async function getSettingsForCurrentOrganization() {
 			customersCount: normalizeCount(customerCountRows[0]?.count),
 		},
 		viewer: {
-			canManageSettings: access.isOrganizationManager,
-			isPlatformAdmin: access.isPlatformAdmin,
+			canManageSettings: capabilities.viewer.isOrganizationManager,
+			isPlatformAdmin: capabilities.viewer.isPlatformAdmin,
 		},
-		modules: {
-			restaurants: restaurantModule,
-		},
+		modules: capabilities.modules,
 		restaurantConfiguration,
 		settings: parseOrganizationSettingsMetadata(organizationRow.metadata),
 	};
@@ -137,7 +133,7 @@ export async function updateSettingsForCurrentOrganization(input: {
 	settings: OrganizationSettings;
 }) {
 	const { organizationId } = await requireOrganizationManagerAccess();
-	const [organizationRow, restaurantModule] = await Promise.all([
+	const [organizationRow, capabilities] = await Promise.all([
 		db
 			.select({
 				metadata: organization.metadata,
@@ -146,15 +142,18 @@ export async function updateSettingsForCurrentOrganization(input: {
 			.where(eq(organization.id, organizationId))
 			.limit(1)
 			.then((rows) => rows[0] ?? null),
-		getModuleAccessForCurrentOrganization("restaurants"),
+		getOrganizationCapabilitiesForCurrentOrganization(),
 	]);
 	const currentSettings = parseOrganizationSettingsMetadata(organizationRow?.metadata);
 	const normalizedSettings = normalizeOrganizationSettings(input.settings);
 	const isRestaurantToggleChanging =
-		normalizedSettings.modules.restaurants.enabled !==
-		currentSettings.modules.restaurants.enabled;
+		getRestaurantModuleToggleSettings(normalizedSettings).enabled !==
+		getRestaurantModuleToggleSettings(currentSettings).enabled;
 
-	if (isRestaurantToggleChanging && !restaurantModule.canManageToggle) {
+	if (
+		isRestaurantToggleChanging &&
+		!capabilities.modules.restaurants.canManageToggle
+	) {
 		throw new Error(
 			"No puedes cambiar la activación del módulo de restaurantes.",
 		);

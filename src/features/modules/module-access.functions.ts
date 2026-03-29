@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { MODULE_KEYS } from "./module-registry";
 import {
 	getOrganizationCapabilitiesForCurrentOrganization,
 	setModuleEntitlementForCurrentOrganization,
@@ -16,7 +17,7 @@ export const setOrganizationModuleEntitlement = createServerFn({
 })
 	.inputValidator(
 		z.object({
-			moduleKey: z.enum(["restaurants"]),
+			moduleKey: z.enum(MODULE_KEYS),
 			status: z.enum(["granted", "blocked"]),
 		}),
 	)

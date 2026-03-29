@@ -27,6 +27,18 @@ import { resetQueryCache } from "@/integrations/tanstack-query/root-provider";
 import { authClient } from "@/lib/auth-client";
 import { OrganizationSelection } from "./OrganizationSelection";
 
+const NAV_ICON_BY_KEY = {
+	"layout-dashboard": LayoutDashboard,
+	users: Users,
+	store: Store,
+	"clock-3": Clock3,
+	receipt: Receipt,
+	package: Package,
+	settings: Settings,
+	"utensils-crossed": UtensilsCrossed,
+	"chef-hat": ChefHat,
+} as const;
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 	const [isCollapsed, setIsCollapsed] = useState(false);
@@ -41,29 +53,38 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 	});
 
 	const navItems = [
-		{ name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-		{ name: "Organización", path: "/organization", icon: Users },
-		{ name: "POS", path: "/pos", icon: Store },
-		{ name: "Turnos", path: "/shifts", icon: Clock3 },
-		{ name: "Ventas", path: "/sales", icon: Receipt },
-		{ name: "Productos", path: "/products", icon: Package },
-		{ name: "Configuración", path: "/settings", icon: Settings },
+		{
+			name: "Dashboard",
+			path: "/dashboard",
+			icon: LayoutDashboard,
+			order: 10,
+		},
+		{
+			name: "Organización",
+			path: "/organization",
+			icon: Users,
+			order: 20,
+		},
+		{ name: "POS", path: "/pos", icon: Store, order: 30 },
+		{ name: "Turnos", path: "/shifts", icon: Clock3, order: 40 },
+		{ name: "Ventas", path: "/sales", icon: Receipt, order: 50 },
+		{ name: "Productos", path: "/products", icon: Package, order: 60 },
+		{ name: "Configuración", path: "/settings", icon: Settings, order: 70 },
 	];
-	if (capabilities?.modules.restaurants.accessible) {
-		navItems.splice(3, 0, {
-			name: "Restaurantes",
-			path: "/restaurants",
-			icon: UtensilsCrossed,
-		});
-	}
-	if (capabilities?.modules.restaurants.accessible &&
-		capabilities.modules.restaurants.kitchenDisplayEnabled) {
-		navItems.splice(4, 0, {
-			name: "Cocina",
-			path: "/kitchen",
-			icon: ChefHat,
-		});
-	}
+	const moduleNavItems = capabilities
+		? Object.values(capabilities.modules)
+				.flatMap((moduleAccess) => moduleAccess.navigation)
+				.map((item) => ({
+					name: item.label,
+					path: item.path,
+					order: item.order,
+					icon:
+						NAV_ICON_BY_KEY[item.icon as keyof typeof NAV_ICON_BY_KEY] ?? Package,
+				}))
+		: [];
+	const orderedNavItems = [...navItems, ...moduleNavItems].sort(
+		(left, right) => left.order - right.order,
+	);
 
 	if (isActiveOrgPending) {
 		return (
@@ -112,6 +133,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 						type="button"
 						onClick={() => setIsCollapsed(!isCollapsed)}
 						className="p-2 hidden lg:flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors ml-auto"
+						aria-label={
+							isCollapsed
+								? "Expandir barra lateral"
+								: "Colapsar barra lateral"
+						}
 					>
 						{isCollapsed ? (
 							<ChevronRight className="w-5 h-5" />
@@ -155,7 +181,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 				<nav
 					className={`flex-1 py-6 px-4 space-y-2 overflow-hidden ${isCollapsed ? "lg:px-2" : ""}`}
 				>
-					{navItems.map((item) => {
+					{orderedNavItems.map((item) => {
 						const isActive = location.pathname.startsWith(item.path);
 						const Icon = item.icon;
 
@@ -217,6 +243,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 						type="button"
 						onClick={() => setIsSidebarOpen(true)}
 						className="p-2 -ml-2 text-gray-400 hover:text-white"
+						aria-label="Abrir navegación"
 					>
 						<Menu className="w-6 h-6" />
 					</button>

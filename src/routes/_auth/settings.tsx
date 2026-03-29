@@ -7,8 +7,6 @@ import {
 	Save,
 	Settings2,
 	Store,
-	Trash2,
-	UtensilsCrossed,
 	Users,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
@@ -26,13 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import {
-	useCreateRestaurantAreaMutation,
-	useCreateRestaurantTableMutation,
-	useDeleteRestaurantAreaMutation,
-	useDeleteRestaurantTableMutation,
-	useUpdateRestaurantTableMutation,
-} from "@/features/restaurants/hooks/use-restaurants";
+import { RestaurantModuleSettingsCard } from "@/features/restaurants/components/RestaurantModuleSettingsCard";
 import {
 	useSettings,
 	useUpdateSettingsMutation,
@@ -61,24 +53,7 @@ function SettingsPage() {
 	const loaderData = Route.useLoaderData();
 	const { data = loaderData } = useSettings(loaderData);
 	const updateSettingsMutation = useUpdateSettingsMutation();
-	const createRestaurantAreaMutation = useCreateRestaurantAreaMutation();
-	const createRestaurantTableMutation = useCreateRestaurantTableMutation();
-	const deleteRestaurantAreaMutation = useDeleteRestaurantAreaMutation();
-	const deleteRestaurantTableMutation = useDeleteRestaurantTableMutation();
-	const updateRestaurantTableMutation = useUpdateRestaurantTableMutation();
 	const canManageSettings = data.viewer.canManageSettings;
-	const restaurantConfigMutationError =
-		createRestaurantAreaMutation.error instanceof Error
-			? createRestaurantAreaMutation.error.message
-			: createRestaurantTableMutation.error instanceof Error
-				? createRestaurantTableMutation.error.message
-				: deleteRestaurantAreaMutation.error instanceof Error
-					? deleteRestaurantAreaMutation.error.message
-					: deleteRestaurantTableMutation.error instanceof Error
-						? deleteRestaurantTableMutation.error.message
-						: updateRestaurantTableMutation.error instanceof Error
-							? updateRestaurantTableMutation.error.message
-							: null;
 
 	const [draftSettings, setDraftSettings] = useState<OrganizationSettings>(() =>
 		normalizeOrganizationSettings(loaderData.settings),
@@ -94,10 +69,6 @@ function SettingsPage() {
 	const [paymentMethodDraftError, setPaymentMethodDraftError] = useState<
 		string | null
 	>(null);
-	const [newAreaName, setNewAreaName] = useState("");
-	const [newTableDrafts, setNewTableDrafts] = useState<
-		Record<string, { name: string; seats: string }>
-	>({});
 	const newPaymentMethodSlug = useMemo(
 		() => normalizePaymentMethodId(newPaymentMethodLabel),
 		[newPaymentMethodLabel],
@@ -199,34 +170,10 @@ function SettingsPage() {
 		setShowSavedMessage(true);
 	};
 
-	const handleCreateArea = async () => {
-		const trimmedName = newAreaName.trim();
-		if (!trimmedName) {
-			return;
-		}
-
-		await createRestaurantAreaMutation.mutateAsync({
-			name: trimmedName,
-		});
-		setNewAreaName("");
-	};
-
-	const handleCreateTable = async (areaId: string) => {
-		const draft = newTableDrafts[areaId];
-		const tableName = draft?.name?.trim() ?? "";
-		if (!tableName) {
-			return;
-		}
-
-		await createRestaurantTableMutation.mutateAsync({
-			areaId,
-			name: tableName,
-			seats: Number(draft?.seats ?? 0) || 0,
-		});
-		setNewTableDrafts((currentValue) => ({
-			...currentValue,
-			[areaId]: { name: "", seats: "" },
-		}));
+	const handleDraftSettingsChange = (
+		updater: (currentValue: OrganizationSettings) => OrganizationSettings,
+	) => {
+		setDraftSettings((currentValue) => updater(currentValue));
 	};
 
 	return (
@@ -278,7 +225,10 @@ function SettingsPage() {
 			</section>
 
 			{showSavedMessage ? (
-				<Alert className="border-emerald-500/20 bg-emerald-500/10 text-emerald-100">
+				<Alert
+					className="border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
+					aria-live="polite"
+				>
 					<AlertTitle>Cambios guardados</AlertTitle>
 					<AlertDescription>
 						El POS y los nuevos cálculos de inventario ya usarán esta
@@ -301,21 +251,12 @@ function SettingsPage() {
 				<Alert
 					variant="destructive"
 					className="border-red-500/20 bg-red-500/10 text-red-100"
+					aria-live="polite"
 				>
 					<AlertTitle>No se pudo guardar</AlertTitle>
 					<AlertDescription>
 						{updateSettingsMutation.error.message}
 					</AlertDescription>
-				</Alert>
-			) : null}
-
-			{restaurantConfigMutationError ? (
-				<Alert
-					variant="destructive"
-					className="border-red-500/20 bg-red-500/10 text-red-100"
-				>
-					<AlertTitle>No se pudo actualizar restaurantes</AlertTitle>
-					<AlertDescription>{restaurantConfigMutationError}</AlertDescription>
 				</Alert>
 			) : null}
 
@@ -528,310 +469,13 @@ function SettingsPage() {
 				</Card>
 
 				<div className="space-y-6">
-					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
-						<CardHeader>
-							<CardTitle className="flex items-center gap-2">
-								<UtensilsCrossed className="h-4 w-4 text-[var(--color-voltage)]" />
-								Restaurantes
-							</CardTitle>
-							<CardDescription className="text-gray-400">
-								Activación del módulo, salida de cocina y estructura de mesas.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-6">
-							{data.modules.restaurants.entitlementStatus === "blocked" ? (
-								<Alert className="border-gray-700 bg-black/10 text-[var(--color-photon)]">
-									<AlertTitle>Módulo bloqueado</AlertTitle>
-									<AlertDescription>
-										Esta organización no tiene entitlement para restaurantes.
-									</AlertDescription>
-								</Alert>
-							) : null}
-
-							<div className="flex items-center justify-between rounded-lg border border-gray-800 bg-black/10 p-4">
-								<div>
-									<p className="font-medium text-white">Activar módulo</p>
-									<p className="text-sm text-gray-400">
-										Muestra rutas y habilita el flujo de mesas.
-									</p>
-								</div>
-								<Switch
-									checked={draftSettings.modules.restaurants.enabled}
-									disabled={!data.modules.restaurants.canManageToggle}
-									onCheckedChange={(checked) =>
-										setDraftSettings((currentValue) => ({
-											...currentValue,
-											modules: {
-												...currentValue.modules,
-												restaurants: {
-													...currentValue.modules.restaurants,
-													enabled: checked,
-												},
-											},
-										}))
-									}
-								/>
-							</div>
-
-							<div className="grid gap-3">
-								<div className="flex items-center justify-between rounded-lg border border-gray-800 bg-black/10 p-4">
-									<div>
-										<p className="font-medium text-white">Pantalla de cocina</p>
-										<p className="text-sm text-gray-400">
-											Habilita la ruta interna de cocina.
-										</p>
-									</div>
-									<Switch
-										checked={draftSettings.restaurants.kitchen.displayEnabled}
-										disabled={!canManageSettings}
-										onCheckedChange={(checked) =>
-											setDraftSettings((currentValue) => ({
-												...currentValue,
-												restaurants: {
-													...currentValue.restaurants,
-													kitchen: {
-														...currentValue.restaurants.kitchen,
-														displayEnabled: checked,
-													},
-												},
-											}))
-										}
-									/>
-								</div>
-								<div className="flex items-center justify-between rounded-lg border border-gray-800 bg-black/10 p-4">
-									<div>
-										<p className="font-medium text-white">Imprimir comandas</p>
-										<p className="text-sm text-gray-400">
-											Permite imprimir ticket de cocina al enviar.
-										</p>
-									</div>
-									<Switch
-										checked={draftSettings.restaurants.kitchen.printTicketsEnabled}
-										disabled={!canManageSettings}
-										onCheckedChange={(checked) =>
-											setDraftSettings((currentValue) => ({
-												...currentValue,
-												restaurants: {
-													...currentValue.restaurants,
-													kitchen: {
-														...currentValue.restaurants.kitchen,
-														printTicketsEnabled: checked,
-													},
-												},
-											}))
-										}
-									/>
-								</div>
-								<div className="flex items-center justify-between rounded-lg border border-gray-800 bg-black/10 p-4">
-									<div>
-										<p className="font-medium text-white">Auto imprimir</p>
-										<p className="text-sm text-gray-400">
-											Dispara impresión inmediata al enviar a cocina.
-										</p>
-									</div>
-									<Switch
-										checked={draftSettings.restaurants.kitchen.autoPrintOnSend}
-										disabled={
-											!canManageSettings ||
-											!draftSettings.restaurants.kitchen.printTicketsEnabled
-										}
-										onCheckedChange={(checked) =>
-											setDraftSettings((currentValue) => ({
-												...currentValue,
-												restaurants: {
-													...currentValue.restaurants,
-													kitchen: {
-														...currentValue.restaurants.kitchen,
-														autoPrintOnSend: checked,
-													},
-												},
-											}))
-										}
-									/>
-								</div>
-							</div>
-
-							<Separator className="border-gray-800" />
-
-							<div className="space-y-4">
-								<div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-									<div className="grid gap-2">
-										<Label htmlFor="new-area-name">Agregar zona</Label>
-										<Input
-											id="new-area-name"
-											name="new-area-name"
-											value={newAreaName}
-											onChange={(event) => setNewAreaName(event.target.value)}
-											placeholder="Ej. Salón, Terraza, Barra…"
-											autoComplete="off"
-											className="border-gray-700 bg-black/20"
-											disabled={!canManageSettings}
-										/>
-									</div>
-									<div className="flex items-end">
-										<Button
-											type="button"
-											variant="outline"
-											onClick={handleCreateArea}
-											disabled={
-												!canManageSettings ||
-												createRestaurantAreaMutation.isPending
-											}
-											className="border-gray-700 bg-transparent text-gray-100 hover:bg-white/5"
-										>
-											<Plus className="h-4 w-4" />
-											Agregar zona
-										</Button>
-									</div>
-								</div>
-
-								<div className="space-y-3">
-									{data.restaurantConfiguration.map((area) => (
-										<div
-											key={area.id}
-											className="rounded-lg border border-gray-800 bg-black/10 p-4"
-										>
-											<div className="flex items-center justify-between gap-3">
-												<div className="font-medium text-white">{area.name}</div>
-												<Button
-													type="button"
-													variant="outline"
-													onClick={() => {
-														const confirmed = window.confirm(
-															"¿Eliminar esta zona? Solo funciona si ya no tiene mesas.",
-														);
-														if (!confirmed) {
-															return;
-														}
-														deleteRestaurantAreaMutation.mutate({
-															id: area.id,
-														});
-													}}
-													disabled={
-														!canManageSettings ||
-														deleteRestaurantAreaMutation.isPending ||
-														area.tables.length > 0
-													}
-													className="border-gray-700 bg-transparent text-gray-100 hover:bg-white/5"
-												>
-													<Trash2 className="h-4 w-4" />
-													Eliminar
-												</Button>
-											</div>
-
-											<div className="mt-4 space-y-2">
-												{area.tables.map((table) => (
-													<div
-														key={table.id}
-														className="flex items-center justify-between gap-3 rounded-lg border border-gray-800 px-3 py-2"
-													>
-														<div className="min-w-0">
-															<div className="truncate">{table.name}</div>
-															<div className="text-xs text-gray-400">
-																{table.seats > 0
-																	? `${table.seats} puestos`
-																	: "Sin capacidad definida"}
-															</div>
-														</div>
-														<div className="flex items-center gap-3">
-															<Switch
-																checked={table.isActive}
-																disabled={
-																	!canManageSettings ||
-																	updateRestaurantTableMutation.isPending
-																}
-																onCheckedChange={(checked) =>
-																	updateRestaurantTableMutation.mutate({
-																		id: table.id,
-																		isActive: checked,
-																	})
-																}
-															/>
-															<Button
-																type="button"
-																variant="outline"
-																onClick={() => {
-																	const confirmed = window.confirm(
-																		"¿Eliminar esta mesa? Si ya tiene historial, la operación será rechazada.",
-																	);
-																	if (!confirmed) {
-																		return;
-																	}
-																	deleteRestaurantTableMutation.mutate({
-																		id: table.id,
-																	});
-																}}
-																disabled={
-																	!canManageSettings ||
-																	deleteRestaurantTableMutation.isPending
-																}
-																className="border-gray-700 bg-transparent text-gray-100 hover:bg-white/5"
-																aria-label={`Eliminar ${table.name}`}
-															>
-																<Trash2 className="h-4 w-4" />
-															</Button>
-														</div>
-													</div>
-												))}
-											</div>
-
-											<div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px_auto]">
-												<Input
-													name={`table-name-${area.id}`}
-													value={newTableDrafts[area.id]?.name ?? ""}
-													onChange={(event) =>
-														setNewTableDrafts((currentValue) => ({
-															...currentValue,
-															[area.id]: {
-																name: event.target.value,
-																seats:
-																	currentValue[area.id]?.seats ?? "",
-															},
-														}))
-													}
-													placeholder="Nueva mesa…"
-													autoComplete="off"
-													className="border-gray-700 bg-black/20"
-													disabled={!canManageSettings}
-												/>
-												<Input
-													name={`table-seats-${area.id}`}
-													type="number"
-													min={0}
-													value={newTableDrafts[area.id]?.seats ?? ""}
-													onChange={(event) =>
-														setNewTableDrafts((currentValue) => ({
-															...currentValue,
-															[area.id]: {
-																name: currentValue[area.id]?.name ?? "",
-																seats: event.target.value,
-															},
-														}))
-													}
-													placeholder="Puestos"
-													className="border-gray-700 bg-black/20"
-													disabled={!canManageSettings}
-												/>
-												<Button
-													type="button"
-													variant="outline"
-													onClick={() => handleCreateTable(area.id)}
-													disabled={
-														!canManageSettings ||
-														createRestaurantTableMutation.isPending
-													}
-													className="border-gray-700 bg-transparent text-gray-100 hover:bg-white/5"
-												>
-													<Plus className="h-4 w-4" />
-													Mesa
-												</Button>
-											</div>
-										</div>
-									))}
-								</div>
-							</div>
-						</CardContent>
-					</Card>
+					<RestaurantModuleSettingsCard
+						moduleAccess={data.modules.restaurants}
+						configuration={data.restaurantConfiguration}
+						settings={draftSettings}
+						canManageSettings={canManageSettings}
+						onSettingsChange={handleDraftSettingsChange}
+					/>
 
 					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
 						<CardHeader>

@@ -1,89 +1,112 @@
 import "@tanstack/react-start/server-only";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "#/db";
 import { organization, organizationModuleEntitlement } from "#/db/schema";
 import { getCurrentOrganizationAccess } from "#/features/organization/access-control.server";
 import { parseOrganizationSettingsMetadata } from "#/features/settings/settings.shared";
 import {
 	isModuleEntitled,
-	MODULE_CATALOG,
 	type ModuleAccessState,
 	type ModuleEntitlementStatus,
 	type ModuleKey,
 } from "./module-access.shared";
+import { getModuleDefinition, MODULE_KEYS } from "./module-registry";
 
-async function getOrganizationEntitlementStatus(
-	organizationId: string,
-	moduleKey: ModuleKey,
-) {
-	const [row] = await db
-		.select({
-			status: organizationModuleEntitlement.status,
-		})
-		.from(organizationModuleEntitlement)
-		.where(
-			and(
-				eq(organizationModuleEntitlement.organizationId, organizationId),
-				eq(organizationModuleEntitlement.moduleKey, moduleKey),
-			),
-		)
-		.limit(1);
-
-	return (row?.status as ModuleEntitlementStatus | undefined) ?? null;
-}
-
-export async function getModuleAccessForCurrentOrganization(
-	moduleKey: ModuleKey,
-): Promise<ModuleAccessState> {
+async function getModuleAccessEnvironmentForCurrentOrganization() {
 	const access = await getCurrentOrganizationAccess();
-	const moduleDefinition = MODULE_CATALOG[moduleKey];
-	const [organizationRow, storedEntitlementStatus] = await Promise.all([
+	const [organizationRow, entitlementRows] = await Promise.all([
 		db
 			.select({ metadata: organization.metadata })
 			.from(organization)
 			.where(eq(organization.id, access.organizationId))
 			.limit(1)
 			.then((rows) => rows[0] ?? null),
-		getOrganizationEntitlementStatus(access.organizationId, moduleKey),
+		db
+			.select({
+				moduleKey: organizationModuleEntitlement.moduleKey,
+				status: organizationModuleEntitlement.status,
+			})
+			.from(organizationModuleEntitlement)
+			.where(
+				and(
+					eq(organizationModuleEntitlement.organizationId, access.organizationId),
+					inArray(organizationModuleEntitlement.moduleKey, MODULE_KEYS),
+				),
+			),
 	]);
-	const settings = parseOrganizationSettingsMetadata(organizationRow?.metadata);
-	const entitlementStatus =
-		storedEntitlementStatus ?? moduleDefinition.defaultEntitlementStatus;
-	const entitlementGranted = isModuleEntitled(entitlementStatus);
-	const enabled = settings.modules.restaurants.enabled;
-	const requiresPlatformAdmin =
-		moduleDefinition.activationPolicy === "platform_admin_only";
-	const canManageToggle =
-		access.isOrganizationManager &&
-		moduleDefinition.activationPolicy !== "platform_admin_only" &&
-		entitlementGranted;
 
 	return {
-		key: moduleKey,
-		label: moduleDefinition.label,
-		entitlementStatus,
-		activationPolicy: moduleDefinition.activationPolicy,
-		enabled,
-		accessible: entitlementGranted && enabled,
-		canManageToggle,
-		requiresPlatformAdmin,
-		kitchenDisplayEnabled: settings.restaurants.kitchen.displayEnabled,
+		access,
+		settings: parseOrganizationSettingsMetadata(organizationRow?.metadata),
+		entitlementStatusByKey: new Map<ModuleKey, ModuleEntitlementStatus>(
+			entitlementRows.map((row) => [
+				row.moduleKey as ModuleKey,
+				row.status as ModuleEntitlementStatus,
+			]),
+		),
 	};
 }
 
+function resolveModuleAccessState(
+	environment: Awaited<ReturnType<typeof getModuleAccessEnvironmentForCurrentOrganization>>,
+	moduleKey: ModuleKey,
+): ModuleAccessState {
+	const definition = getModuleDefinition(moduleKey);
+	const entitlementStatus =
+		environment.entitlementStatusByKey.get(moduleKey) ??
+		definition.defaultEntitlementStatus;
+	const entitlementGranted = isModuleEntitled(entitlementStatus);
+	const enabled = definition.getEnabled(environment.settings);
+	const flags = definition.getFlags(environment.settings);
+	const requiresPlatformAdmin =
+		definition.activationPolicy === "platform_admin_only";
+	const canManageToggle =
+		environment.access.isOrganizationManager &&
+		definition.activationPolicy !== "platform_admin_only" &&
+		entitlementGranted;
+	const accessible = entitlementGranted && enabled;
+
+	return {
+		key: moduleKey,
+		label: definition.label,
+		entitlementStatus,
+		activationPolicy: definition.activationPolicy,
+		enabled,
+		accessible,
+		canManageToggle,
+		requiresPlatformAdmin,
+		flags,
+		navigation: definition.getNavigation({
+			settings: environment.settings,
+			accessible,
+			flags,
+		}),
+	};
+}
+
+export async function getModuleAccessForCurrentOrganization(
+	moduleKey: ModuleKey,
+): Promise<ModuleAccessState> {
+	const environment = await getModuleAccessEnvironmentForCurrentOrganization();
+	return resolveModuleAccessState(environment, moduleKey);
+}
+
 export async function getOrganizationCapabilitiesForCurrentOrganization() {
-	const access = await getCurrentOrganizationAccess();
-	const restaurants = await getModuleAccessForCurrentOrganization("restaurants");
+	const environment = await getModuleAccessEnvironmentForCurrentOrganization();
+	const modules = Object.fromEntries(
+		MODULE_KEYS.map((moduleKey) => [
+			moduleKey,
+			resolveModuleAccessState(environment, moduleKey),
+		]),
+	) as Record<ModuleKey, ModuleAccessState>;
 
 	return {
 		viewer: {
-			organizationRole: access.organizationRole,
-			isOrganizationManager: access.isOrganizationManager,
-			isPlatformAdmin: access.isPlatformAdmin,
+			organizationRole: environment.access.organizationRole,
+			isOrganizationManager: environment.access.isOrganizationManager,
+			isPlatformAdmin: environment.access.isPlatformAdmin,
 		},
-		modules: {
-			restaurants,
-		},
+		modules,
 	};
 }
 

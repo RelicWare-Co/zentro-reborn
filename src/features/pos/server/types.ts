@@ -1,3 +1,5 @@
+import type { CreateCoreSaleInput } from "#/features/core/sales/types";
+
 export const CASH_MOVEMENT_TYPES = ["expense", "payout", "inflow"] as const;
 export type CashMovementType = (typeof CASH_MOVEMENT_TYPES)[number];
 
@@ -28,30 +30,7 @@ export type CloseShiftInput = {
 	closedAt?: number;
 };
 
-export type CreatePosSaleInput = {
-	shiftId: string;
-	customerId?: string | null;
-	items: Array<{
-		productId: string;
-		quantity: number;
-		unitPrice?: number;
-		taxRate?: number;
-		discountAmount?: number;
-		modifiers?: Array<{
-			modifierProductId: string;
-			quantity: number;
-			unitPrice?: number;
-		}>;
-	}>;
-	discountAmount?: number;
-	payments?: Array<{
-		method: string;
-		amount: number;
-		reference?: string | null;
-	}>;
-	isCreditSale?: boolean;
-	createdAt?: number;
-};
+export type CreatePosSaleInput = CreateCoreSaleInput;
 
 export type CancelSaleInput = {
 	saleId: string;

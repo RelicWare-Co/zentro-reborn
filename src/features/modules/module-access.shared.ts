@@ -1,11 +1,17 @@
-export const MODULE_KEYS = ["restaurants"] as const;
+import type {
+	ModuleActivationPolicy,
+	ModuleEntitlementStatus,
+	ModuleNavigationItem,
+} from "./module-definition";
+import {
+	getModuleDefinition,
+	MODULE_KEYS,
+	type ModuleKey,
+} from "./module-registry";
 
-export type ModuleKey = (typeof MODULE_KEYS)[number];
-export type ModuleEntitlementStatus = "granted" | "blocked";
-export type ModuleActivationPolicy =
-	| "self_service"
-	| "entitled_self_service"
-	| "platform_admin_only";
+export { MODULE_KEYS, type ModuleKey };
+export type { ModuleActivationPolicy, ModuleEntitlementStatus };
+export type { ModuleNavigationItem };
 
 export type ModuleAccessState = {
 	key: ModuleKey;
@@ -16,23 +22,30 @@ export type ModuleAccessState = {
 	accessible: boolean;
 	canManageToggle: boolean;
 	requiresPlatformAdmin: boolean;
-	kitchenDisplayEnabled: boolean;
+	flags: Record<string, boolean>;
+	navigation: ModuleNavigationItem[];
 };
 
-export const MODULE_CATALOG: Record<
+export const MODULE_CATALOG = Object.fromEntries(
+	MODULE_KEYS.map((moduleKey) => {
+		const definition = getModuleDefinition(moduleKey);
+		return [
+			moduleKey,
+			{
+				label: definition.label,
+				activationPolicy: definition.activationPolicy,
+				defaultEntitlementStatus: definition.defaultEntitlementStatus,
+			},
+		];
+	}),
+) as Record<
 	ModuleKey,
 	{
 		label: string;
 		activationPolicy: ModuleActivationPolicy;
 		defaultEntitlementStatus: ModuleEntitlementStatus;
 	}
-> = {
-	restaurants: {
-		label: "Restaurantes",
-		activationPolicy: "entitled_self_service",
-		defaultEntitlementStatus: "granted",
-	},
-};
+>;
 
 export function isModuleEntitled(status: ModuleEntitlementStatus) {
 	return status === "granted";

@@ -191,12 +191,11 @@ describe("restaurants.server", () => {
 				price: 24000,
 			});
 
-			const addResult =
-				await restaurantsServer.addRestaurantOrderItemForCurrentOrganization({
-					tableId,
-					productId,
-					quantity: 1,
-				});
+			await restaurantsServer.addRestaurantOrderItemForCurrentOrganization({
+				tableId,
+				productId,
+				quantity: 1,
+			});
 			const tableDetail =
 				await restaurantsServer.getRestaurantTableDetailForCurrentOrganization({
 					tableId,

@@ -15,9 +15,10 @@ import {
 	getCurrentOrganizationAccess,
 	requireOrganizationManagerAccess,
 } from "#/features/organization/access-control.server";
+import { createCoreSaleForCurrentOrganization } from "#/features/core/sales/create-sale.server";
 import { requireModuleAccessForCurrentOrganization } from "#/features/modules/module-access.server";
-import { createPosSaleForCurrentOrganization } from "#/features/pos/server/sales";
 import { getPosBootstrapForCurrentOrganization } from "#/features/pos/server/shifts";
+import { getRestaurantModuleSettings } from "#/features/restaurants/restaurants.module";
 import {
 	normalizeOptionalString,
 	normalizeRequiredString,
@@ -27,7 +28,8 @@ import {
 } from "#/features/pos/server/utils";
 import { parseOrganizationSettingsMetadata } from "#/features/settings/settings.shared";
 
-type RestaurantDatabase = typeof db;
+type RestaurantTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type RestaurantDatabase = typeof db | RestaurantTransaction;
 
 type RestaurantOrderItemDetail = Awaited<
 	ReturnType<typeof getOrderItemsWithModifiers>
@@ -144,13 +146,11 @@ function groupAreasWithTables(
 	return areas.map((area) => ({
 		...area,
 		tables:
-			tablesByAreaId
-				.get(area.id)
-				?.toSorted(
-					(left, right) =>
-						left.sortOrder - right.sortOrder ||
-						left.name.localeCompare(right.name, "es-CO"),
-				) ?? [],
+			[...(tablesByAreaId.get(area.id) ?? [])].sort(
+				(left, right) =>
+					left.sortOrder - right.sortOrder ||
+					left.name.localeCompare(right.name, "es-CO"),
+			),
 	}));
 }
 
@@ -692,7 +692,7 @@ export async function getRestaurantBootstrapForCurrentOrganization() {
 		settings: {
 			paymentMethods: posBootstrap.settings.paymentMethods,
 			defaultTerminalName: posBootstrap.settings.defaultTerminalName,
-			restaurant: settings.restaurants,
+			restaurant: getRestaurantModuleSettings(settings),
 		},
 		areas: groupAreasWithTables(
 			layoutRows.areas,
@@ -770,7 +770,7 @@ export async function addRestaurantOrderItemForCurrentOrganization(input: {
 	);
 
 	return db.transaction(async (tx) => {
-		const database = tx as typeof db;
+		const database = tx;
 		const table = await assertTableFromOrganization(
 			database,
 			access.organizationId,
@@ -952,7 +952,7 @@ export async function deleteRestaurantDraftItemForCurrentOrganization(orderItemI
 	}
 
 	return db.transaction(async (tx) => {
-		const database = tx as typeof db;
+		const database = tx;
 		await database
 			.delete(restaurantOrderItem)
 			.where(eq(restaurantOrderItem.id, itemRow.id));
@@ -985,10 +985,12 @@ export async function deleteRestaurantDraftItemForCurrentOrganization(orderItemI
 export async function sendRestaurantOrderToKitchenForCurrentOrganization(orderId: string) {
 	await requireModuleAccessForCurrentOrganization("restaurants");
 	const access = await getCurrentOrganizationAccess();
-	const settings = await getOrganizationSettings(access.organizationId);
+	const settings = getRestaurantModuleSettings(
+		await getOrganizationSettings(access.organizationId),
+	);
 
 	return db.transaction(async (tx) => {
-		const database = tx as typeof db;
+		const database = tx;
 		const order = await getOpenOrderById(database, access.organizationId, orderId);
 		const table = await assertTableFromOrganization(
 			database,
@@ -1072,8 +1074,8 @@ export async function sendRestaurantOrderToKitchenForCurrentOrganization(orderId
 				items: draftItems,
 			},
 			printing: {
-				enabled: settings.restaurants.kitchen.printTicketsEnabled,
-				autoPrintOnSend: settings.restaurants.kitchen.autoPrintOnSend,
+				enabled: settings.kitchen.printTicketsEnabled,
+				autoPrintOnSend: settings.kitchen.autoPrintOnSend,
 			},
 		};
 	});
@@ -1132,8 +1134,10 @@ export async function updateRestaurantOrderItemStatusForCurrentOrganization(inpu
 export async function getKitchenBoardForCurrentOrganization() {
 	await requireModuleAccessForCurrentOrganization("restaurants");
 	const access = await getCurrentOrganizationAccess();
-	const settings = await getOrganizationSettings(access.organizationId);
-	if (!settings.restaurants.kitchen.displayEnabled) {
+	const settings = getRestaurantModuleSettings(
+		await getOrganizationSettings(access.organizationId),
+	);
+	if (!settings.kitchen.displayEnabled) {
 		throw new Error("La vista de cocina no está habilitada.");
 	}
 
@@ -1237,7 +1241,7 @@ export async function closeRestaurantOrderForCurrentOrganization(input: {
 		throw new Error("No puedes cerrar una mesa sin ítems activos.");
 	}
 
-	const saleResult = await createPosSaleForCurrentOrganization({
+	const saleResult = await createCoreSaleForCurrentOrganization({
 		shiftId: normalizeRequiredString(input.shiftId, "shiftId"),
 		customerId: normalizeOptionalString(input.customerId),
 		items: activeItems.map((item) => ({

@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
+	restaurantModuleSettingsSchema,
+	restaurantModuleToggleSettingsSchema,
+} from "#/features/restaurants/restaurants.module";
+import {
 	getSettingsForCurrentOrganization,
 	updateSettingsForCurrentOrganization,
 } from "./settings.server";
@@ -75,17 +79,9 @@ const paymentMethodsSchema = z
 
 const settingsSchema = z.object({
 	modules: z.object({
-		restaurants: z.object({
-			enabled: z.boolean(),
-		}),
+		restaurants: restaurantModuleToggleSettingsSchema,
 	}),
-	restaurants: z.object({
-		kitchen: z.object({
-			displayEnabled: z.boolean(),
-			printTicketsEnabled: z.boolean(),
-			autoPrintOnSend: z.boolean(),
-		}),
-	}),
+	restaurants: restaurantModuleSettingsSchema,
 	pos: z.object({
 		defaultTerminalName: z.string().trim().min(1).max(80),
 		defaultStartingCash: z.coerce.number().int().min(0),

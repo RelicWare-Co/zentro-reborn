@@ -1,3 +1,12 @@
+import type {
+	RestaurantModuleSettings,
+	RestaurantModuleToggleSettings,
+} from "#/features/restaurants/restaurants.module";
+import {
+	DEFAULT_RESTAURANT_MODULE_SETTINGS,
+	DEFAULT_RESTAURANT_MODULE_TOGGLE_SETTINGS,
+} from "#/features/restaurants/restaurants.module";
+
 export const PAYMENT_METHOD_CATALOG = [
 	{
 		id: "cash",
@@ -42,17 +51,9 @@ export type OrganizationPaymentMethodSettings = {
 
 export type OrganizationSettings = {
 	modules: {
-		restaurants: {
-			enabled: boolean;
-		};
+		restaurants: RestaurantModuleToggleSettings;
 	};
-	restaurants: {
-		kitchen: {
-			displayEnabled: boolean;
-			printTicketsEnabled: boolean;
-			autoPrintOnSend: boolean;
-		};
-	};
+	restaurants: RestaurantModuleSettings;
 	pos: {
 		defaultTerminalName: string;
 		defaultStartingCash: number;
@@ -72,17 +73,9 @@ export type OrganizationSettings = {
 
 export const DEFAULT_ORGANIZATION_SETTINGS: OrganizationSettings = {
 	modules: {
-		restaurants: {
-			enabled: false,
-		},
+		restaurants: DEFAULT_RESTAURANT_MODULE_TOGGLE_SETTINGS,
 	},
-	restaurants: {
-		kitchen: {
-			displayEnabled: false,
-			printTicketsEnabled: true,
-			autoPrintOnSend: true,
-		},
-	},
+	restaurants: DEFAULT_RESTAURANT_MODULE_SETTINGS,
 	pos: {
 		defaultTerminalName: "Caja Principal",
 		defaultStartingCash: 0,
@@ -357,7 +350,7 @@ export function normalizeOrganizationSettings(
 				enabled: toBoolean(
 					(modulesSource.restaurants as Record<string, unknown> | undefined)
 						?.enabled,
-					DEFAULT_ORGANIZATION_SETTINGS.modules.restaurants.enabled,
+					DEFAULT_RESTAURANT_MODULE_TOGGLE_SETTINGS.enabled,
 				),
 			},
 		},
@@ -365,16 +358,15 @@ export function normalizeOrganizationSettings(
 			kitchen: {
 				displayEnabled: toBoolean(
 					restaurantKitchenSource.displayEnabled,
-					DEFAULT_ORGANIZATION_SETTINGS.restaurants.kitchen.displayEnabled,
+					DEFAULT_RESTAURANT_MODULE_SETTINGS.kitchen.displayEnabled,
 				),
 				printTicketsEnabled: toBoolean(
 					restaurantKitchenSource.printTicketsEnabled,
-					DEFAULT_ORGANIZATION_SETTINGS.restaurants.kitchen
-						.printTicketsEnabled,
+					DEFAULT_RESTAURANT_MODULE_SETTINGS.kitchen.printTicketsEnabled,
 				),
 				autoPrintOnSend: toBoolean(
 					restaurantKitchenSource.autoPrintOnSend,
-					DEFAULT_ORGANIZATION_SETTINGS.restaurants.kitchen.autoPrintOnSend,
+					DEFAULT_RESTAURANT_MODULE_SETTINGS.kitchen.autoPrintOnSend,
 				),
 			},
 		},

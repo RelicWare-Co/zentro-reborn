@@ -40,7 +40,10 @@ import {
 	getPosBootstrap,
 	searchPosProducts,
 } from "@/features/pos/pos.functions";
-import { printThermalReceipt } from "@/features/pos/printing/printThermalReceipt";
+import {
+	openPosCashDrawer,
+	printThermalReceipt,
+} from "@/features/pos/printing/printThermalReceipt";
 import { buildSaleReceiptDocument } from "@/features/pos/printing/receiptDocuments";
 import type { Category, Product } from "@/features/pos/types";
 import {
@@ -173,7 +176,7 @@ function PosPage() {
 				paymentMethodLabels,
 			});
 
-			printThermalReceipt(receiptDocument);
+			void printThermalReceipt(receiptDocument);
 		},
 		[
 			activeShift?.terminalName,
@@ -322,6 +325,16 @@ function PosPage() {
 				onCustomerChange={handleCustomerChange}
 				onOpenShift={handleOpenShift}
 				onCashMovement={() => shift.setIsCashMovementModalOpen(true)}
+				onOpenDrawer={() => {
+					void openPosCashDrawer().catch((error) => {
+						console.error(error);
+						window.alert(
+							error instanceof Error
+								? error.message
+								: "No se pudo enviar la señal de apertura de caja.",
+						);
+					});
+				}}
 				onCloseShift={() => shift.setIsCloseShiftModalOpen(true)}
 				onCreateCustomer={() =>
 					createCustomer.setIsCreateCustomerModalOpen(true)

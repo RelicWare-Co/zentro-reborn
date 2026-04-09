@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { LocalPrinterSettingsCard } from "@/features/pos/components/LocalPrinterSettingsCard";
 import { RestaurantModuleSettingsCard } from "@/features/restaurants/components/RestaurantModuleSettingsCard";
 import {
 	useSettings,
@@ -476,6 +477,8 @@ function SettingsPage() {
 						canManageSettings={canManageSettings}
 						onSettingsChange={handleDraftSettingsChange}
 					/>
+
+					<LocalPrinterSettingsCard />
 
 					<Card className="border-gray-800 bg-[var(--color-carbon)] text-[var(--color-photon)] shadow-none">
 						<CardHeader>

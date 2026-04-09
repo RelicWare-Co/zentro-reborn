@@ -82,6 +82,24 @@ const config = defineConfig({
 		host: "127.0.0.1",
 	},
 	resolve: {
+		alias: {
+			"@point-of-sale/webusb-receipt-printer": path.resolve(
+				process.cwd(),
+				"node_modules/@point-of-sale/webusb-receipt-printer/dist/webusb-receipt-printer.esm.js",
+			),
+			"@point-of-sale/webserial-receipt-printer": path.resolve(
+				process.cwd(),
+				"node_modules/@point-of-sale/webserial-receipt-printer/dist/webserial-receipt-printer.esm.js",
+			),
+			"@point-of-sale/webbluetooth-receipt-printer": path.resolve(
+				process.cwd(),
+				"node_modules/@point-of-sale/webbluetooth-receipt-printer/dist/webbluetooth-receipt-printer.esm.js",
+			),
+			"@point-of-sale/receipt-printer-status": path.resolve(
+				process.cwd(),
+				"node_modules/@point-of-sale/receipt-printer-status/dist/receipt-printer-status.esm.js",
+			),
+		},
 		tsconfigPaths: true,
 	},
 	build: {

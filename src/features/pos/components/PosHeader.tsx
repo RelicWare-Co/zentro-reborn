@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Lock, Plus, Users } from "lucide-react";
+import { ArrowLeftRight, Lock, Plus, Printer, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { ActiveShift, PosCustomer } from "../types";
@@ -12,6 +12,7 @@ interface PosHeaderProps {
 	onCustomerChange: (customerId: string) => void;
 	onOpenShift: () => void;
 	onCashMovement: () => void;
+	onOpenDrawer: () => void;
 	onCloseShift: () => void;
 	onCreateCustomer: () => void;
 }
@@ -24,6 +25,7 @@ export function PosHeader({
 	onCustomerChange,
 	onOpenShift,
 	onCashMovement,
+	onOpenDrawer,
 	onCloseShift,
 	onCreateCustomer,
 }: PosHeaderProps) {
@@ -95,6 +97,17 @@ export function PosHeader({
 						<ArrowLeftRight className="h-4 w-4 sm:mr-2" />
 						<span className="sm:hidden">Caja</span>
 						<span className="hidden sm:inline">Movimiento de Caja</span>
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={onOpenDrawer}
+						disabled={!activeShift}
+						className="h-9 whitespace-nowrap border-gray-700 bg-gray-900/50 text-gray-300 transition-all hover:border-gray-600 hover:bg-gray-800 hover:text-white"
+					>
+						<Printer className="h-4 w-4 sm:mr-2" />
+						<span className="sm:hidden">Abrir</span>
+						<span className="hidden sm:inline">Abrir Caja</span>
 					</Button>
 					<Button
 						variant="outline"

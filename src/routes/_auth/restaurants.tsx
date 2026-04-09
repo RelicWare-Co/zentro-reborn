@@ -1,16 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
+import {
+	startTransition,
+	useDeferredValue,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import {
+	NativeSelect,
+	NativeSelectOption,
+} from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { usePosProducts } from "@/features/pos/hooks/usePosQueries";
 import { printThermalReceipt } from "@/features/pos/printing/printThermalReceipt";
@@ -18,16 +22,16 @@ import { formatCurrency } from "@/features/pos/utils";
 import {
 	useAddRestaurantOrderItemMutation,
 	useCloseRestaurantOrderMutation,
+	useDeleteRestaurantDraftItemMutation,
 	useRestaurantBootstrap,
 	useRestaurantTableDetail,
 	useSendRestaurantOrderToKitchenMutation,
 	useUpdateRestaurantDraftItemMutation,
 	useUpdateRestaurantOrderItemStatusMutation,
 	useUpdateRestaurantOrderMetaMutation,
-	useDeleteRestaurantDraftItemMutation,
 } from "@/features/restaurants/hooks/use-restaurants";
-import { getRestaurantBootstrap } from "@/features/restaurants/restaurants.functions";
 import { buildKitchenTicketDocument } from "@/features/restaurants/printing/kitchenTicketDocuments";
+import { getRestaurantBootstrap } from "@/features/restaurants/restaurants.functions";
 import type { RestaurantTableSummary } from "@/features/restaurants/types";
 
 export const Route = createFileRoute("/_auth/restaurants")({
@@ -72,7 +76,9 @@ function RestaurantsPage() {
 
 	useEffect(() => {
 		if (selectedTableId) {
-			const tableStillExists = allTables.some((table) => table.id === selectedTableId);
+			const tableStillExists = allTables.some(
+				(table) => table.id === selectedTableId,
+			);
 			if (tableStillExists) {
 				return;
 			}
@@ -96,8 +102,9 @@ function RestaurantsPage() {
 	const openOrder = selectedTableDetail?.openOrder ?? null;
 	const products = productSearchResult?.data ?? [];
 	const requiresReference =
-		bootstrap.settings.paymentMethods.find((method) => method.id === paymentMethod)
-			?.requiresReference ?? false;
+		bootstrap.settings.paymentMethods.find(
+			(method) => method.id === paymentMethod,
+		)?.requiresReference ?? false;
 
 	const handleSelectTable = (tableId: string) => {
 		startTransition(() => {
@@ -175,7 +182,7 @@ function RestaurantsPage() {
 						totalAmount: item.totalAmount,
 					})),
 				});
-				printThermalReceipt(document);
+				await printThermalReceipt(document);
 			}
 			setFeedbackMessage("La comanda fue enviada a cocina.");
 		} catch (error) {
@@ -204,7 +211,9 @@ function RestaurantsPage() {
 			});
 		} catch (error) {
 			setFeedbackMessage(
-				error instanceof Error ? error.message : "No se pudo actualizar el ítem.",
+				error instanceof Error
+					? error.message
+					: "No se pudo actualizar el ítem.",
 			);
 		}
 	};
@@ -238,7 +247,9 @@ function RestaurantsPage() {
 			});
 		} catch (error) {
 			setFeedbackMessage(
-				error instanceof Error ? error.message : "No se pudo actualizar el estado.",
+				error instanceof Error
+					? error.message
+					: "No se pudo actualizar el estado.",
 			);
 		}
 	};
@@ -327,7 +338,9 @@ function RestaurantsPage() {
 											>
 												<div className="flex items-center justify-between gap-3">
 													<div className="min-w-0">
-														<div className="truncate font-medium">{table.name}</div>
+														<div className="truncate font-medium">
+															{table.name}
+														</div>
 														<div className="mt-1 text-xs text-gray-400">
 															{table.seats > 0
 																? `${table.seats} puestos`
@@ -338,7 +351,9 @@ function RestaurantsPage() {
 														{table.openOrder ? (
 															<>
 																<div>Orden #{table.openOrder.orderNumber}</div>
-																<div>{formatCurrency(table.openOrder.totalAmount)}</div>
+																<div>
+																	{formatCurrency(table.openOrder.totalAmount)}
+																</div>
 															</>
 														) : (
 															<div>Libre</div>
@@ -358,7 +373,9 @@ function RestaurantsPage() {
 					<Card className="border-gray-800 bg-[var(--color-carbon)] shadow-none">
 						<CardHeader className="border-b border-gray-800 pb-4">
 							<CardTitle className="text-base">
-								{selectedTable ? `${selectedTable.name} · ${selectedTable.areaName}` : "Selecciona una mesa"}
+								{selectedTable
+									? `${selectedTable.name} · ${selectedTable.areaName}`
+									: "Selecciona una mesa"}
 							</CardTitle>
 						</CardHeader>
 						<CardContent className="space-y-6 pt-5">
@@ -373,7 +390,9 @@ function RestaurantsPage() {
 												type="number"
 												min={0}
 												value={guestCountInput}
-												onChange={(event) => setGuestCountInput(event.target.value)}
+												onChange={(event) =>
+													setGuestCountInput(event.target.value)
+												}
 												autoComplete="off"
 												className="border-gray-700 bg-black/20"
 											/>
@@ -393,10 +412,14 @@ function RestaurantsPage() {
 											<Button
 												type="button"
 												onClick={handleSaveOrderMeta}
-												disabled={!openOrder || updateOrderMetaMutation.isPending}
+												disabled={
+													!openOrder || updateOrderMetaMutation.isPending
+												}
 												className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
 											>
-												{updateOrderMetaMutation.isPending ? "Guardando…" : "Guardar"}
+												{updateOrderMetaMutation.isPending
+													? "Guardando…"
+													: "Guardar"}
 											</Button>
 										</div>
 									</div>
@@ -404,12 +427,16 @@ function RestaurantsPage() {
 									<section>
 										<div className="mb-3 flex flex-wrap items-end gap-3">
 											<div className="grid min-w-[220px] flex-1 gap-2">
-												<Label htmlFor="restaurantSearch">Buscar producto</Label>
+												<Label htmlFor="restaurantSearch">
+													Buscar producto
+												</Label>
 												<Input
 													id="restaurantSearch"
 													name="restaurantSearch"
 													value={searchQuery}
-													onChange={(event) => setSearchQuery(event.target.value)}
+													onChange={(event) =>
+														setSearchQuery(event.target.value)
+													}
 													placeholder="Nombre, SKU o código…"
 													autoComplete="off"
 													className="border-gray-700 bg-black/20"
@@ -421,12 +448,19 @@ function RestaurantsPage() {
 													id="restaurantCategory"
 													name="restaurantCategory"
 													value={activeCategoryId}
-													onChange={(event) => setActiveCategoryId(event.target.value)}
+													onChange={(event) =>
+														setActiveCategoryId(event.target.value)
+													}
 													className="w-[180px]"
 												>
-													<NativeSelectOption value="all">Todas</NativeSelectOption>
+													<NativeSelectOption value="all">
+														Todas
+													</NativeSelectOption>
 													{bootstrap.categories.map((category) => (
-														<NativeSelectOption key={category.id} value={category.id}>
+														<NativeSelectOption
+															key={category.id}
+															value={category.id}
+														>
 															{category.name}
 														</NativeSelectOption>
 													))}
@@ -634,19 +668,22 @@ function RestaurantsPage() {
 														id="paymentMethod"
 														name="paymentMethod"
 														value={paymentMethod}
-														onChange={(event) => setPaymentMethod(event.target.value)}
+														onChange={(event) =>
+															setPaymentMethod(event.target.value)
+														}
 													>
 														{bootstrap.settings.paymentMethods.map((method) => (
-															<NativeSelectOption key={method.id} value={method.id}>
+															<NativeSelectOption
+																key={method.id}
+																value={method.id}
+															>
 																{method.label}
 															</NativeSelectOption>
 														))}
 													</NativeSelect>
 												</div>
 												<div className="grid gap-2">
-													<Label htmlFor="paymentReference">
-														Referencia
-													</Label>
+													<Label htmlFor="paymentReference">Referencia</Label>
 													<Input
 														id="paymentReference"
 														name="paymentReference"
@@ -665,11 +702,14 @@ function RestaurantsPage() {
 												onClick={handleCloseOrder}
 												disabled={
 													closeOrderMutation.isPending ||
-													(requiresReference && paymentReference.trim().length === 0)
+													(requiresReference &&
+														paymentReference.trim().length === 0)
 												}
 												className="w-full bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]"
 											>
-												{closeOrderMutation.isPending ? "Cobrando…" : "Cobrar Mesa"}
+												{closeOrderMutation.isPending
+													? "Cobrando…"
+													: "Cobrar Mesa"}
 											</Button>
 										</div>
 									) : (

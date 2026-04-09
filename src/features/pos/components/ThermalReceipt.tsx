@@ -25,6 +25,19 @@ export type ThermalReceiptTotal = {
 	emphasis?: boolean;
 };
 
+export type ThermalReceiptProps = {
+	businessName?: string;
+	title: string;
+	documentLabel?: string;
+	issuedAtLabel: string;
+	statusLabel?: string;
+	infoLines?: ThermalReceiptInfoLine[];
+	items?: ThermalReceiptItem[];
+	payments?: ThermalReceiptPayment[];
+	totals: ThermalReceiptTotal[];
+	footerLines?: string[];
+};
+
 export function ThermalReceipt({
 	businessName = "Zentro",
 	title,
@@ -36,18 +49,7 @@ export function ThermalReceipt({
 	payments = [],
 	totals,
 	footerLines = ["Gracias por su compra"],
-}: {
-	businessName?: string;
-	title: string;
-	documentLabel?: string;
-	issuedAtLabel: string;
-	statusLabel?: string;
-	infoLines?: ThermalReceiptInfoLine[];
-	items?: ThermalReceiptItem[];
-	payments?: ThermalReceiptPayment[];
-	totals: ThermalReceiptTotal[];
-	footerLines?: string[];
-}) {
+}: ThermalReceiptProps) {
 	const visibleInfoLines = (infoLines ?? []).filter((line) =>
 		Boolean(line.value),
 	);

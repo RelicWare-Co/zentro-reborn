@@ -90,7 +90,7 @@ export function SaleDetailSheet({
 			return;
 		}
 
-		printThermalReceipt(
+		void printThermalReceipt(
 			buildSaleReceiptDocument({
 				...buildSaleReceiptPayload(sale),
 				paymentMethodLabels,
@@ -104,7 +104,7 @@ export function SaleDetailSheet({
 				return;
 			}
 
-			printThermalReceipt(
+			void printThermalReceipt(
 				buildPaymentReceiptDocument({
 					...buildPaymentReceiptPayload({
 						sale,
@@ -572,7 +572,7 @@ function CreditPaymentSection({
 						0,
 					);
 
-					printThermalReceipt(
+					void printThermalReceipt(
 						buildPaymentReceiptDocument({
 							paymentId: result.paymentId,
 							saleId: sale.id,

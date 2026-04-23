@@ -416,6 +416,41 @@ describe("products.server", () => {
 		}
 	});
 
+	test("allows recreating a product with the same barcode or sku after soft delete", async () => {
+		const { ctx, server } = await setupProductsServer();
+		try {
+			const { id: productId } =
+				await server.createProductForCurrentOrganization({
+					name: "Producto Original",
+					price: 1000,
+					barcode: "123456789",
+					sku: "SKU-001",
+				});
+
+			await server.deleteProductForCurrentOrganization(productId);
+
+			const { id: newProductId } =
+				await server.createProductForCurrentOrganization({
+					name: "Producto Nuevo",
+					price: 2000,
+					barcode: "123456789",
+					sku: "SKU-001",
+				});
+
+			const [newProduct] = await ctx.db
+				.select()
+				.from(schema.product)
+				.where(eq(schema.product.id, newProductId))
+				.limit(1);
+
+			expect(newProduct).toBeDefined();
+			expect(newProduct?.barcode).toBe("123456789");
+			expect(newProduct?.sku).toBe("SKU-001");
+		} finally {
+			ctx.cleanup();
+		}
+	});
+
 	test("requires an active organization instead of falling back to another membership", async () => {
 		const ctx = await createBackendTestContext("products-no-active-org");
 		mockBackendRuntime({

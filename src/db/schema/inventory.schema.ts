@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
 	index,
 	integer,
@@ -52,10 +52,12 @@ export const product = sqliteTable(
 	(table) => [
 		index("product_organizationId_idx").on(table.organizationId),
 		index("product_categoryId_idx").on(table.categoryId),
-		uniqueIndex("product_org_barcode_uidx").on(
-			table.organizationId,
-			table.barcode,
-		),
+		uniqueIndex("product_org_barcode_uidx")
+			.on(table.organizationId, table.barcode)
+			.where(sql`deleted_at is null`),
+		uniqueIndex("product_org_sku_uidx")
+			.on(table.organizationId, table.sku)
+			.where(sql`deleted_at is null`),
 	],
 );
 

@@ -315,7 +315,7 @@ function PosPage() {
 		!checkout.isCheckoutModalOpen;
 
 	return (
-		<div className="flex flex-col h-full w-full bg-[var(--color-void)] text-[var(--color-photon)] overflow-hidden">
+		<div className="flex flex-col h-[calc(100dvh-4rem)] md:h-[100dvh] w-full bg-[var(--color-void)] text-[var(--color-photon)] overflow-hidden">
 			{/* Header */}
 			<PosHeader
 				activeShift={activeShift}

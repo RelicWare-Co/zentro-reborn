@@ -3,6 +3,7 @@ import {
 	ArrowRight,
 	Building2,
 	Loader2,
+	LogOut,
 	Mail,
 	Plus,
 	ShieldAlert,
@@ -244,6 +245,22 @@ export function OrganizationSelection() {
 	return (
 		<div className="app-safe-area flex min-h-[100dvh] w-full items-center justify-center bg-[var(--color-void)] text-[var(--color-photon)]">
 			<div className="w-full max-w-6xl space-y-8 px-4 py-8 md:px-8">
+				<div className="flex items-start justify-end">
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={async () => {
+							await authClient.signOut();
+							await router.navigate({ to: "/login" });
+						}}
+						className="border-gray-700 bg-transparent text-gray-300 hover:bg-white/5 hover:text-white"
+					>
+						<LogOut className="mr-2 h-4 w-4" />
+						Cerrar sesión
+					</Button>
+				</div>
+
 				<div className="space-y-3 text-center">
 					<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">
 						Acceso a organizaciones

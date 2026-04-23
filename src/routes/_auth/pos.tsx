@@ -374,7 +374,7 @@ function PosPage() {
 				/>
 			</div>
 
-			<div className="sticky bottom-0 z-20 border-t border-gray-800 bg-[var(--color-carbon)]/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 backdrop-blur md:hidden">
+			<div className="shrink-0 z-20 border-t border-gray-800 bg-[var(--color-carbon)]/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 backdrop-blur md:hidden">
 				<Button
 					type="button"
 					variant="outline"

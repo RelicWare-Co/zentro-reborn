@@ -1,7 +1,7 @@
 import { Search, X } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { cn } from "@/lib/utils";
 import type { Category, Product } from "../types";
 import { CategoryTabs } from "./CategoryTabs";
@@ -215,7 +215,7 @@ export function ProductGrid({
 	return (
 		<div
 			className={cn(
-				"flex-1 flex flex-col min-w-0 border-r border-gray-800",
+				"flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden border-r border-gray-800",
 				className,
 			)}
 		>
@@ -349,7 +349,7 @@ export function ProductGrid({
 				/>
 			</div>
 
-			<ScrollArea className="flex-1 min-h-0 bg-[#0a0a0a] p-4">
+			<div className="flex-1 min-h-0 overflow-y-auto bg-[#0a0a0a] p-4">
 				<div className="space-y-6 pb-24 md:pb-6 h-fit">
 					<div className="grid grid-cols-2 gap-3 [&>*]:h-fit md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
 						{regularProducts.map((product) => {
@@ -381,7 +381,7 @@ export function ProductGrid({
 						</div>
 					)}
 				</div>
-			</ScrollArea>
+			</div>
 		</div>
 	);
 }

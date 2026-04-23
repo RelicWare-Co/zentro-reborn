@@ -1,6 +1,6 @@
 import { Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { cn } from "@/lib/utils";
 import type { CartItem, CartTotals } from "../types";
 import { formatCurrency } from "../utils";
@@ -37,7 +37,7 @@ export function CartPanel({
 	return (
 		<div
 			className={cn(
-				"w-[380px] bg-[var(--color-carbon)] flex flex-col shrink-0 border-l border-gray-800",
+				"w-[380px] bg-[var(--color-carbon)] flex flex-col shrink-0 min-h-0 overflow-hidden border-l border-gray-800",
 				className,
 			)}
 		>
@@ -62,7 +62,7 @@ export function CartPanel({
 			</div>
 
 			{/* Items */}
-			<ScrollArea className="flex-1 px-2 py-1 min-h-0 bg-[#0f0f0f]">
+			<div className="flex-1 min-h-0 overflow-y-auto px-2 py-1 bg-[#0f0f0f]">
 				<div className="space-y-1 py-2">
 					{cart.map((item) => (
 						<CartItemCard
@@ -83,7 +83,7 @@ export function CartPanel({
 						</div>
 					)}
 				</div>
-			</ScrollArea>
+			</div>
 
 			{/* Payment Summary */}
 			<div className="p-4 bg-[#0a0a0a] border-t border-gray-800 shrink-0">

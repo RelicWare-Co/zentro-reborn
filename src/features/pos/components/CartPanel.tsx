@@ -37,7 +37,7 @@ export function CartPanel({
 	return (
 		<div
 			className={cn(
-				"w-[380px] bg-[var(--color-carbon)] flex flex-col shrink-0 h-full border-l border-gray-800",
+				"w-[380px] bg-[var(--color-carbon)] flex flex-col shrink-0 border-l border-gray-800",
 				className,
 			)}
 		>

@@ -215,7 +215,7 @@ export function ProductGrid({
 	return (
 		<div
 			className={cn(
-				"flex-1 flex flex-col min-w-0 border-r border-gray-800 h-full",
+				"flex-1 flex flex-col min-w-0 border-r border-gray-800",
 				className,
 			)}
 		>

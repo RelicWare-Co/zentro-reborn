@@ -22,6 +22,7 @@ import {
 	registerCashMovement,
 	searchPosCustomers,
 	searchPosProducts,
+	toggleProductFavorite,
 } from "../pos.functions";
 import type { PosBootstrap, SaleDetail, SaleListResult } from "../types";
 
@@ -364,6 +365,20 @@ export function useCreateCustomerMutation() {
 			}),
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: ["pos-customers"] });
+		},
+	});
+}
+
+export function useToggleProductFavoriteMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (productId: string) =>
+			toggleProductFavorite({
+				data: { productId },
+			}),
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({ queryKey: ["pos-products"] });
 		},
 	});
 }

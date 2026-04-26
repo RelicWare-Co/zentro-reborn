@@ -13,6 +13,7 @@ import {
 	registerCashMovementForCurrentOrganization,
 	searchPosCustomersForCurrentOrganization,
 	searchPosProductsForCurrentOrganization,
+	toggleProductFavoriteForCurrentOrganization,
 } from "./pos.server";
 
 const nullableString = z.string().trim().optional().nullable();
@@ -162,6 +163,10 @@ const shiftSummaryInputSchema = z.object({
 	shiftId: z.string().trim().min(1),
 });
 
+const toggleProductFavoriteInputSchema = z.object({
+	productId: z.string().trim().min(1),
+});
+
 export const getPosBootstrap = createServerFn({ method: "GET" }).handler(
 	async () => {
 		return getPosBootstrapForCurrentOrganization();
@@ -271,4 +276,12 @@ export const createPosSale = createServerFn({ method: "POST" })
 	.inputValidator(createPosSaleInputSchema)
 	.handler(async ({ data }) => {
 		return createPosSaleForCurrentOrganization(data);
+	});
+
+export const toggleProductFavorite = createServerFn({ method: "POST" })
+	.inputValidator(toggleProductFavoriteInputSchema)
+	.handler(async ({ data }) => {
+		return toggleProductFavoriteForCurrentOrganization({
+			productId: data.productId,
+		});
 	});

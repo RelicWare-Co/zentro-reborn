@@ -46,6 +46,9 @@ export const product = sqliteTable(
 			.default(true)
 			.notNull(),
 		stock: integer("stock").default(0).notNull(), // Cache del stock actual
+		isFavorite: integer("is_favorite", { mode: "boolean" })
+			.default(false)
+			.notNull(),
 		deletedAt: integer("deleted_at", { mode: "timestamp_ms" }), // Soft delete: null = activo, fecha = eliminado
 		createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 	},

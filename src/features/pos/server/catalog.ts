@@ -61,8 +61,17 @@ export async function searchPosProductsForCurrentOrganization(input: {
 		end`
 		: null;
 	const productOrderBy = searchRank
-		? [asc(searchRank), asc(product.name), asc(product.id)]
-		: [asc(product.name), asc(product.id)];
+		? [
+				sql`case when ${product.isFavorite} = 1 then 0 else 1 end`,
+				asc(searchRank),
+				asc(product.name),
+				asc(product.id),
+			]
+		: [
+				sql`case when ${product.isFavorite} = 1 then 0 else 1 end`,
+				asc(product.name),
+				asc(product.id),
+			];
 
 	const clauses = [
 		eq(product.organizationId, organizationId),
@@ -92,6 +101,7 @@ export async function searchPosProductsForCurrentOrganization(input: {
 				trackInventory: product.trackInventory,
 				stock: product.stock,
 				isModifier: product.isModifier,
+				isFavorite: product.isFavorite,
 			})
 			.from(product)
 			.leftJoin(
@@ -122,6 +132,50 @@ export async function searchPosProductsForCurrentOrganization(input: {
 		total: normalizeCount(totalRows[0]?.total),
 		nextCursor: rows.length > limit ? cursor + limit : null,
 	};
+}
+
+export async function toggleProductFavoriteForCurrentOrganization(input: {
+	productId: string;
+}) {
+	const { organizationId } = await requireAuthContext();
+
+	if (!organizationId) {
+		throw new Error("No se pudo identificar la organización");
+	}
+
+	const [targetProduct] = await db
+		.select({
+			id: product.id,
+			isFavorite: product.isFavorite,
+		})
+		.from(product)
+		.where(
+			and(
+				eq(product.id, input.productId),
+				eq(product.organizationId, organizationId),
+				isNull(product.deletedAt),
+			),
+		)
+		.limit(1);
+
+	if (!targetProduct) {
+		throw new Error("Producto no encontrado");
+	}
+
+	const newIsFavorite = !targetProduct.isFavorite;
+
+	await db
+		.update(product)
+		.set({ isFavorite: newIsFavorite })
+		.where(
+			and(
+				eq(product.id, input.productId),
+				eq(product.organizationId, organizationId),
+				isNull(product.deletedAt),
+			),
+		);
+
+	return { success: true, isFavorite: newIsFavorite };
 }
 
 export async function searchPosCustomersForCurrentOrganization(input: {

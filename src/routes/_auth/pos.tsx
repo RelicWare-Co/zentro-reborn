@@ -29,6 +29,7 @@ import {
 	useCreditAccounts,
 	usePosCustomers,
 	usePosProducts,
+	useToggleProductFavoriteMutation,
 } from "@/features/pos/hooks";
 import { useCreateCustomerModal } from "@/features/pos/hooks/useCreateCustomerModal";
 import { useModifierModal } from "@/features/pos/hooks/useModifierModal";
@@ -75,6 +76,7 @@ function PosPage() {
 		usePosProducts(activeCategoryId, deferredSearchQuery);
 	const { data: customerSearchResult } = usePosCustomers();
 	const { data: creditAccountsSearchResult } = useCreditAccounts();
+	const toggleFavoriteMutation = useToggleProductFavoriteMutation();
 
 	// Derived data
 	const activeShift = bootstrap.activeShift;
@@ -358,6 +360,10 @@ function PosPage() {
 					onClearSearch={clearSearchQuery}
 					onBarcodeScan={handleBarcodeScan}
 					onProductSelect={handleProductSelect}
+				onToggleFavorite={(productId) => {
+					toggleFavoriteMutation.mutate(productId);
+				}}
+				isTogglingFavorite={toggleFavoriteMutation.isPending}
 				/>
 
 				<CartPanel

@@ -134,6 +134,7 @@ export async function getProductsForCurrentOrganization() {
 			stock: product.stock,
 			trackInventory: product.trackInventory,
 			isModifier: product.isModifier,
+			isFavorite: product.isFavorite,
 			createdAt: product.createdAt,
 		})
 		.from(product)

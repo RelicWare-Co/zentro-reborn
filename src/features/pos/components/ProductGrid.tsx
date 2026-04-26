@@ -25,6 +25,8 @@ interface ProductGridProps {
 	onClearSearch: () => void;
 	onBarcodeScan: (value: string) => Promise<boolean> | boolean;
 	onProductSelect: (product: Product) => void;
+	onToggleFavorite?: (productId: string) => void;
+	isTogglingFavorite?: boolean;
 	className?: string;
 }
 
@@ -42,6 +44,8 @@ export function ProductGrid({
 	onClearSearch,
 	onBarcodeScan,
 	onProductSelect,
+	onToggleFavorite,
+	isTogglingFavorite,
 	className,
 }: ProductGridProps) {
 	const regularProducts = products.filter((product) => !product.isModifier);
@@ -364,6 +368,8 @@ export function ProductGrid({
 									isOutOfStock={isOutOfStock}
 									isActiveShift={isActiveShift}
 									onSelect={() => onProductSelect(product)}
+									onToggleFavorite={onToggleFavorite}
+									isTogglingFavorite={isTogglingFavorite}
 								/>
 							);
 						})}

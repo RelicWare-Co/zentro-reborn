@@ -14,5 +14,6 @@ export {
 	useRegisterCashMovementMutation,
 	useRegisterCreditPaymentMutation,
 	useShiftCloseSummary,
+	useToggleProductFavoriteMutation,
 } from "./usePosQueries";
 export { usePosShift } from "./usePosShift";

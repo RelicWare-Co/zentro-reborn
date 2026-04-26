@@ -3,6 +3,7 @@ import "@tanstack/react-start/server-only";
 export {
 	searchPosCustomersForCurrentOrganization,
 	searchPosProductsForCurrentOrganization,
+	toggleProductFavoriteForCurrentOrganization,
 } from "./server/catalog";
 export {
 	cancelSaleForCurrentOrganization,

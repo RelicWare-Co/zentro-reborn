@@ -273,6 +273,7 @@ export async function getOrganizationManagementDataForCurrentOrganization() {
 			createdAt: toTimestamp(organizationRow.createdAt),
 		},
 		viewer: {
+			userId: session.user.id,
 			role: currentMember.role,
 			canManageAccess: isOrganizationManagerRole(currentMember.role),
 		},

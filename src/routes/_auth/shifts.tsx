@@ -437,8 +437,8 @@ function ShiftsPage() {
 	const rangeEnd = totalResults === 0 ? 0 : cursor + shifts.length;
 
 	return (
-		<main className="flex-1 space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12 font-sans">
-			<div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+		<main className="flex-1 flex flex-col space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12 font-sans min-h-0">
+			<div className="shrink-0 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
 				<div className="flex items-baseline gap-3">
 					<h1 className="text-3xl font-bold tracking-tight text-white">
 						Turnos y cierres de caja
@@ -469,7 +469,7 @@ function ShiftsPage() {
 				</div>
 			</div>
 
-			<div className="mb-6 grid gap-3 grid-cols-2 lg:grid-cols-4">
+			<div className="shrink-0 grid gap-3 grid-cols-2 lg:grid-cols-4">
 				<CompactMetricCard
 					title="Turnos cargados"
 					value={formatCount(shifts.length)}
@@ -492,8 +492,8 @@ function ShiftsPage() {
 				/>
 			</div>
 
-			<div className="overflow-x-auto rounded-xl border border-gray-800 bg-[var(--color-carbon)]">
-				<div className="flex flex-col gap-4 border-b border-gray-800 p-4 lg:flex-row lg:items-center lg:justify-between">
+			<div className="flex-1 flex flex-col min-h-0 overflow-hidden rounded-xl border border-gray-800 bg-[var(--color-carbon)]">
+				<div className="shrink-0 flex flex-col gap-4 border-b border-gray-800 p-4 lg:flex-row lg:items-center lg:justify-between">
 					<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center w-full">
 						<div className="relative w-full sm:max-w-xs md:max-w-sm">
 							<Search
@@ -645,7 +645,7 @@ function ShiftsPage() {
 					</div>
 				</div>
 
-				<div className="p-4 pt-4">
+				<div className="flex-1 overflow-y-auto min-h-0 p-4">
 					<div className="space-y-4">
 						{shifts.length > 0 ? (
 							shifts.map((shift) => (
@@ -885,57 +885,57 @@ function ShiftsPage() {
 							</div>
 						)}
 					</div>
+				</div>
 
-					<div className="flex flex-col items-center justify-between gap-4 border-t border-gray-800 bg-black/10 p-4 text-sm text-gray-400 sm:flex-row -mx-4 -mb-4 mt-4">
-						<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-start">
-							<div className="flex items-center gap-2">
-								<span>Mostrar</span>
-								<Select
-									value={`${pageSize}`}
-									onValueChange={(value) => {
-										updatePagination(0, Number(value));
-									}}
-								>
-									<SelectTrigger className="h-8 w-[70px] rounded-md border-gray-700 bg-[var(--color-carbon)] text-white">
-										<SelectValue placeholder={pageSize} />
-									</SelectTrigger>
-									<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
-										{[10, 20, 30, 40, 50].map((size) => (
-											<SelectItem key={size} value={`${size}`}>
-												{size}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-								<span>filas</span>
-							</div>
-							<div className="hidden sm:block tabular-nums">
-								{rangeStart}-{rangeEnd} de {totalResults}
-							</div>
+				<div className="shrink-0 flex flex-col items-center justify-between gap-4 border-t border-gray-800 bg-black/10 p-4 text-sm text-gray-400 sm:flex-row">
+					<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-start">
+						<div className="flex items-center gap-2">
+							<span>Mostrar</span>
+							<Select
+								value={`${pageSize}`}
+								onValueChange={(value) => {
+									updatePagination(0, Number(value));
+								}}
+							>
+								<SelectTrigger className="h-8 w-[70px] rounded-md border-gray-700 bg-[var(--color-carbon)] text-white">
+									<SelectValue placeholder={pageSize} />
+								</SelectTrigger>
+								<SelectContent className="border-gray-800 bg-[var(--color-carbon)] text-white">
+									{[10, 20, 30, 40, 50].map((size) => (
+										<SelectItem key={size} value={`${size}`}>
+											{size}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							<span>filas</span>
 						</div>
+						<div className="hidden sm:block tabular-nums">
+							{rangeStart}-{rangeEnd} de {totalResults}
+						</div>
+					</div>
 
-						<div className="flex w-full items-center justify-end gap-2 sm:w-auto">
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								disabled={cursor <= 0}
-								onClick={() => updatePagination(Math.max(cursor - pageSize, 0))}
-								className="h-8 rounded-md border-gray-700 bg-[var(--color-carbon)] px-3 text-gray-300 hover:bg-white/5 hover:text-white"
-							>
-								Anterior
-							</Button>
-							<Button
-								type="button"
-								variant="default"
-								size="sm"
-								disabled={!nextCursor}
-								onClick={() => nextCursor && updatePagination(nextCursor)}
-								className="h-8 rounded-md border-none bg-[var(--color-voltage)] px-4 font-medium text-black hover:bg-[#c9e605]"
-							>
-								Siguiente
-							</Button>
-						</div>
+					<div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							disabled={cursor <= 0}
+							onClick={() => updatePagination(Math.max(cursor - pageSize, 0))}
+							className="h-8 rounded-md border-gray-700 bg-[var(--color-carbon)] px-3 text-gray-300 hover:bg-white/5 hover:text-white"
+						>
+							Anterior
+						</Button>
+						<Button
+							type="button"
+							variant="default"
+							size="sm"
+							disabled={!nextCursor}
+							onClick={() => nextCursor && updatePagination(nextCursor)}
+							className="h-8 rounded-md border-none bg-[var(--color-voltage)] px-4 font-medium text-black hover:bg-[#c9e605]"
+						>
+							Siguiente
+						</Button>
 					</div>
 				</div>
 			</div>

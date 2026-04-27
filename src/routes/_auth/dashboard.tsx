@@ -83,7 +83,7 @@ function DashboardPage() {
 		null;
 
 	return (
-		<main className="flex-1 space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12 font-sans">
+		<main className="flex-1 space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12 font-sans overflow-y-auto">
 			<div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
 				<div className="flex items-baseline gap-3">
 					<h1 className="text-3xl font-bold tracking-tight text-white">

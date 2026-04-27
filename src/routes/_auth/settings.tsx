@@ -178,7 +178,7 @@ function SettingsPage() {
 	};
 
 	return (
-		<main className="flex-1 space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12">
+		<main className="flex-1 space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12 overflow-y-auto">
 			<section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
 				<div className="space-y-3">
 					<Badge className="border-[var(--color-voltage)]/20 bg-[var(--color-voltage)]/10 text-[var(--color-voltage)] hover:bg-[var(--color-voltage)]/10">

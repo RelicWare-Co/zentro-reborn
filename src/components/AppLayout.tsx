@@ -235,9 +235,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 			</aside>
 
 			{/* Main Content */}
-			<div className="flex-1 flex flex-col min-w-0 min-h-[100dvh] overflow-y-auto">
+			<div className="flex-1 flex flex-col min-w-0 h-dvh overflow-hidden">
 				{/* Mobile Header */}
-				<header className="lg:hidden h-16 flex items-center px-4 bg-[var(--color-carbon)] border-b border-gray-800">
+				<header className="lg:hidden shrink-0 h-16 flex items-center px-4 bg-[var(--color-carbon)] border-b border-gray-800">
 					<button
 						type="button"
 						onClick={() => setIsSidebarOpen(true)}

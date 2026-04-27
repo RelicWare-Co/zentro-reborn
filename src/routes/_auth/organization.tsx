@@ -127,7 +127,7 @@ function OrganizationPage() {
 	};
 
 	return (
-		<div className="flex-1 bg-[var(--color-void)] min-h-screen">
+		<div className="flex-1 bg-[var(--color-void)] min-h-0 overflow-y-auto">
 			<div className="mx-auto max-w-7xl min-h-screen flex flex-col">
 				{/* Header */}
 				<header className="border-b border-gray-800 px-6 py-6 md:px-8 lg:px-12 shrink-0">

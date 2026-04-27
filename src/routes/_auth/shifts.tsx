@@ -437,7 +437,7 @@ function ShiftsPage() {
 	const rangeEnd = totalResults === 0 ? 0 : cursor + shifts.length;
 
 	return (
-		<main className="flex flex-col space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12 font-sans overflow-hidden h-[calc(100dvh-4rem)] lg:h-[100dvh]">
+		<main className="flex-1 flex flex-col space-y-6 bg-[var(--color-void)] p-6 text-[var(--color-photon)] md:p-8 lg:p-12 font-sans min-h-0 overflow-hidden">
 			<div className="shrink-0 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
 				<div className="flex items-baseline gap-3">
 					<h1 className="text-3xl font-bold tracking-tight text-white">

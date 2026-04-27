@@ -16,16 +16,16 @@ import {
 } from "#/db/schema";
 import { requireAuthContext } from "#/features/core/auth/auth-context.server";
 import {
-	getEnabledPaymentMethods,
-	parseOrganizationSettingsMetadata,
-} from "#/features/settings/settings.shared";
-import {
 	normalizeOptionalString,
 	normalizeRequiredString,
 	resolveDate,
 	toNonNegativeInteger,
 	toPositiveInteger,
 } from "#/features/pos/server/utils";
+import {
+	getEnabledPaymentMethods,
+	parseOrganizationSettingsMetadata,
+} from "#/features/settings/settings.shared";
 import type { CreateCoreSaleInput } from "./types";
 
 function canSettleCompletedSaleWithCashChange(

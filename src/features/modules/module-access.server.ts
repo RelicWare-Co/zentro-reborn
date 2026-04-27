@@ -29,7 +29,10 @@ async function getModuleAccessEnvironmentForCurrentOrganization() {
 			.from(organizationModuleEntitlement)
 			.where(
 				and(
-					eq(organizationModuleEntitlement.organizationId, access.organizationId),
+					eq(
+						organizationModuleEntitlement.organizationId,
+						access.organizationId,
+					),
 					inArray(organizationModuleEntitlement.moduleKey, MODULE_KEYS),
 				),
 			),
@@ -48,7 +51,9 @@ async function getModuleAccessEnvironmentForCurrentOrganization() {
 }
 
 function resolveModuleAccessState(
-	environment: Awaited<ReturnType<typeof getModuleAccessEnvironmentForCurrentOrganization>>,
+	environment: Awaited<
+		ReturnType<typeof getModuleAccessEnvironmentForCurrentOrganization>
+	>,
 	moduleKey: ModuleKey,
 ): ModuleAccessState {
 	const definition = getModuleDefinition(moduleKey);
@@ -127,7 +132,9 @@ export async function setModuleEntitlementForCurrentOrganization(input: {
 }) {
 	const access = await getCurrentOrganizationAccess();
 	if (!access.isPlatformAdmin) {
-		throw new Error("Esta acción requiere permisos de administrador de la app.");
+		throw new Error(
+			"Esta acción requiere permisos de administrador de la app.",
+		);
 	}
 
 	const now = new Date();

@@ -7,7 +7,6 @@ import {
 	Mail,
 	MoreHorizontal,
 	Pencil,
-	Plus,
 	ShieldCheck,
 	Trash2,
 	UserMinus,
@@ -112,12 +111,17 @@ export const Route = createFileRoute("/_auth/organization")({
 function OrganizationPage() {
 	const loaderData = Route.useLoaderData();
 	const { data = loaderData } = useOrganizationManagement(loaderData);
-	const { data: activeOrganization } = authClient.useActiveOrganization();
+	authClient.useActiveOrganization();
 
 	const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
-	const [feedbackType, setFeedbackType] = useState<"success" | "error">("success");
+	const [feedbackType, setFeedbackType] = useState<"success" | "error">(
+		"success",
+	);
 
-	const setFeedback = (message: string | null, type: "success" | "error" = "success") => {
+	const setFeedback = (
+		message: string | null,
+		type: "success" | "error" = "success",
+	) => {
 		setFeedbackMessage(message);
 		setFeedbackType(type);
 	};
@@ -185,11 +189,17 @@ function OrganizationPage() {
 
 						<Tabs defaultValue="general" className="space-y-6">
 							<TabsList className="bg-[var(--color-carbon)] border border-gray-800">
-								<TabsTrigger value="general" className="data-[state=active]:bg-[var(--color-voltage)]/10 data-[state=active]:text-[var(--color-voltage)]">
+								<TabsTrigger
+									value="general"
+									className="data-[state=active]:bg-[var(--color-voltage)]/10 data-[state=active]:text-[var(--color-voltage)]"
+								>
 									<Building2 className="h-4 w-4 mr-2" />
 									General
 								</TabsTrigger>
-								<TabsTrigger value="members" className="data-[state=active]:bg-[var(--color-voltage)]/10 data-[state=active]:text-[var(--color-voltage)]">
+								<TabsTrigger
+									value="members"
+									className="data-[state=active]:bg-[var(--color-voltage)]/10 data-[state=active]:text-[var(--color-voltage)]"
+								>
 									<Users className="h-4 w-4 mr-2" />
 									Miembros
 									{data.pendingInvitations.length > 0 && (
@@ -198,42 +208,48 @@ function OrganizationPage() {
 										</span>
 									)}
 								</TabsTrigger>
-								<TabsTrigger value="invitations" className="data-[state=active]:bg-[var(--color-voltage)]/10 data-[state=active]:text-[var(--color-voltage)]">
+								<TabsTrigger
+									value="invitations"
+									className="data-[state=active]:bg-[var(--color-voltage)]/10 data-[state=active]:text-[var(--color-voltage)]"
+								>
 									<Mail className="h-4 w-4 mr-2" />
 									Invitaciones
 								</TabsTrigger>
-								<TabsTrigger value="access" className="data-[state=active]:bg-[var(--color-voltage)]/10 data-[state=active]:text-[var(--color-voltage)]">
+								<TabsTrigger
+									value="access"
+									className="data-[state=active]:bg-[var(--color-voltage)]/10 data-[state=active]:text-[var(--color-voltage)]"
+								>
 									<Link2 className="h-4 w-4 mr-2" />
 									Acceso
 								</TabsTrigger>
 							</TabsList>
 
-							<TabsContent value="general" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-								<GeneralTab
-									data={data}
-									setFeedback={setFeedback}
-								/>
+							<TabsContent
+								value="general"
+								className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300"
+							>
+								<GeneralTab data={data} setFeedback={setFeedback} />
 							</TabsContent>
 
-							<TabsContent value="members" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-								<MembersTab
-									data={data}
-									setFeedback={setFeedback}
-								/>
+							<TabsContent
+								value="members"
+								className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300"
+							>
+								<MembersTab data={data} setFeedback={setFeedback} />
 							</TabsContent>
 
-							<TabsContent value="invitations" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-								<InvitationsTab
-									data={data}
-									setFeedback={setFeedback}
-								/>
+							<TabsContent
+								value="invitations"
+								className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300"
+							>
+								<InvitationsTab data={data} setFeedback={setFeedback} />
 							</TabsContent>
 
-							<TabsContent value="access" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-								<AccessTab
-									data={data}
-									setFeedback={setFeedback}
-								/>
+							<TabsContent
+								value="access"
+								className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300"
+							>
+								<AccessTab data={data} setFeedback={setFeedback} />
 							</TabsContent>
 						</Tabs>
 					</div>
@@ -343,9 +359,7 @@ function GeneralTab({
 									value={editSlug}
 									onChange={(e) =>
 										setEditSlug(
-											e.target.value
-												.toLowerCase()
-												.replace(/[^a-z0-9-]/g, ""),
+											e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
 										)
 									}
 									className="border-gray-800 bg-black/30"
@@ -496,9 +510,12 @@ function GeneralTab({
 							</AlertDialogTrigger>
 							<AlertDialogContent className="bg-[var(--color-carbon)] border-gray-800 text-white">
 								<AlertDialogHeader>
-									<AlertDialogTitle>¿Salir de la organización?</AlertDialogTitle>
+									<AlertDialogTitle>
+										¿Salir de la organización?
+									</AlertDialogTitle>
 									<AlertDialogDescription className="text-gray-400">
-										Perderás el acceso a todos los recursos de esta organización.
+										Perderás el acceso a todos los recursos de esta
+										organización.
 									</AlertDialogDescription>
 								</AlertDialogHeader>
 								<AlertDialogFooter>
@@ -557,7 +574,9 @@ function MembersTab({
 			setIsInviteDialogOpen(false);
 		} catch (error) {
 			setFeedback(
-				error instanceof Error ? error.message : "No se pudo enviar la invitación.",
+				error instanceof Error
+					? error.message
+					: "No se pudo enviar la invitación.",
 				"error",
 			);
 		}
@@ -594,7 +613,10 @@ function MembersTab({
 			<div className="flex items-center justify-between">
 				<h2 className="text-lg font-semibold text-white">Miembros Activos</h2>
 				{isManager && (
-					<Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+					<Dialog
+						open={isInviteDialogOpen}
+						onOpenChange={setIsInviteDialogOpen}
+					>
 						<DialogTrigger asChild>
 							<Button className="bg-[var(--color-voltage)] text-black hover:bg-[#d9f15c]">
 								<UserPlus className="h-4 w-4 mr-2" />
@@ -622,10 +644,7 @@ function MembersTab({
 								</div>
 								<div className="space-y-2">
 									<Label>Rol</Label>
-									<Select
-										value={inviteRole}
-										onValueChange={setInviteRole}
-									>
+									<Select value={inviteRole} onValueChange={setInviteRole}>
 										<SelectTrigger className="border-gray-800 bg-black/30">
 											<SelectValue />
 										</SelectTrigger>
@@ -663,7 +682,9 @@ function MembersTab({
 								<TableHead className="text-gray-400">Miembro</TableHead>
 								<TableHead className="text-gray-400">Rol</TableHead>
 								<TableHead className="text-gray-400">Ingreso</TableHead>
-								<TableHead className="text-gray-400 text-right">Acciones</TableHead>
+								<TableHead className="text-gray-400 text-right">
+									Acciones
+								</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
@@ -690,8 +711,7 @@ function MembersTab({
 										</div>
 									</TableCell>
 									<TableCell>
-										{isManager &&
-										memberRow.userId !== data.viewer.userId ? (
+										{isManager && memberRow.userId !== data.viewer.userId ? (
 											<Select
 												value={memberRow.role}
 												onValueChange={(value) =>
@@ -702,18 +722,13 @@ function MembersTab({
 													<SelectValue />
 												</SelectTrigger>
 												<SelectContent>
-													<SelectItem value="member">
-														Miembro
-													</SelectItem>
+													<SelectItem value="member">Miembro</SelectItem>
 													<SelectItem value="admin">Admin</SelectItem>
 													<SelectItem value="owner">Owner</SelectItem>
 												</SelectContent>
 											</Select>
 										) : (
-											<Badge
-												variant="outline"
-												className="text-gray-300"
-											>
+											<Badge variant="outline" className="text-gray-300">
 												{formatOrganizationRoleLabel(memberRow.role)}
 											</Badge>
 										)}
@@ -724,8 +739,7 @@ function MembersTab({
 											: "N/A"}
 									</TableCell>
 									<TableCell className="text-right">
-										{isManager &&
-										memberRow.userId !== data.viewer.userId && (
+										{isManager && memberRow.userId !== data.viewer.userId && (
 											<DropdownMenu>
 												<DropdownMenuTrigger asChild>
 													<Button
@@ -756,8 +770,8 @@ function MembersTab({
 																	¿Eliminar miembro?
 																</AlertDialogTitle>
 																<AlertDialogDescription className="text-gray-400">
-																	{memberRow.name} perderá acceso a
-																	todos los recursos.
+																	{memberRow.name} perderá acceso a todos los
+																	recursos.
 																</AlertDialogDescription>
 															</AlertDialogHeader>
 															<AlertDialogFooter>
@@ -823,7 +837,9 @@ function InvitationsTab({
 
 	return (
 		<div className="space-y-6">
-			<h2 className="text-lg font-semibold text-white">Invitaciones Pendientes</h2>
+			<h2 className="text-lg font-semibold text-white">
+				Invitaciones Pendientes
+			</h2>
 
 			<Card className="border-gray-800 bg-[var(--color-carbon)] shadow-none">
 				<CardContent className="p-0">
@@ -833,7 +849,9 @@ function InvitationsTab({
 								<TableHead className="text-gray-400">Email</TableHead>
 								<TableHead className="text-gray-400">Rol</TableHead>
 								<TableHead className="text-gray-400">Expira</TableHead>
-								<TableHead className="text-gray-400 text-right">Acciones</TableHead>
+								<TableHead className="text-gray-400 text-right">
+									Acciones
+								</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
@@ -846,10 +864,7 @@ function InvitationsTab({
 										{invitation.email}
 									</TableCell>
 									<TableCell>
-										<Badge
-											variant="outline"
-											className="text-gray-300"
-										>
+										<Badge variant="outline" className="text-gray-300">
 											{formatOrganizationRoleLabel(invitation.role)}
 										</Badge>
 									</TableCell>
@@ -877,8 +892,8 @@ function InvitationsTab({
 															¿Cancelar invitación?
 														</AlertDialogTitle>
 														<AlertDialogDescription className="text-gray-400">
-															La invitación enviada a{" "}
-															{invitation.email} será revocada.
+															La invitación enviada a {invitation.email} será
+															revocada.
 														</AlertDialogDescription>
 													</AlertDialogHeader>
 													<AlertDialogFooter>
@@ -986,17 +1001,16 @@ function AccessTab({
 			<div className="grid gap-6 lg:grid-cols-3">
 				<Card className="col-span-2 border-gray-800 bg-[var(--color-carbon)] shadow-none">
 					<CardHeader className="pb-4">
-						<CardTitle className="text-lg">Crear Nuevo Link de Acceso</CardTitle>
+						<CardTitle className="text-lg">
+							Crear Nuevo Link de Acceso
+						</CardTitle>
 						<CardDescription className="text-gray-400">
 							Genera enlaces directos para nuevos miembros
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
 						{data.viewer.canManageAccess ? (
-							<form
-								onSubmit={handleCreateJoinLink}
-								className="space-y-4"
-							>
+							<form onSubmit={handleCreateJoinLink} className="space-y-4">
 								<div className="grid gap-4 sm:grid-cols-2">
 									<div className="space-y-2">
 										<Label htmlFor={labelId}>Referencia</Label>
@@ -1004,9 +1018,7 @@ function AccessTab({
 											id={labelId}
 											name="joinLinkLabel"
 											value={joinLinkLabel}
-											onChange={(event) =>
-												setJoinLinkLabel(event.target.value)
-											}
+											onChange={(event) => setJoinLinkLabel(event.target.value)}
 											placeholder="Ej. Cliente Centro..."
 											autoComplete="off"
 											className="border-gray-800 bg-black/30"
@@ -1053,8 +1065,7 @@ function AccessTab({
 							<Alert className="border-amber-500/20 bg-amber-500/10 text-amber-100">
 								<AlertTitle>Acceso restringido</AlertTitle>
 								<AlertDescription>
-									Solo owners y admins pueden crear o revocar enlaces de
-									acceso.
+									Solo owners y admins pueden crear o revocar enlaces de acceso.
 								</AlertDescription>
 							</Alert>
 						)}
@@ -1074,11 +1085,9 @@ function AccessTab({
 										type="button"
 										variant="outline"
 										onClick={() =>
-											navigator.clipboard
-												.writeText(latestJoinUrl)
-												.then(() => {
-													setFeedback("Enlace copiado nuevamente.");
-												})
+											navigator.clipboard.writeText(latestJoinUrl).then(() => {
+												setFeedback("Enlace copiado nuevamente.");
+											})
 										}
 										className="border-[var(--color-voltage)]/20 bg-black/20 text-white"
 									>
@@ -1108,7 +1117,7 @@ function AccessTab({
 									data.policy.allowOrganizationCreation
 										? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
 										: "border-gray-700 bg-gray-800 text-gray-400"
-									}
+								}
 							>
 								{data.policy.allowOrganizationCreation
 									? "Habilitada"
@@ -1159,9 +1168,7 @@ function AccessTab({
 											<p className="font-medium text-white truncate">
 												{joinLink.label || "Sin referencia"}
 											</p>
-											<JoinLinkStatusBadge
-												status={joinLink.status}
-											/>
+											<JoinLinkStatusBadge status={joinLink.status} />
 										</div>
 										<p className="text-xs text-gray-500">
 											{joinLink.lastUsedAt
@@ -1172,9 +1179,7 @@ function AccessTab({
 											<span className="mx-2 text-gray-700">•</span>
 											Expira:{" "}
 											{joinLink.expiresAt
-												? dateTimeFormatter.format(
-														joinLink.expiresAt,
-													)
+												? dateTimeFormatter.format(joinLink.expiresAt)
 												: "Sin límite"}
 											<span className="mx-2 text-gray-700">•</span>
 											Uso: {joinLink.useCount}/{joinLink.maxUses}
@@ -1185,9 +1190,7 @@ function AccessTab({
 											type="button"
 											variant="outline"
 											size="sm"
-											onClick={() =>
-												handleCopyJoinUrl(joinLink.joinPath)
-											}
+											onClick={() => handleCopyJoinUrl(joinLink.joinPath)}
 											disabled={!isJoinLinkActive(joinLink.status)}
 											className="border-gray-700 bg-transparent text-gray-200 hover:bg-white/5"
 										>
@@ -1199,9 +1202,7 @@ function AccessTab({
 												type="button"
 												variant="outline"
 												size="sm"
-												onClick={() =>
-													handleRevokeJoinLink(joinLink.id)
-												}
+												onClick={() => handleRevokeJoinLink(joinLink.id)}
 												disabled={
 													joinLink.status === "revoked" ||
 													revokeJoinLinkMutation.isPending

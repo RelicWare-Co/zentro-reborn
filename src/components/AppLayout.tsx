@@ -18,8 +18,8 @@ import {
 	Receipt,
 	Settings,
 	Store,
-	UtensilsCrossed,
 	Users,
+	UtensilsCrossed,
 } from "lucide-react";
 import { useState } from "react";
 import { useOrganizationCapabilities } from "@/features/modules/hooks/use-module-access";
@@ -79,7 +79,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 					path: item.path,
 					order: item.order,
 					icon:
-						NAV_ICON_BY_KEY[item.icon as keyof typeof NAV_ICON_BY_KEY] ?? Package,
+						NAV_ICON_BY_KEY[item.icon as keyof typeof NAV_ICON_BY_KEY] ??
+						Package,
 				}))
 		: [];
 	const orderedNavItems = [...navItems, ...moduleNavItems].sort(
@@ -134,9 +135,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 						onClick={() => setIsCollapsed(!isCollapsed)}
 						className="p-2 hidden lg:flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors ml-auto"
 						aria-label={
-							isCollapsed
-								? "Expandir barra lateral"
-								: "Colapsar barra lateral"
+							isCollapsed ? "Expandir barra lateral" : "Colapsar barra lateral"
 						}
 					>
 						{isCollapsed ? (

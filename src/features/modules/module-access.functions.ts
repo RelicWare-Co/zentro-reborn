@@ -1,10 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { MODULE_KEYS } from "./module-registry";
 import {
 	getOrganizationCapabilitiesForCurrentOrganization,
 	setModuleEntitlementForCurrentOrganization,
 } from "./module-access.server";
+import { MODULE_KEYS } from "./module-registry";
 
 export const getOrganizationCapabilities = createServerFn({
 	method: "GET",

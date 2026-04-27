@@ -303,7 +303,7 @@ export function RestaurantModuleSettingsCard(
 								</div>
 
 								<div className="mt-4 space-y-2">
-										{area.tables.map((table: RestaurantTableSummary) => (
+									{area.tables.map((table: RestaurantTableSummary) => (
 										<div
 											key={table.id}
 											className="flex items-center justify-between gap-3 rounded-lg border border-gray-800 px-3 py-2"

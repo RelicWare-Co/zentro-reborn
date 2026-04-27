@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { authClient } from "@/lib/auth-client";
 import {
 	createOrganizationJoinLink,
 	getOrganizationManagementData,
 	getOrganizationSelectionData,
 	revokeOrganizationJoinLink,
 } from "@/features/organization/organization.functions";
+import { authClient } from "@/lib/auth-client";
 
 export const ORGANIZATION_SELECTION_QUERY_KEY = ["organization-selection"];
 export const ORGANIZATION_MANAGEMENT_QUERY_KEY = ["organization-management"];
@@ -81,7 +81,9 @@ export function useInviteMemberMutation() {
 				role: payload.role,
 			});
 			if (result.error) {
-				throw new Error(result.error.message || "No se pudo enviar la invitación.");
+				throw new Error(
+					result.error.message || "No se pudo enviar la invitación.",
+				);
 			}
 			return result.data;
 		},
@@ -102,7 +104,9 @@ export function useRemoveMemberMutation() {
 				memberIdOrEmail: payload.memberIdOrEmail,
 			});
 			if (result.error) {
-				throw new Error(result.error.message || "No se pudo eliminar al miembro.");
+				throw new Error(
+					result.error.message || "No se pudo eliminar al miembro.",
+				);
 			}
 			return result.data;
 		},
@@ -124,7 +128,9 @@ export function useUpdateMemberRoleMutation() {
 				role: payload.role,
 			});
 			if (result.error) {
-				throw new Error(result.error.message || "No se pudo actualizar el rol.");
+				throw new Error(
+					result.error.message || "No se pudo actualizar el rol.",
+				);
 			}
 			return result.data;
 		},
@@ -145,7 +151,9 @@ export function useCancelInvitationMutation() {
 				invitationId: payload.invitationId,
 			});
 			if (result.error) {
-				throw new Error(result.error.message || "No se pudo cancelar la invitación.");
+				throw new Error(
+					result.error.message || "No se pudo cancelar la invitación.",
+				);
 			}
 			return result.data;
 		},
@@ -170,7 +178,9 @@ export function useUpdateOrganizationMutation() {
 				data: payload.data,
 			});
 			if (result.error) {
-				throw new Error(result.error.message || "No se pudo actualizar la organización.");
+				throw new Error(
+					result.error.message || "No se pudo actualizar la organización.",
+				);
 			}
 			return result.data;
 		},
@@ -194,7 +204,9 @@ export function useDeleteOrganizationMutation() {
 				organizationId: payload.organizationId,
 			});
 			if (result.error) {
-				throw new Error(result.error.message || "No se pudo eliminar la organización.");
+				throw new Error(
+					result.error.message || "No se pudo eliminar la organización.",
+				);
 			}
 			return result.data;
 		},
@@ -215,7 +227,9 @@ export function useLeaveOrganizationMutation() {
 				organizationId: payload.organizationId,
 			});
 			if (result.error) {
-				throw new Error(result.error.message || "No se pudo salir de la organización.");
+				throw new Error(
+					result.error.message || "No se pudo salir de la organización.",
+				);
 			}
 			return result.data;
 		},

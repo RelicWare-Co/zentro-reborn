@@ -1,5 +1,5 @@
-import type { ModuleDefinition } from "./module-definition";
 import { restaurantModuleDefinition } from "#/features/restaurants/restaurants.module";
+import type { ModuleDefinition } from "./module-definition";
 
 export const MODULE_REGISTRY = {
 	restaurants: restaurantModuleDefinition,

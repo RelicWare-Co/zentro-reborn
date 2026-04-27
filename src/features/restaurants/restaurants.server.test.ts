@@ -166,7 +166,8 @@ describe("restaurants.server", () => {
 	});
 
 	test("sends an order to kitchen and closes it as a POS sale", async () => {
-		const { ctx, restaurantsServer, shiftsServer } = await setupRestaurantServers();
+		const { ctx, restaurantsServer, shiftsServer } =
+			await setupRestaurantServers();
 		try {
 			await enableRestaurantsModule({
 				db: ctx.db,
@@ -202,10 +203,11 @@ describe("restaurants.server", () => {
 				});
 			const orderId = tableDetail.openOrder?.id;
 			expect(orderId).toBeTruthy();
+			if (!orderId) throw new Error("Expected orderId to be defined");
 
 			const sendResult =
 				await restaurantsServer.sendRestaurantOrderToKitchenForCurrentOrganization(
-					orderId!,
+					orderId,
 				);
 			expect(sendResult.ticket.sequenceNumber).toBe(1);
 			expect(sendResult.ticket.items).toHaveLength(1);
@@ -222,7 +224,7 @@ describe("restaurants.server", () => {
 
 			const saleResult =
 				await restaurantsServer.closeRestaurantOrderForCurrentOrganization({
-					orderId: orderId!,
+					orderId,
 					shiftId: openedShift.id,
 					payments: [{ method: "cash", amount: 24000 }],
 				});
@@ -239,7 +241,7 @@ describe("restaurants.server", () => {
 				.where(
 					and(
 						eq(schema.restaurantOrder.organizationId, ctx.organizationId),
-						eq(schema.restaurantOrder.id, orderId!),
+						eq(schema.restaurantOrder.id, orderId),
 					),
 				)
 				.limit(1);

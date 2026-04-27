@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { OrganizationSettings } from "#/features/settings/settings.shared";
 import { defineModule } from "#/features/modules/module-definition";
+import type { OrganizationSettings } from "#/features/settings/settings.shared";
 
 export const restaurantModuleToggleSettingsSchema = z.object({
 	enabled: z.boolean(),
@@ -34,7 +34,9 @@ export const DEFAULT_RESTAURANT_MODULE_SETTINGS: RestaurantModuleSettings = {
 	},
 };
 
-export function getRestaurantModuleToggleSettings(settings: OrganizationSettings) {
+export function getRestaurantModuleToggleSettings(
+	settings: OrganizationSettings,
+) {
 	return settings.modules.restaurants;
 }
 
@@ -82,7 +84,7 @@ export const restaurantModuleDefinition = defineModule({
 							order: 36,
 							icon: "chef-hat",
 						},
-				  ]
+					]
 				: []),
 		];
 	},

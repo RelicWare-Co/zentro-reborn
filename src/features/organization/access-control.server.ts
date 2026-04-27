@@ -17,7 +17,10 @@ export async function getCurrentOrganizationAccess() {
 			.select({ role: member.role })
 			.from(member)
 			.where(
-				and(eq(member.organizationId, organizationId), eq(member.userId, userId)),
+				and(
+					eq(member.organizationId, organizationId),
+					eq(member.userId, userId),
+				),
 			)
 			.limit(1)
 			.then((rows) => rows[0] ?? null),
@@ -58,7 +61,9 @@ export async function requireOrganizationManagerAccess() {
 export async function requirePlatformAdminAccess() {
 	const access = await getCurrentOrganizationAccess();
 	if (!access.isPlatformAdmin) {
-		throw new Error("Esta acción requiere permisos de administrador de la app.");
+		throw new Error(
+			"Esta acción requiere permisos de administrador de la app.",
+		);
 	}
 
 	return access;

@@ -9,9 +9,12 @@ import {
 	type ModuleKey,
 } from "./module-registry";
 
+export type {
+	ModuleActivationPolicy,
+	ModuleEntitlementStatus,
+	ModuleNavigationItem,
+};
 export { MODULE_KEYS, type ModuleKey };
-export type { ModuleActivationPolicy, ModuleEntitlementStatus };
-export type { ModuleNavigationItem };
 
 export type ModuleAccessState = {
 	key: ModuleKey;

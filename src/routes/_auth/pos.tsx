@@ -360,10 +360,10 @@ function PosPage() {
 					onClearSearch={clearSearchQuery}
 					onBarcodeScan={handleBarcodeScan}
 					onProductSelect={handleProductSelect}
-				onToggleFavorite={(productId) => {
-					toggleFavoriteMutation.mutate(productId);
-				}}
-				isTogglingFavorite={toggleFavoriteMutation.isPending}
+					onToggleFavorite={(productId) => {
+						toggleFavoriteMutation.mutate(productId);
+					}}
+					isTogglingFavorite={toggleFavoriteMutation.isPending}
 				/>
 
 				<CartPanel

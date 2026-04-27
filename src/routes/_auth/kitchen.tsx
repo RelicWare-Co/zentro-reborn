@@ -1,19 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import {
-	getKitchenBoard,
-} from "@/features/restaurants/restaurants.functions";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	useKitchenBoard,
 	useUpdateRestaurantOrderItemStatusMutation,
 } from "@/features/restaurants/hooks/use-restaurants";
+import { getKitchenBoard } from "@/features/restaurants/restaurants.functions";
 
 export const Route = createFileRoute("/_auth/kitchen")({
 	loader: () => getKitchenBoard(),

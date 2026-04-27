@@ -98,7 +98,9 @@ export function ProductCard({
 			{onToggleFavorite && (
 				<button
 					type="button"
-					aria-label={product.isFavorite ? "Quitar de favoritos" : "Agregar a favoritos"}
+					aria-label={
+						product.isFavorite ? "Quitar de favoritos" : "Agregar a favoritos"
+					}
 					aria-pressed={product.isFavorite}
 					disabled={isTogglingFavorite}
 					className={`absolute top-1.5 left-1.5 z-10 p-1 rounded-md hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-voltage)] disabled:opacity-50 disabled:cursor-not-allowed`}

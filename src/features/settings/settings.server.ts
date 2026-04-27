@@ -9,9 +9,7 @@ import {
 	product,
 } from "#/db/schema";
 import { getOrganizationCapabilitiesForCurrentOrganization } from "#/features/modules/module-access.server";
-import {
-	requireOrganizationManagerAccess,
-} from "#/features/organization/access-control.server";
+import { requireOrganizationManagerAccess } from "#/features/organization/access-control.server";
 import { requireAuthContext } from "#/features/pos/server/auth-context";
 import { getRestaurantModuleToggleSettings } from "#/features/restaurants/restaurants.module";
 import { getRestaurantConfigurationForCurrentOrganization } from "#/features/restaurants/restaurants.server";
@@ -144,7 +142,9 @@ export async function updateSettingsForCurrentOrganization(input: {
 			.then((rows) => rows[0] ?? null),
 		getOrganizationCapabilitiesForCurrentOrganization(),
 	]);
-	const currentSettings = parseOrganizationSettingsMetadata(organizationRow?.metadata);
+	const currentSettings = parseOrganizationSettingsMetadata(
+		organizationRow?.metadata,
+	);
 	const normalizedSettings = normalizeOrganizationSettings(input.settings);
 	const isRestaurantToggleChanging =
 		getRestaurantModuleToggleSettings(normalizedSettings).enabled !==

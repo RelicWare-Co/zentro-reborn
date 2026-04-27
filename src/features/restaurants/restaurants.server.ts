@@ -11,14 +11,13 @@ import {
 	restaurantOrderItemModifier,
 	restaurantTable,
 } from "#/db/schema";
+import { createCoreSaleForCurrentOrganization } from "#/features/core/sales/create-sale.server";
+import { requireModuleAccessForCurrentOrganization } from "#/features/modules/module-access.server";
 import {
 	getCurrentOrganizationAccess,
 	requireOrganizationManagerAccess,
 } from "#/features/organization/access-control.server";
-import { createCoreSaleForCurrentOrganization } from "#/features/core/sales/create-sale.server";
-import { requireModuleAccessForCurrentOrganization } from "#/features/modules/module-access.server";
 import { getPosBootstrapForCurrentOrganization } from "#/features/pos/server/shifts";
-import { getRestaurantModuleSettings } from "#/features/restaurants/restaurants.module";
 import {
 	normalizeOptionalString,
 	normalizeRequiredString,
@@ -26,9 +25,12 @@ import {
 	toPositiveInteger,
 	toTimestamp,
 } from "#/features/pos/server/utils";
+import { getRestaurantModuleSettings } from "#/features/restaurants/restaurants.module";
 import { parseOrganizationSettingsMetadata } from "#/features/settings/settings.shared";
 
-type RestaurantTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type RestaurantTransaction = Parameters<
+	Parameters<typeof db.transaction>[0]
+>[0];
 type RestaurantDatabase = typeof db | RestaurantTransaction;
 
 type RestaurantOrderItemDetail = Awaited<
@@ -123,17 +125,15 @@ function groupAreasWithTables(
 		seats: number;
 		sortOrder: number;
 		isActive: boolean;
-		openOrder:
-			| {
-					id: string;
-					orderNumber: number;
-					itemCount: number;
-					totalAmount: number;
-					draftItemsCount: number;
-					readyItemsCount: number;
-					servedItemsCount: number;
-				}
-			| null;
+		openOrder: {
+			id: string;
+			orderNumber: number;
+			itemCount: number;
+			totalAmount: number;
+			draftItemsCount: number;
+			readyItemsCount: number;
+			servedItemsCount: number;
+		} | null;
 	}>,
 ) {
 	const tablesByAreaId = new Map<string, typeof tables>();
@@ -145,12 +145,11 @@ function groupAreasWithTables(
 
 	return areas.map((area) => ({
 		...area,
-		tables:
-			[...(tablesByAreaId.get(area.id) ?? [])].sort(
-				(left, right) =>
-					left.sortOrder - right.sortOrder ||
-					left.name.localeCompare(right.name, "es-CO"),
-			),
+		tables: [...(tablesByAreaId.get(area.id) ?? [])].sort(
+			(left, right) =>
+				left.sortOrder - right.sortOrder ||
+				left.name.localeCompare(right.name, "es-CO"),
+		),
 	}));
 }
 
@@ -588,8 +587,8 @@ async function refreshKitchenTicketStatus(
 	const nextStatus = activeStatuses.every((status) => status === "served")
 		? "served"
 		: activeStatuses.every(
-				(status) => status === "ready" || status === "served",
-			)
+					(status) => status === "ready" || status === "served",
+				)
 			? "ready"
 			: "sent";
 
@@ -612,7 +611,9 @@ export async function getRestaurantConfigurationForCurrentOrganization() {
 	return listRestaurantLayoutForOrganization(access.organizationId);
 }
 
-export async function listRestaurantLayoutForOrganization(organizationId: string) {
+export async function listRestaurantLayoutForOrganization(
+	organizationId: string,
+) {
 	const { areas, tables } = await getLayoutRows(organizationId);
 	return groupAreasWithTables(
 		areas,
@@ -626,24 +627,26 @@ export async function listRestaurantLayoutForOrganization(organizationId: string
 export async function getRestaurantBootstrapForCurrentOrganization() {
 	await requireModuleAccessForCurrentOrganization("restaurants");
 	const access = await getCurrentOrganizationAccess();
-	const [posBootstrap, settings, layoutRows, openOrderRows] = await Promise.all([
-		getPosBootstrapForCurrentOrganization(),
-		getOrganizationSettings(access.organizationId),
-		getLayoutRows(access.organizationId),
-		db
-			.select({
-				id: restaurantOrder.id,
-				tableId: restaurantOrder.tableId,
-				orderNumber: restaurantOrder.orderNumber,
-			})
-			.from(restaurantOrder)
-			.where(
-				and(
-					eq(restaurantOrder.organizationId, access.organizationId),
-					eq(restaurantOrder.status, "open"),
+	const [posBootstrap, settings, layoutRows, openOrderRows] = await Promise.all(
+		[
+			getPosBootstrapForCurrentOrganization(),
+			getOrganizationSettings(access.organizationId),
+			getLayoutRows(access.organizationId),
+			db
+				.select({
+					id: restaurantOrder.id,
+					tableId: restaurantOrder.tableId,
+					orderNumber: restaurantOrder.orderNumber,
+				})
+				.from(restaurantOrder)
+				.where(
+					and(
+						eq(restaurantOrder.organizationId, access.organizationId),
+						eq(restaurantOrder.status, "open"),
+					),
 				),
-			),
-	]);
+		],
+	);
 	const itemGroups = await Promise.all(
 		openOrderRows.map((orderRow) =>
 			getOrderItemsWithModifiers(db, access.organizationId, orderRow.id).then(
@@ -765,9 +768,9 @@ export async function addRestaurantOrderItemForCurrentOrganization(input: {
 	const productId = normalizeRequiredString(input.productId, "productId");
 	const quantity = toPositiveInteger(input.quantity, "quantity");
 	const notes = normalizeOptionalString(input.notes);
-	const modifierProductIds = [...new Set(input.modifierProductIds ?? [])].filter(
-		Boolean,
-	);
+	const modifierProductIds = [
+		...new Set(input.modifierProductIds ?? []),
+	].filter(Boolean);
 
 	return db.transaction(async (tx) => {
 		const database = tx;
@@ -862,7 +865,11 @@ export async function updateRestaurantOrderMetaForCurrentOrganization(input: {
 }) {
 	await requireModuleAccessForCurrentOrganization("restaurants");
 	const access = await getCurrentOrganizationAccess();
-	const order = await getOpenOrderById(db, access.organizationId, input.orderId);
+	const order = await getOpenOrderById(
+		db,
+		access.organizationId,
+		input.orderId,
+	);
 
 	const updates: Partial<typeof restaurantOrder.$inferInsert> = {
 		updatedAt: new Date(),
@@ -890,7 +897,10 @@ export async function updateRestaurantDraftItemForCurrentOrganization(input: {
 	await requireModuleAccessForCurrentOrganization("restaurants");
 	const access = await getCurrentOrganizationAccess();
 	const quantity = toPositiveInteger(input.quantity, "quantity");
-	const notes = input.notes === undefined ? undefined : normalizeOptionalString(input.notes);
+	const notes =
+		input.notes === undefined
+			? undefined
+			: normalizeOptionalString(input.notes);
 
 	const [itemRow] = await db
 		.select({
@@ -926,7 +936,9 @@ export async function updateRestaurantDraftItemForCurrentOrganization(input: {
 	return { success: true, orderId: itemRow.orderId };
 }
 
-export async function deleteRestaurantDraftItemForCurrentOrganization(orderItemId: string) {
+export async function deleteRestaurantDraftItemForCurrentOrganization(
+	orderItemId: string,
+) {
 	await requireModuleAccessForCurrentOrganization("restaurants");
 	const access = await getCurrentOrganizationAccess();
 	const [itemRow] = await db
@@ -982,7 +994,9 @@ export async function deleteRestaurantDraftItemForCurrentOrganization(orderItemI
 	});
 }
 
-export async function sendRestaurantOrderToKitchenForCurrentOrganization(orderId: string) {
+export async function sendRestaurantOrderToKitchenForCurrentOrganization(
+	orderId: string,
+) {
 	await requireModuleAccessForCurrentOrganization("restaurants");
 	const access = await getCurrentOrganizationAccess();
 	const settings = getRestaurantModuleSettings(
@@ -991,7 +1005,11 @@ export async function sendRestaurantOrderToKitchenForCurrentOrganization(orderId
 
 	return db.transaction(async (tx) => {
 		const database = tx;
-		const order = await getOpenOrderById(database, access.organizationId, orderId);
+		const order = await getOpenOrderById(
+			database,
+			access.organizationId,
+			orderId,
+		);
 		const table = await assertTableFromOrganization(
 			database,
 			access.organizationId,
@@ -1154,7 +1172,10 @@ export async function getKitchenBoardForCurrentOrganization() {
 			areaName: restaurantArea.name,
 		})
 		.from(restaurantKitchenTicket)
-		.innerJoin(restaurantOrder, eq(restaurantKitchenTicket.orderId, restaurantOrder.id))
+		.innerJoin(
+			restaurantOrder,
+			eq(restaurantKitchenTicket.orderId, restaurantOrder.id),
+		)
 		.innerJoin(restaurantTable, eq(restaurantOrder.tableId, restaurantTable.id))
 		.innerJoin(restaurantArea, eq(restaurantTable.areaId, restaurantArea.id))
 		.where(
@@ -1233,8 +1254,16 @@ export async function closeRestaurantOrderForCurrentOrganization(input: {
 }) {
 	await requireModuleAccessForCurrentOrganization("restaurants");
 	const access = await getCurrentOrganizationAccess();
-	const order = await getOpenOrderById(db, access.organizationId, input.orderId);
-	const items = await getOrderItemsWithModifiers(db, access.organizationId, order.id);
+	const order = await getOpenOrderById(
+		db,
+		access.organizationId,
+		input.orderId,
+	);
+	const items = await getOrderItemsWithModifiers(
+		db,
+		access.organizationId,
+		order.id,
+	);
 	const activeItems = items.filter((item) => item.status !== "cancelled");
 
 	if (activeItems.length === 0) {
@@ -1309,7 +1338,7 @@ export async function closeRestaurantOrderForCurrentOrganization(input: {
 								inArray(restaurantKitchenTicket.id, ticketIds),
 							),
 						),
-			  ]
+				]
 			: []),
 	]);
 
@@ -1391,7 +1420,11 @@ export async function createRestaurantTableForCurrentOrganization(input: {
 	seats?: number;
 }) {
 	const access = await requireOrganizationManagerAccess();
-	const area = await assertAreaFromOrganization(db, access.organizationId, input.areaId);
+	const area = await assertAreaFromOrganization(
+		db,
+		access.organizationId,
+		input.areaId,
+	);
 	const name = normalizeRequiredString(input.name, "name");
 	const seats = toNonNegativeInteger(input.seats ?? 0, "seats");
 	const now = new Date();

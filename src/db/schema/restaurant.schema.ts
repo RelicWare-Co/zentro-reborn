@@ -1,4 +1,10 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+	index,
+	integer,
+	sqliteTable,
+	text,
+	uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import { organization, user } from "./auth.schema";
 import { product } from "./inventory.schema";
 import { sale } from "./sales.schema";
@@ -116,7 +122,9 @@ export const restaurantKitchenTicket = sqliteTable(
 		printedAt: integer("printed_at", { mode: "timestamp_ms" }),
 	},
 	(table) => [
-		index("restaurantKitchenTicket_organizationId_idx").on(table.organizationId),
+		index("restaurantKitchenTicket_organizationId_idx").on(
+			table.organizationId,
+		),
 		index("restaurantKitchenTicket_orderId_idx").on(table.orderId),
 		uniqueIndex("restaurantKitchenTicket_order_sequence_uidx").on(
 			table.orderId,

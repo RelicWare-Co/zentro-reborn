@@ -33,7 +33,9 @@ function getRestaurantTableDetailQueryKey(tableId: string | null) {
 	return ["restaurant-table-detail", tableId];
 }
 
-export type RestaurantBootstrap = Awaited<ReturnType<typeof getRestaurantBootstrap>>;
+export type RestaurantBootstrap = Awaited<
+	ReturnType<typeof getRestaurantBootstrap>
+>;
 export type RestaurantTableDetail = Awaited<
 	ReturnType<typeof getRestaurantTableDetail>
 >;
@@ -81,7 +83,9 @@ export function useRestaurantTableDetail(
 	});
 }
 
-export function useRestaurantConfiguration(initialData?: RestaurantConfiguration) {
+export function useRestaurantConfiguration(
+	initialData?: RestaurantConfiguration,
+) {
 	return useQuery({
 		queryKey: RESTAURANT_CONFIGURATION_QUERY_KEY,
 		queryFn: () => getRestaurantConfiguration(),
@@ -101,8 +105,9 @@ export function useAddRestaurantOrderItemMutation() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: (payload: Parameters<typeof addRestaurantOrderItem>[0]["data"]) =>
-			addRestaurantOrderItem({ data: payload }),
+		mutationFn: (
+			payload: Parameters<typeof addRestaurantOrderItem>[0]["data"],
+		) => addRestaurantOrderItem({ data: payload }),
 		onSuccess: async () => {
 			await invalidateRestaurantQueries(queryClient);
 		},
@@ -113,8 +118,9 @@ export function useUpdateRestaurantOrderMetaMutation() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: (payload: Parameters<typeof updateRestaurantOrderMeta>[0]["data"]) =>
-			updateRestaurantOrderMeta({ data: payload }),
+		mutationFn: (
+			payload: Parameters<typeof updateRestaurantOrderMeta>[0]["data"],
+		) => updateRestaurantOrderMeta({ data: payload }),
 		onSuccess: async () => {
 			await invalidateRestaurantQueries(queryClient);
 		},
@@ -225,8 +231,9 @@ export function useCreateRestaurantTableMutation() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: (payload: Parameters<typeof createRestaurantTable>[0]["data"]) =>
-			createRestaurantTable({ data: payload }),
+		mutationFn: (
+			payload: Parameters<typeof createRestaurantTable>[0]["data"],
+		) => createRestaurantTable({ data: payload }),
 		onSuccess: async () => {
 			await invalidateRestaurantQueries(queryClient);
 		},
@@ -237,8 +244,9 @@ export function useUpdateRestaurantTableMutation() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: (payload: Parameters<typeof updateRestaurantTable>[0]["data"]) =>
-			updateRestaurantTable({ data: payload }),
+		mutationFn: (
+			payload: Parameters<typeof updateRestaurantTable>[0]["data"],
+		) => updateRestaurantTable({ data: payload }),
 		onSuccess: async () => {
 			await invalidateRestaurantQueries(queryClient);
 		},
@@ -249,8 +257,9 @@ export function useDeleteRestaurantTableMutation() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: (payload: Parameters<typeof deleteRestaurantTable>[0]["data"]) =>
-			deleteRestaurantTable({ data: payload }),
+		mutationFn: (
+			payload: Parameters<typeof deleteRestaurantTable>[0]["data"],
+		) => deleteRestaurantTable({ data: payload }),
 		onSuccess: async () => {
 			await invalidateRestaurantQueries(queryClient);
 		},
